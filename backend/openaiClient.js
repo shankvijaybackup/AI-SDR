@@ -47,6 +47,20 @@ function inferPhase({ transcript, latestUserText }) {
     t.speaker === 'agent' && 
     /what'?s your email|email address|spelled|reach out.*monday|send.*confirmation/i.test(t.text)
   );
+
+  // If the agent is already trying to verify/collect email, stay in email capture
+  const agentAskedForEmail = transcript.some(t =>
+    t.speaker === 'agent' &&
+    /best email|your email|email to reach|have your email as/i.test(t.text)
+  );
+
+  // If the prospect has agreed to a meeting/demo, move into email capture next
+  const meetingAgreed =
+    /let'?s meet|meet next week|schedule|book|demo|send.*times|tuesday|wednesday|thursday|friday|monday/i.test(text) ||
+    transcript.some(t =>
+      t.speaker === 'prospect' &&
+      /let'?s meet|meet next week|schedule|book|demo|send.*times/i.test(t.text)
+    );
   
   const emailConfirmed = transcript.some(t =>
     t.speaker === 'prospect' &&
@@ -56,6 +70,14 @@ function inferPhase({ transcript, latestUserText }) {
   // If email was asked for AND confirmed, move to closing
   if (emailCaptured && emailConfirmed && turnCount >= 8) {
     return "closing";
+  }
+
+  // If meeting is agreed or agent asked for email, switch to email capture (before parsing email text)
+  if (meetingAgreed && turnCount >= 6) {
+    return "email_capture";
+  }
+  if (agentAskedForEmail) {
+    return "email_capture";
   }
 
   // EMAIL CAPTURE: If they're giving email or contact info
@@ -354,7 +376,8 @@ export async function getAiSdrReply({
   latestUserText,
   sttConfidence,
   userId,
-  leadEmail
+  leadEmail,
+  leadRegion
 }) {
   const startTime = Date.now();
   const phase = inferPhase({ transcript, latestUserText });
@@ -423,6 +446,11 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
     userContent += `\n\n[LEAD EMAIL ON FILE]\nThe lead's email is: ${leadEmail}\n\nCRITICAL: Do NOT ask "What's your email?" — we already have it!\nInstead, VERIFY it by saying: "Perfect! I have your email as ${leadEmail}—is that still the best one to reach you?"\nIf they confirm (yes, yep, that works, etc.): Move to closing with "Great, I'll send over some times. Talk soon!"\nIf they give a different email: "Got it, I'll use that one instead. I'll reach out next week!"`;
   } else if (phase === 'email_capture' && !leadEmail) {
     userContent += `\n\n[NO EMAIL ON FILE]\nWe don't have this lead's email. Ask for it: "Perfect! What's the best email to reach you?"`;
+  }
+
+  // Region-specific talking points (ANZ)
+  if (leadRegion && /^(AUSTRALIA|AU|NZ|NEW ZEALAND|ANZ)$/i.test(String(leadRegion).trim())) {
+    userContent += `\n\n[ANZ LOCAL CONTEXT]\nThis lead is in ANZ (Australia/New Zealand).\nIn consultative or pitch, weave in ONE quick mention of the Sydney AI Summit / the State of AI report to make it locally relevant. Do not repeat it more than once.`;
   }
 
   // Add RAG context if available

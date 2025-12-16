@@ -38,6 +38,7 @@ async function initiateCall(req, res) {
       voiceId, // Store the actual ElevenLabs voice ID
       leadName,
       leadEmail: leadEmail || null,
+      region: region || null,
       startTime: new Date(),
       transcript: [],
       userId: req.body.userId || null,

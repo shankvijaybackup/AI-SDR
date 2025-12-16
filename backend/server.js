@@ -315,6 +315,9 @@ app.post("/api/twilio/voice", async (req, res) => {
   const customScript = req.query.script ? decodeURIComponent(req.query.script) : null;
   const voicePersona = req.query.voicePersona || 'female';
 
+  // Bridge metadata from the initiation request into call state (lead email, userId, region)
+  const activeCall = callId ? getActiveCall(callId) : null;
+
   // Extract first line/sentence from script as opening greeting
   let openingScript = "Hi, this is Alex from Atomicwork. How are you doing today?";
   if (customScript) {
@@ -326,11 +329,19 @@ app.post("/api/twilio/voice", async (req, res) => {
   }
 
   initCall(callSid, {
-    script: customScript || "Default sales script",
-    leadName: req.query.leadName || "there",
-    companyName: ""
+    script: (activeCall && activeCall.script) ? activeCall.script : (customScript || "Default sales script"),
+    leadName: (activeCall && activeCall.leadName) ? activeCall.leadName : (req.query.leadName || "there"),
+    companyName: "",
+    userId: (activeCall && activeCall.userId) ? activeCall.userId : null
   });
   updateCall(callSid, { status: "in-progress" });
+
+  if (activeCall) {
+    updateCall(callSid, {
+      leadEmail: activeCall.leadEmail || null,
+      leadRegion: activeCall.region || null
+    });
+  }
 
   console.log(`[Script] Using opening: ${openingScript.substring(0, 80)}...`);
 
@@ -351,7 +362,7 @@ app.post("/api/twilio/voice", async (req, res) => {
     input: "speech",
     action: "/api/twilio/handle-speech",
     method: "POST",
-    timeout: 8,
+    timeout: 12,
     speechTimeout: "auto",
     speechModel: "phone_call",  // Enhanced model for phone calls
     enhanced: true,              // Enable enhanced speech recognition
@@ -360,18 +371,27 @@ app.post("/api/twilio/voice", async (req, res) => {
   });
 
   // Fallback if no speech detected
-  twiml.say({ voice: "Polly.Joanna" }, "Are you still there?");
+  try {
+    const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
+    twiml.play(stillThereUrl);
+  } catch (err) {
+    twiml.pause({ length: 0.2 });
+  }
   twiml.gather({
     input: "speech",
     action: "/api/twilio/handle-speech",
     method: "POST",
-    timeout: 8,
+    timeout: 12,
     speechTimeout: "auto",
     speechModel: "phone_call",
     enhanced: true,
     profanityFilter: false,
     language: "en-US"
   });
+
+  // If no speech is captured even after the second gather, Twilio will continue to the next verb.
+  // Redirect back to handle-speech so we can reprompt without replaying the greeting.
+  twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
 
   res.type("text/xml");
   res.send(twiml.toString());
@@ -405,8 +425,214 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       return res.send(twiml.toString());
     }
 
+    // If Twilio posts back with no speech (silence/timeout), reprompt + listen again.
+    if (!String(speechResult || "").trim()) {
+      try {
+        const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
+        twiml.play(stillThereUrl);
+      } catch (err) {
+        twiml.pause({ length: 0.2 });
+      }
+
+      twiml.gather({
+        input: "speech",
+        action: "/api/twilio/handle-speech",
+        method: "POST",
+        timeout: 12,
+        speechTimeout: "auto",
+        speechModel: "phone_call",
+        enhanced: true,
+        profanityFilter: false,
+        language: "en-US"
+      });
+
+      // Second reprompt + listen, then loop back here.
+      try {
+        const stillThereUrl2 = await synthesizeTTS("Are you still there?", callSid);
+        twiml.play(stillThereUrl2);
+      } catch (err) {
+        twiml.pause({ length: 0.2 });
+      }
+
+      twiml.gather({
+        input: "speech",
+        action: "/api/twilio/handle-speech",
+        method: "POST",
+        timeout: 12,
+        speechTimeout: "auto",
+        speechModel: "phone_call",
+        enhanced: true,
+        profanityFilter: false,
+        language: "en-US"
+      });
+
+      twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
+      res.type("text/xml");
+      return res.send(twiml.toString());
+    }
+
     if (speechResult) {
       addTranscript(callSid, { speaker: "prospect", text: speechResult });
+    }
+
+    // If we just asked to VERIFY an email on file, handle the response deterministically.
+    if (call.leadEmail) {
+      const lastAgentLine = [...(call.transcript || [])]
+        .reverse()
+        .find((t) => t && t.speaker === "agent" && typeof t.text === "string");
+
+      const lastAskedToVerifyEmail =
+        lastAgentLine && /have your email as/i.test(lastAgentLine.text);
+
+      if (lastAskedToVerifyEmail) {
+        const normalized = String(speechResult || "").toLowerCase();
+        const confirmed = /\b(yes|yep|yeah|correct|that's correct|right|sure|exactly)\b/i.test(normalized);
+        const denied = /\b(no|nope|wrong|not correct|that's not)\b/i.test(normalized);
+
+        // Very lightweight email extraction from speech-to-text
+        const candidate = normalized
+          .replace(/\s+at\s+/g, "@")
+          .replace(/\s+dot\s+/g, ".")
+          .replace(/\s+/g, "")
+          .trim();
+        const containsEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(candidate);
+
+        if (confirmed) {
+          const closingLine = "Perfect — I'll send over some times. Talk soon!";
+          addTranscript(callSid, { speaker: "agent", text: closingLine });
+          try {
+            const audioUrl = await synthesizeTTS(closingLine, callSid);
+            console.log(`[AI Reply] Playing: ${audioUrl}`);
+            twiml.play(audioUrl);
+          } catch {
+            twiml.say({ voice: "Polly.Joanna" }, closingLine);
+          }
+          twiml.pause({ length: 1.5 });
+          twiml.hangup();
+          res.type("text/xml");
+          return res.send(twiml.toString());
+        }
+
+        if (denied || containsEmail) {
+          const newEmail = containsEmail ? candidate : null;
+          if (newEmail) {
+            updateCall(callSid, { leadEmail: newEmail });
+          }
+          const usedEmail = newEmail || call.leadEmail;
+          const closingLine = `Got it — I'll use ${usedEmail}. I'll send over some times. Talk soon!`;
+          addTranscript(callSid, { speaker: "agent", text: closingLine });
+          try {
+            const audioUrl = await synthesizeTTS(closingLine, callSid);
+            console.log(`[AI Reply] Playing: ${audioUrl}`);
+            twiml.play(audioUrl);
+          } catch {
+            twiml.say({ voice: "Polly.Joanna" }, closingLine);
+          }
+          twiml.pause({ length: 1.5 });
+          twiml.hangup();
+          res.type("text/xml");
+          return res.send(twiml.toString());
+        }
+
+        // Unclear response — restate the email we have and ask again.
+        const reprompt = `Sorry — just confirming, is it ${call.leadEmail}?`;
+        addTranscript(callSid, { speaker: "agent", text: reprompt });
+        try {
+          const audioUrl = await synthesizeTTS(reprompt, callSid);
+          console.log(`[AI Reply] Playing: ${audioUrl}`);
+          twiml.play(audioUrl);
+        } catch {
+          twiml.say({ voice: "Polly.Joanna" }, reprompt);
+        }
+        twiml.pause({ length: 0.3 });
+        twiml.gather({
+          input: "speech",
+          action: "/api/twilio/handle-speech",
+          method: "POST",
+          timeout: 12,
+          speechTimeout: "auto",
+          speechModel: "phone_call",
+          enhanced: true,
+          profanityFilter: false,
+          language: "en-US"
+        });
+        try {
+          const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
+          twiml.play(stillThereUrl);
+        } catch {
+          twiml.pause({ length: 0.2 });
+        }
+        twiml.gather({
+          input: "speech",
+          action: "/api/twilio/handle-speech",
+          method: "POST",
+          timeout: 12,
+          speechTimeout: "auto",
+          speechModel: "phone_call",
+          enhanced: true,
+          profanityFilter: false,
+          language: "en-US"
+        });
+        twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
+        res.type("text/xml");
+        return res.send(twiml.toString());
+      }
+    }
+
+    // Deterministic email verification when we already have it on file:
+    // If the prospect just agreed to a meeting/demo and we have leadEmail, immediately verify it.
+    if (
+      call.leadEmail &&
+      /let'?s meet|meet next week|schedule|book|demo|send.*times|tuesday|wednesday|thursday|friday|monday/i.test(speechResult) &&
+      call.transcript.length >= 6
+    ) {
+      const verifyEmailLine = `Perfect! I have your email as ${call.leadEmail}—is that still the best one to reach you?`;
+      addTranscript(callSid, { speaker: "agent", text: verifyEmailLine });
+      try {
+        const audioUrl = await synthesizeTTS(verifyEmailLine, callSid);
+        console.log(`[AI Reply] Playing: ${audioUrl}`);
+        twiml.play(audioUrl);
+      } catch (err) {
+        twiml.pause({ length: 0.2 });
+      }
+
+      twiml.pause({ length: 0.3 });
+      twiml.gather({
+        input: "speech",
+        action: "/api/twilio/handle-speech",
+        method: "POST",
+        timeout: 12,
+        speechTimeout: "auto",
+        speechModel: "phone_call",
+        enhanced: true,
+        profanityFilter: false,
+        language: "en-US"
+      });
+
+      // Fallback if no speech detected
+      try {
+        const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
+        twiml.play(stillThereUrl);
+      } catch (err) {
+        twiml.pause({ length: 0.2 });
+      }
+      twiml.gather({
+        input: "speech",
+        action: "/api/twilio/handle-speech",
+        method: "POST",
+        timeout: 12,
+        speechTimeout: "auto",
+        speechModel: "phone_call",
+        enhanced: true,
+        profanityFilter: false,
+        language: "en-US"
+      });
+
+      // If Twilio still doesn't capture speech, keep looping without replaying the greeting.
+      twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
+
+      res.type("text/xml");
+      return res.send(twiml.toString());
     }
 
     // Get AI reply with timeout protection (handled inside getAiSdrReply)
@@ -416,7 +642,8 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       latestUserText: speechResult,
       sttConfidence: Number(confidence || 0),
       userId: call.userId,
-      leadEmail: call.leadEmail
+      leadEmail: call.leadEmail,
+      leadRegion: call.leadRegion
     });
 
     addTranscript(callSid, { speaker: "agent", text: reply });
@@ -459,7 +686,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
         input: "speech",
         action: "/api/twilio/handle-speech",
         method: "POST",
-        timeout: 8,
+        timeout: 12,
         speechTimeout: "auto",
         speechModel: "phone_call",
         enhanced: true,
@@ -468,18 +695,26 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       });
 
       // Fallback if no speech detected
-      twiml.say({ voice: "Polly.Joanna" }, "Are you still there?");
+      try {
+        const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
+        twiml.play(stillThereUrl);
+      } catch (err) {
+        twiml.pause({ length: 0.2 });
+      }
       twiml.gather({
         input: "speech",
         action: "/api/twilio/handle-speech",
         method: "POST",
-        timeout: 8,
+        timeout: 12,
         speechTimeout: "auto",
         speechModel: "phone_call",
         enhanced: true,
         profanityFilter: false,
         language: "en-US"
       });
+
+      // Loop to avoid TwiML ending the call on repeated silence
+      twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
     }
 
     res.type("text/xml");
