@@ -46,6 +46,11 @@ PAIN POINT RESPONSES:
 - If they mention TOOL SPRAWL: "One conversation orchestrates across all systems—AD, Okta, ServiceNow, Slack."
 - If they mention LOW ADOPTION: "Meets employees in Slack/Teams. No portals, just natural conversation."
 
+AI EXPLORATION RESPONSES:
+- If they mention "exploring AI" or "AI initiatives" generally: "That's great timing! We're hosting the Sydney AI Summit—it's bringing together IT leaders to discuss how they're moving from basic chatbots to agentic AI that actually takes action. Want me to share what we're covering?"
+- If they ask about AI trends: "Honestly, the biggest shift we're seeing is from reactive AI to agentic systems. We're seeing this firsthand as we prepare for the Sydney AI Summit where 73% of attending IT leaders are planning agentic implementations."
+- If they're early in AI journey: "Totally fair to be exploring. We're compiling insights from 50+ IT leaders for our Sydney AI Summit—it might save you some research time. Happy to walk you through what's working."
+
 CONVERSATION FLOW:
 1. Greeting & Rapport (brief, friendly)
 2. Discovery (ask about current ITSM, pain points)

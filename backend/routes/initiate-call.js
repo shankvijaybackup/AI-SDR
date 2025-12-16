@@ -1,5 +1,5 @@
 import twilio from 'twilio';
-import { getRandomVoice } from '../utils/voice-rotation.js';
+import { getVoiceByLocation } from '../utils/voice-rotation.js';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -13,18 +13,19 @@ const activeCalls = new Map();
 
 async function initiateCall(req, res) {
   try {
-    const { callId, phoneNumber, script, leadName, leadEmail } = req.body;
+    const { callId, phoneNumber, script, leadName, leadEmail, region } = req.body;
 
     if (!callId || !phoneNumber || !script) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Randomly select voice from pool (ignore user's voicePersona)
-    const selectedVoice = getRandomVoice();
+    // Select voice based on lead's region
+    const selectedVoice = getVoiceByLocation(region);
     const voicePersona = selectedVoice.name; // Use voice name as persona
     const voiceId = selectedVoice.id;
 
     console.log(`[Initiate Call] Starting call to ${phoneNumber} for ${leadName}`);
+    console.log(`[Initiate Call] Region: ${region || 'Not specified'}`);
     console.log(`[Initiate Call] Voice: ${voicePersona} (${selectedVoice.gender}), ID: ${voiceId}`);
     console.log(`[Initiate Call] Script: ${script.substring(0, 50)}...`);
 

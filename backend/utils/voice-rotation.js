@@ -1,6 +1,31 @@
 // utils/voice-rotation.js - Voice rotation logic for randomized voice selection
 
-const VOICE_POOL = [
+const REGIONAL_VOICE_POOLS = {
+  US: [
+    { name: 'Arabella', id: process.env.ELEVEN_VOICE_ARABELLA, gender: 'female' },
+    { name: 'Brandon', id: process.env.ELEVEN_VOICE_BRANDON, gender: 'male' },
+    { name: 'Adam', id: process.env.ELEVEN_VOICE_ADAM, gender: 'male' },
+    { name: 'Jane', id: process.env.ELEVEN_VOICE_JANE, gender: 'female' },
+  ],
+  UK: [
+    { name: 'Arabella', id: process.env.ELEVEN_VOICE_ARABELLA, gender: 'female' },
+    { name: 'Brandon', id: process.env.ELEVEN_VOICE_BRANDON, gender: 'male' },
+    { name: 'Adam', id: process.env.ELEVEN_VOICE_ADAM, gender: 'male' },
+  ],
+  Australia: [
+    { name: 'Anika', id: process.env.ELEVEN_VOICE_ANIKA, gender: 'female' },
+    { name: 'Brandon', id: process.env.ELEVEN_VOICE_BRANDON, gender: 'male' },
+    { name: 'Jane', id: process.env.ELEVEN_VOICE_JANE, gender: 'female' },
+  ],
+  India: [
+    { name: 'Anika', id: process.env.ELEVEN_VOICE_ANIKA, gender: 'female' },
+    { name: 'Arabella', id: process.env.ELEVEN_VOICE_ARABELLA, gender: 'female' },
+    { name: 'Adam', id: process.env.ELEVEN_VOICE_ADAM, gender: 'male' },
+  ],
+};
+
+// Fallback voice pool for when no region is specified
+const DEFAULT_VOICE_POOL = [
   { name: 'Arabella', id: process.env.ELEVEN_VOICE_ARABELLA, gender: 'female' },
   { name: 'Anika', id: process.env.ELEVEN_VOICE_ANIKA, gender: 'female' },
   { name: 'Brandon', id: process.env.ELEVEN_VOICE_BRANDON, gender: 'male' },
@@ -13,8 +38,8 @@ const VOICE_POOL = [
  * @returns {Object} { name: string, id: string, gender: string }
  */
 export function getRandomVoice() {
-  const randomIndex = Math.floor(Math.random() * VOICE_POOL.length);
-  const voice = VOICE_POOL[randomIndex];
+  const randomIndex = Math.floor(Math.random() * DEFAULT_VOICE_POOL.length);
+  const voice = DEFAULT_VOICE_POOL[randomIndex];
   
   console.log(`[Voice Rotation] Selected: ${voice.name} (${voice.gender})`);
   
@@ -27,7 +52,7 @@ export function getRandomVoice() {
  * @returns {Object} { name: string, id: string, gender: string }
  */
 export function getVoiceByGender(gender) {
-  const voicesOfGender = VOICE_POOL.filter(v => v.gender === gender);
+  const voicesOfGender = DEFAULT_VOICE_POOL.filter(v => v.gender === gender);
   
   if (voicesOfGender.length === 0) {
     console.warn(`[Voice Rotation] No voices found for gender: ${gender}, using random`);
@@ -47,17 +72,35 @@ export function getVoiceByGender(gender) {
  * @returns {Array} Voice pool
  */
 export function getVoicePool() {
-  return VOICE_POOL;
+  return DEFAULT_VOICE_POOL;
 }
 
 /**
- * Future: Get voice by location/accent
- * @param {string} location - Country code or region
+ * Get voice by region/location
+ * @param {string} region - 'India', 'UK', 'Australia', 'US'
  * @returns {Object} Voice object
  */
-export function getVoiceByLocation(location) {
-  // TODO: Implement location-based voice selection
-  // For now, return random voice
-  console.log(`[Voice Rotation] Location-based selection not yet implemented for: ${location}`);
-  return getRandomVoice();
+export function getVoiceByLocation(region) {
+  // If no region provided, fall back to random voice
+  if (!region) {
+    console.log(`[Voice Rotation] No region specified, using random voice`);
+    return getRandomVoice();
+  }
+  
+  // Normalize region name
+  const normalizedRegion = region?.charAt(0).toUpperCase() + region?.slice(1).toLowerCase();
+  
+  const voicePool = REGIONAL_VOICE_POOLS[normalizedRegion];
+  
+  if (!voicePool) {
+    console.warn(`[Voice Rotation] No voice pool found for region: ${region}, using default`);
+    return getRandomVoice();
+  }
+  
+  const randomIndex = Math.floor(Math.random() * voicePool.length);
+  const voice = voicePool[randomIndex];
+  
+  console.log(`[Voice Rotation] Selected ${normalizedRegion} voice: ${voice.name} (${voice.gender})`);
+  
+  return voice;
 }

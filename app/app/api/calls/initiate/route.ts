@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
           // voicePersona removed - backend auto-selects
           leadName: `${lead.firstName} ${lead.lastName}`,
           leadEmail: lead.email,
+          region: lead.region, // Pass the lead's region for voice selection
         }),
       })
 

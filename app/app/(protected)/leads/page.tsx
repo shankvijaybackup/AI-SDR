@@ -19,6 +19,7 @@ interface Lead {
   linkedinUrl?: string
   status: string
   interestLevel?: string
+  region?: string
   linkedinEnriched: boolean
   calls: any[]
 }
@@ -227,7 +228,7 @@ export default function LeadsPage() {
           title="Import Leads from CSV"
           description="Upload a CSV file with your leads. The file should include firstName, lastName, and phone as required fields."
           endpoint="/api/leads/import"
-          sampleFormat={['firstName', 'lastName', 'phone', 'email', 'company', 'jobTitle', 'linkedinUrl', 'notes', 'status']}
+          sampleFormat={['firstName', 'lastName', 'phone', 'email', 'company', 'jobTitle', 'linkedinUrl', 'notes', 'status', 'region']}
           onSuccess={() => {
             fetchLeads()
             setShowUpload(false)
@@ -305,6 +306,7 @@ export default function LeadsPage() {
                     </th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Name</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Company</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Region</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Contact</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Status</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Calls</th>
@@ -334,6 +336,11 @@ export default function LeadsPage() {
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-700">
                         {lead.company || '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                          {lead.region || 'Not set'}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-2">

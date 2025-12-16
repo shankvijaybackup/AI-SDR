@@ -23,7 +23,9 @@ model User {
   isEmailVerified       Boolean   @default(false)
   emailVerificationToken String?  @unique
   emailVerificationExpiry DateTime?
-  magicLinkToken        String?   @unique
+  magicLinkToken        String?   
+  resetToken            String?   @unique
+  resetTokenExpiry      DateTime?
   magicLinkExpiry       DateTime?
   lastLoginAt           DateTime?
 
@@ -53,6 +55,7 @@ model Lead {
   linkedinData     Json?
   status           String    @default("pending")
   interestLevel    String?
+  region           String?   // India, UK, Australia, US
   nextFollowUp     DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 interface AddLeadDialogProps {
   open: boolean
@@ -23,6 +24,7 @@ export function AddLeadDialog({ open, onOpenChange, onSuccess }: AddLeadDialogPr
     jobTitle: '',
     linkedinUrl: '',
     notes: '',
+    region: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,6 +49,7 @@ export function AddLeadDialog({ open, onOpenChange, onSuccess }: AddLeadDialogPr
           jobTitle: '',
           linkedinUrl: '',
           notes: '',
+          region: '',
         })
         onSuccess()
         onOpenChange(false)
@@ -65,6 +68,13 @@ export function AddLeadDialog({ open, onOpenChange, onSuccess }: AddLeadDialogPr
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value,
+    }))
+  }
+
+  const handleRegionChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      region: value,
     }))
   }
 
@@ -157,6 +167,23 @@ export function AddLeadDialog({ open, onOpenChange, onSuccess }: AddLeadDialogPr
                   placeholder="VP of IT"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Region *
+              </label>
+              <Select value={formData.region} onValueChange={handleRegionChange} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a region" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="India">India</SelectItem>
+                  <SelectItem value="UK">UK</SelectItem>
+                  <SelectItem value="Australia">Australia</SelectItem>
+                  <SelectItem value="US">US</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

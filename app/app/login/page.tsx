@@ -196,6 +196,11 @@ export default function LoginPage() {
         </CardContent>
 
         <CardFooter className="flex flex-col space-y-4">
+          <div className="flex justify-between w-full text-sm">
+            <Link href="/reset-password" className="text-primary hover:underline font-medium">
+              Forgot password?
+            </Link>
+          </div>
           <p className="text-sm text-center text-muted-foreground">
             Don't have an account?{' '}
             <Link href="/register" className="text-primary hover:underline font-medium">
