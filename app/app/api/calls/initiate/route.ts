@@ -26,6 +26,19 @@ export async function POST(request: NextRequest) {
         id: validatedData.leadId,
         userId: currentUser.userId,
       },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        company: true,
+        jobTitle: true,
+        linkedinUrl: true,
+        region: true,
+        linkedinEnriched: true,
+        linkedinData: true,
+      },
     })
 
     if (!lead) {
