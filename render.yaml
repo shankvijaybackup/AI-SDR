@@ -59,6 +59,18 @@ services:
         sync: false
       - key: ELEVEN_API_KEY
         sync: false
+      # Voice Pool (rotated randomly for each call)
+      - key: ELEVEN_VOICE_ARABELLA
+        sync: false
+      - key: ELEVEN_VOICE_ANIKA
+        sync: false
+      - key: ELEVEN_VOICE_BRANDON
+        sync: false
+      - key: ELEVEN_VOICE_ADAM
+        sync: false
+      - key: ELEVEN_VOICE_JANE
+        sync: false
+      # Legacy voice IDs (backward compatibility)
       - key: ELEVEN_VOICE_ID_MALE
         sync: false
       - key: ELEVEN_VOICE_ID_FEMALE
