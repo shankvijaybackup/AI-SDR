@@ -1,0 +1,80 @@
+# Render Blueprint - Deploy both services with one click
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Next.js Frontend
+  - type: web
+    name: ai-sdr-app
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: app
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NEXT_PUBLIC_APP_URL
+        fromService:
+          type: web
+          name: ai-sdr-app
+          property: url
+      - key: NEXT_PUBLIC_BACKEND_URL
+        fromService:
+          type: web
+          name: ai-sdr-backend
+          property: url
+      - key: BACKEND_API_URL
+        fromService:
+          type: web
+          name: ai-sdr-backend
+          property: url
+      - key: SENDGRID_API_KEY
+        sync: false  # Set manually
+      - key: FROM_EMAIL
+        sync: false  # Set manually
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually
+
+  # Express Backend
+  - type: web
+    name: ai-sdr-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_ORIGIN
+        fromService:
+          type: web
+          name: ai-sdr-app
+          property: url
+      - key: PUBLIC_BASE_URL
+        fromService:
+          type: web
+          name: ai-sdr-backend
+          property: url
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: ELEVEN_API_KEY
+        sync: false
+      - key: ELEVEN_VOICE_ID_MALE
+        sync: false
+      - key: ELEVEN_VOICE_ID_FEMALE
+        sync: false
