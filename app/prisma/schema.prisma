@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  password              String
+  firstName             String
+  lastName              String
+  company               String?
+  role                  String    @default("SDR")
+  linkedinSessionCookie String?   @db.Text
+  
+  // Activation & Verification
+  isActive              Boolean   @default(false)
+  isEmailVerified       Boolean   @default(false)
+  emailVerificationToken String?  @unique
+  emailVerificationExpiry DateTime?
+  magicLinkToken        String?   @unique
+  magicLinkExpiry       DateTime?
+  lastLoginAt           DateTime?
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  leads                 Lead[]
+  scripts               Script[]
+  calls                 Call[]
+  knowledgeSources      KnowledgeSource[]
+  
+  @@index([isActive])
+  @@index([isEmailVerified])
+}
+
+model Lead {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String
+  company           String?
+  jobTitle          String?
+  linkedinUrl       String?
+  notes             String?   @db.Text
+  
+  linkedinEnriched  Boolean   @default(false)
+  linkedinData      Json?
+  
+  status            String    @default("pending")
+  interestLevel     String?
+  nextFollowUp      DateTime?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  calls             Call[]
+  
+  @@index([userId, status])
+  @@index([userId, interestLevel])
+}
+
+model Script {
+  id                String   @id @default(uuid())
+  userId            String?  // Nullable for shared scripts
+  user              User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  content           String   @db.Text
+  isDefault         Boolean  @default(false)
+  isShared          Boolean  @default(true)  // Shared across all users by default
+  createdBy         String?  // Track who created it even if shared
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  calls             Call[]
+  
+  @@index([userId])
+  @@index([isShared])
+}
+
+model Call {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  leadId            String
+  lead              Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  scriptId          String?
+  script            Script?   @relation(fields: [scriptId], references: [id], onDelete: SetNull)
+  
+  twilioCallSid     String?   @unique
+  voicePersona      String    @default("female")
+  
+  transcript        Json
+  duration          Int?
+  status            String    @default("initiated")
+  
+  aiSummary         String?   @db.Text
+  interestLevel     String?
+  objections        String[]
+  emailCaptured     String?
+  nextSteps         String?   @db.Text
+  scheduledDemo     DateTime?
+  
+  // Analytics & Metrics
+  outcome           String?   // 'booked', 'interested', 'not_interested', 'no_answer', 'voicemail', 'callback_requested'
+  sentimentScore    Float?    // -1.0 to 1.0
+  engagementScore   Float?    // 0.0 to 1.0
+  talkRatio         Float?    // AI talk time / total talk time
+  questionsAsked    Int?      // Number of questions AI asked
+  objectionCount    Int?      // Number of objections raised
+  
+  // Call Quality Metrics
+  callQualityScore  Float?    // 0.0 to 100.0
+  responseTime      Float?    // Average response time in seconds
+  interruptionCount Int?      // Number of times AI interrupted
+  
+  // Conversion Tracking
+  conversionStage   String?   // 'awareness', 'interest', 'consideration', 'decision', 'closed'
+  revenueImpact     Float?    // Potential revenue from this call
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId, leadId])
+  @@index([twilioCallSid])
+  @@index([userId, outcome])
+  @@index([userId, createdAt])
+  @@index([conversionStage])
+}
+
+model KnowledgeSource {
+  id                String    @id @default(uuid())
+  userId            String?   // Nullable for shared knowledge
+  user              User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title             String
+  description       String?   @db.Text
+  type              String    // 'document', 'video', 'url', 'text'
+  
+  // File/URL info
+  fileUrl           String?   @db.Text
+  fileName          String?
+  fileSize          Int?
+  mimeType          String?
+  
+  // Video-specific
+  videoUrl          String?   @db.Text
+  videoDuration     Int?
+  videoTranscript   String?   @db.Text
+  
+  // Processed content
+  content           String    @db.Text
+  summary           String?   @db.Text
+  
+  // Embeddings for semantic search
+  embeddings        Json?
+  chunks            Json?     // Array of text chunks with embeddings
+  
+  // Metadata
+  tags              String[]
+  category          String?   // 'product', 'sales', 'technical', 'customer_story', 'objection_handling'
+  isActive          Boolean   @default(true)
+  isShared          Boolean   @default(true)  // Shared across all users by default
+  createdBy         String?   // Track who created it even if shared
+  
+  // Processing status
+  status            String    @default("pending") // 'pending', 'processing', 'completed', 'failed'
+  processingError   String?   @db.Text
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId, isActive])
+  @@index([category])
+  @@index([status])
+  @@index([isShared])
+}

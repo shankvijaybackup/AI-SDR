@@ -1,0 +1,186 @@
+{
+  "company": {
+    "name": "Atomicwork",
+    "tagline": "AI-native service management platform",
+    "founded": "2022",
+    "headquarters": "San Francisco, California",
+    "offices": ["San Francisco, CA", "Bangalore, India"],
+    "funding": "Series A funded",
+    "team_size": "50-100 employees",
+    "website": "https://atomicwork.com"
+  },
+  "product_overview": {
+    "description": "Atomicwork is an AI-native service management platform that transforms how organizations handle IT, HR, and Finance operations through a Universal AI Agent.",
+    "core_value": "Eliminate busywork and portal fatigue by meeting employees where they work - in Slack, Teams, or email.",
+    "key_differentiator": "First truly agentic service management platform with 100+ pre-built skills out of the box"
+  },
+  "features": [
+    {
+      "name": "Universal AI Agent (Atom)",
+      "description": "AI agent that works in Slack, Teams, email with voice, chat, and screen-sharing support",
+      "benefits": [
+        "Zero-touch resolutions for IT, HR, Finance requests",
+        "40-60% ticket deflection rate",
+        "Employees get help in under 30 seconds",
+        "No portal login required"
+      ],
+      "use_cases": [
+        "Password resets in Slack",
+        "Access requests via Teams",
+        "PTO approvals through email",
+        "Onboarding/offboarding automation"
+      ]
+    },
+    {
+      "name": "Identity & Access Management (IGA)",
+      "description": "Automated access provisioning, deprovisioning, and governance",
+      "benefits": [
+        "Saves 1500+ IT hours per year on manual access requests",
+        "Real-time audit trails for compliance",
+        "Automated access reviews",
+        "Zero standing privileges"
+      ],
+      "roi": "Typical customer saves $200K+ annually in IT labor costs"
+    },
+    {
+      "name": "Digital Workplace Experience",
+      "description": "Eliminate portal fatigue with conversational AI",
+      "benefits": [
+        "Single interface for all services",
+        "Personalized, permission-aware responses",
+        "Knowledge graph integration",
+        "Multi-language support"
+      ]
+    },
+    {
+      "name": "Modern ITSM",
+      "description": "Asset, incident, service request, and change management with built-in AI",
+      "benefits": [
+        "AI-powered incident categorization",
+        "Automated ticket routing",
+        "Predictive analytics",
+        "Integration with existing tools"
+      ]
+    },
+    {
+      "name": "Enterprise Service Management",
+      "description": "Extends beyond IT to HR, Finance, Sales Ops with unified workflows",
+      "benefits": [
+        "Single platform for all departments",
+        "Unified reporting and analytics",
+        "Cross-functional workflows",
+        "Centralized knowledge base"
+      ]
+    }
+  ],
+  "integrations": [
+    "Okta", "Azure AD", "Google Workspace",
+    "ServiceNow", "Jira", "Freshservice",
+    "Salesforce", "Workday", "BambooHR",
+    "Slack", "Microsoft Teams", "Zoom",
+    "AWS", "GCP", "Azure"
+  ],
+  "objections_and_responses": [
+    {
+      "objection": "We already use ServiceNow/Jira/Freshservice",
+      "response": "That's great! Atomicwork actually integrates with ServiceNow, Jira, and Freshservice. We don't replace them - we add an AI layer on top that makes them 10x easier to use. Your employees never have to log into a portal again. They just ask Atom in Slack, and it handles the ServiceNow ticket creation, routing, and updates behind the scenes.",
+      "follow_up": "Most customers keep their existing ITSM but see 40-60% ticket deflection because Atom resolves common requests instantly."
+    },
+    {
+      "objection": "How is this different from a chatbot?",
+      "response": "Great question! Traditional chatbots follow decision trees and can only answer FAQs. Atom is an agentic AI - it actually takes actions. It can reset passwords, provision access, approve requests, create tickets, and even execute workflows across multiple systems. It's like having a junior IT admin available 24/7 for every employee.",
+      "follow_up": "Plus, Atom learns from your organization's knowledge graph, so responses are personalized and permission-aware."
+    },
+    {
+      "objection": "We're not ready for AI yet",
+      "response": "I totally understand the hesitation. Here's the thing - your employees are already using AI tools like ChatGPT for work questions. The question isn't whether to use AI, but whether you want a controlled, secure AI that's trained on your company's policies and integrated with your systems. Atom gives you that control.",
+      "follow_up": "We can start with a pilot - just IT password resets and access requests. Low risk, high impact."
+    },
+    {
+      "objection": "What about security and compliance?",
+      "response": "Security is built into our DNA. We're SOC 2 Type II certified, GDPR compliant, and support SSO with all major identity providers. Every action Atom takes is logged with full audit trails. Plus, Atom respects your existing RBAC - it only shows and does what each user is permitted to see and do.",
+      "follow_up": "Many of our customers are in regulated industries like finance and healthcare. Happy to connect you with references."
+    },
+    {
+      "objection": "This sounds expensive",
+      "response": "Let me flip that - what's the cost of your IT team spending 1500+ hours a year on repetitive access requests and password resets? Or employees waiting hours or days for simple approvals? Our typical customer sees ROI in under 6 months just from IT labor savings alone.",
+      "follow_up": "We price per employee, starting around $8-12/user/month. Most customers save 3-5x that in productivity gains."
+    },
+    {
+      "objection": "We don't have the resources to implement this",
+      "response": "That's exactly why we built Atomicwork! Implementation is 2-4 weeks, not 6-12 months like legacy ITSM. We come with 100+ pre-built skills out of the box - password resets, access requests, PTO approvals, etc. You're not building from scratch.",
+      "follow_up": "Our team handles the heavy lifting. You just need to dedicate a few hours for configuration and testing."
+    },
+    {
+      "objection": "Our employees won't adopt it",
+      "response": "Actually, adoption is our strongest metric! Employees love Atom because it meets them where they already work - Slack, Teams, email. No new portal to learn, no tickets to track. They just ask a question and get an answer. We typically see 70-80% adoption in the first month.",
+      "follow_up": "Think about it - would your employees rather log into a portal and fill out a form, or just type 'reset my password' in Slack?"
+    },
+    {
+      "objection": "What if it gives wrong answers?",
+      "response": "Great question. Atom is trained on your specific knowledge base and policies, so it's not making things up. For complex issues it can't handle, it automatically escalates to a human with full context. Plus, you have admin controls to review and approve responses before they go live.",
+      "follow_up": "We also provide analytics showing you exactly what Atom is handling vs. escalating, so you can continuously improve."
+    },
+    {
+      "objection": "We need to see a demo first",
+      "response": "Absolutely! I'd love to show you Atom in action. How about I set up a 30-minute demo next week? I can show you password resets, access provisioning, and how it integrates with your existing tools. I'll even customize it with your company's branding so you can see exactly how it would work for your team.",
+      "follow_up": "What day works better for you - Tuesday or Thursday?"
+    },
+    {
+      "objection": "We're in the middle of other projects",
+      "response": "I hear you - IT always has a full plate. Here's the thing: Atomicwork actually frees up your team to focus on those strategic projects by automating the repetitive stuff. Imagine getting back 20-30% of your IT team's time currently spent on password resets and access requests.",
+      "follow_up": "We can start small - just one use case like password resets. Quick win, minimal disruption."
+    }
+  ],
+  "customer_stories": [
+    {
+      "company": "TechCorp (500 employees)",
+      "challenge": "IT team overwhelmed with 200+ password reset tickets per week",
+      "solution": "Deployed Atom for password resets and access requests",
+      "results": [
+        "85% of password resets automated",
+        "IT team saved 15 hours/week",
+        "Employee satisfaction up 40%",
+        "ROI in 4 months"
+      ]
+    },
+    {
+      "company": "FinanceGlobal (2000 employees)",
+      "challenge": "Compliance issues with manual access provisioning",
+      "solution": "Implemented Atomicwork IGA",
+      "results": [
+        "100% audit trail for all access changes",
+        "Access provisioning time reduced from 3 days to 30 minutes",
+        "Passed SOC 2 audit with zero findings",
+        "Saved $250K annually in IT labor"
+      ]
+    }
+  ],
+  "competitive_advantages": [
+    "100+ pre-built skills vs. competitors' 10-20",
+    "True agentic AI that takes actions, not just answers questions",
+    "2-4 week implementation vs. 6-12 months for legacy ITSM",
+    "Works in Slack/Teams vs. requiring portal login",
+    "Permission-aware responses using knowledge graph",
+    "Real-time learning and improvement"
+  ],
+  "pricing": {
+    "model": "Per employee per month",
+    "starting_price": "$8-12/user/month",
+    "enterprise": "Custom pricing for 1000+ employees",
+    "free_trial": "14-day free trial available",
+    "implementation": "Included in annual contracts"
+  },
+  "ideal_customer_profile": {
+    "company_size": "200-5000 employees",
+    "industries": ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail"],
+    "pain_points": [
+      "High volume of repetitive IT/HR requests",
+      "Low employee satisfaction with service desk",
+      "Compliance and audit requirements",
+      "Portal fatigue and low adoption",
+      "IT team overwhelmed with busywork"
+    ],
+    "decision_makers": ["CIO", "Head of IT", "VP of Engineering", "CISO", "Head of HR"]
+  }
+}

@@ -1,0 +1,497 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react'
+
+interface KnowledgeSource {
+  id: string
+  title: string
+  description?: string
+  type: string
+  category?: string
+  tags: string[]
+  status: string
+  summary?: string
+  fileSize?: number
+  fileName?: string
+  videoUrl?: string
+  createdAt: string
+}
+
+export default function KnowledgePage() {
+  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
+
+  // Form state
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('product')
+  const [tags, setTags] = useState('')
+  const [files, setFiles] = useState<File[]>([])
+  const [videoUrl, setVideoUrl] = useState('')
+  const [url, setUrl] = useState('')
+  const [textContent, setTextContent] = useState('')
+
+  useEffect(() => {
+    fetchKnowledgeSources()
+  }, [])
+
+  const fetchKnowledgeSources = async () => {
+    try {
+      const response = await fetch('/api/knowledge')
+      if (response.ok) {
+        const data = await response.json()
+        setKnowledgeSources(data.knowledgeSources)
+      }
+    } catch (error) {
+      console.error('Failed to fetch knowledge sources:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!title) {
+      alert('Please enter a title')
+      return
+    }
+
+    // Auto-detect upload type based on what user provided
+    let uploadType: 'document' | 'video' | 'url' | 'text'
+    
+    if (files.length > 0) {
+      uploadType = 'document'
+    } else if (videoUrl) {
+      // Check if it's a YouTube URL
+      if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+        uploadType = 'video'
+      } else {
+        uploadType = 'url'
+      }
+    } else if (url) {
+      uploadType = 'url'
+    } else if (textContent) {
+      uploadType = 'text'
+    } else {
+      alert('Please provide content: upload a file, paste a URL, or enter text')
+      return
+    }
+
+    setUploading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('title', title)
+      formData.append('description', description)
+      formData.append('type', uploadType)
+      formData.append('category', category)
+      formData.append('tags', tags)
+
+      if (uploadType === 'document' && files.length > 0) {
+        files.forEach((file, index) => {
+          formData.append('files', file)
+        })
+      } else if (uploadType === 'video') {
+        formData.append('videoUrl', videoUrl)
+      } else if (uploadType === 'url') {
+        formData.append('url', url || videoUrl)
+      } else if (uploadType === 'text') {
+        formData.append('content', textContent)
+      }
+
+      const response = await fetch('/api/knowledge/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        const successCount = result.count || 1
+        alert(`${successCount} file(s) uploaded successfully! Processing embeddings...`)
+        resetForm()
+        setShowUploadDialog(false)
+        fetchKnowledgeSources()
+      } else {
+        const error = await response.json()
+        alert(`Upload failed: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      alert('Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this knowledge source?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/knowledge?id=${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        fetchKnowledgeSources()
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+    }
+  }
+
+  const resetForm = () => {
+    setTitle('')
+    setDescription('')
+    setCategory('product')
+    setTags('')
+    setFiles([])
+    setVideoUrl('')
+    setUrl('')
+    setTextContent('')
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-600" />
+      case 'processing':
+        return <Clock className="w-4 h-4 text-yellow-600 animate-spin" />
+      case 'failed':
+        return <XCircle className="w-4 h-4 text-red-600" />
+      default:
+        return <Clock className="w-4 h-4 text-gray-400" />
+    }
+  }
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'document':
+        return <FileText className="w-4 h-4" />
+      case 'video':
+        return <Video className="w-4 h-4" />
+      case 'url':
+        return <LinkIcon className="w-4 h-4" />
+      case 'text':
+        return <Type className="w-4 h-4" />
+      default:
+        return <FileText className="w-4 h-4" />
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Knowledge Base</h1>
+          <p className="text-slate-500 mt-2">Upload documents, videos, and content to power your AI SDR</p>
+        </div>
+        <Button onClick={() => setShowUploadDialog(true)}>
+          <Upload className="w-4 h-4 mr-2" />
+          Add Knowledge
+        </Button>
+      </div>
+
+      {showUploadDialog && (
+        <Card className="border-2 border-primary">
+          <CardHeader>
+            <CardTitle>Add Knowledge Source</CardTitle>
+            <CardDescription>Upload documents, videos, or paste content to enhance AI intelligence</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Simple instruction */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900">
+                <strong>📤 Upload anything:</strong> Drag a file, paste a URL, or type content below. We'll automatically detect the type.
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Supported: PDF, Word, Excel, PowerPoint, YouTube videos, web pages, or plain text (max 10 files at once)
+              </p>
+            </div>
+
+            {/* Title */}
+            <div className="space-y-2">
+              <Label htmlFor="title">Title *</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Product Demo Video, Feature Documentation"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description of this content"
+                rows={2}
+              />
+            </div>
+
+            {/* Category */}
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <select
+                id="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full border rounded-md px-3 py-2"
+              >
+                <option value="product">Product</option>
+                <option value="sales">Sales</option>
+                <option value="technical">Technical</option>
+                <option value="customer_story">Customer Story</option>
+                <option value="objection_handling">Objection Handling</option>
+              </select>
+            </div>
+
+            {/* Tags */}
+            <div className="space-y-2">
+              <Label htmlFor="tags">Tags (comma-separated)</Label>
+              <Input
+                id="tags"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="e.g., AI, automation, demo"
+              />
+            </div>
+
+            {/* Unified upload interface */}
+            <div className="space-y-4 border-2 border-dashed border-slate-300 rounded-lg p-6 bg-slate-50">
+              {/* File Upload */}
+              <div className="space-y-2">
+                <Label htmlFor="file" className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4" />
+                  <span>Upload File</span>
+                </Label>
+                <Input
+                  id="file"
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv"
+                  onChange={(e) => {
+                    const newFiles = Array.from(e.target.files || [])
+                    const combined = [...files, ...newFiles]
+                    // Remove duplicates by name
+                    const unique = combined.filter((file, index, self) => 
+                      index === self.findIndex(f => f.name === file.name)
+                    )
+                    if (unique.length > 10) {
+                      alert('Maximum 10 files allowed at once')
+                      return
+                    }
+                    setFiles(unique)
+                    if (unique.length > 0) {
+                      setVideoUrl('')
+                      setUrl('')
+                      setTextContent('')
+                    }
+                  }}
+                  className="cursor-pointer"
+                />
+                {files.length > 0 && (
+                  <div className="text-xs text-green-600">
+                    <p className="flex items-center space-x-1 mb-1">
+                      <CheckCircle className="w-3 h-3" />
+                      <span>Selected {files.length} file{files.length > 1 ? 's' : ''} (max 10):</span>
+                    </p>
+                    <ul className="ml-5 space-y-0.5">
+                      {files.map((f, i) => (
+                        <li key={i} className="text-slate-600 flex items-center justify-between">
+                          <span>• {f.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
+                            className="text-red-500 hover:text-red-700 ml-2 text-xs"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setFiles([])}
+                      className="text-red-500 hover:text-red-700 text-xs mt-2"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center text-sm text-slate-500 font-medium">OR</div>
+
+              {/* URL/YouTube Input */}
+              <div className="space-y-2">
+                <Label htmlFor="urlInput" className="flex items-center space-x-2">
+                  <LinkIcon className="w-4 h-4" />
+                  <span>Paste URL (YouTube, website, article)</span>
+                </Label>
+                <Input
+                  id="urlInput"
+                  value={videoUrl || url}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value.includes('youtube.com') || value.includes('youtu.be')) {
+                      setVideoUrl(value)
+                      setUrl('')
+                    } else {
+                      setUrl(value)
+                      setVideoUrl('')
+                    }
+                    if (value) {
+                      setFiles([])
+                      setTextContent('')
+                    }
+                  }}
+                  placeholder="https://youtube.com/watch?v=... or https://example.com/article"
+                />
+                {(videoUrl || url) && (
+                  <p className="text-xs text-green-600 flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>{videoUrl ? '🎥 YouTube video detected' : '🔗 Web page detected'}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="text-center text-sm text-slate-500 font-medium">OR</div>
+
+              {/* Text Content */}
+              <div className="space-y-2">
+                <Label htmlFor="textContent" className="flex items-center space-x-2">
+                  <Type className="w-4 h-4" />
+                  <span>Paste or type content</span>
+                </Label>
+                <Textarea
+                  id="textContent"
+                  value={textContent}
+                  onChange={(e) => {
+                    setTextContent(e.target.value)
+                    if (e.target.value) {
+                      setFiles([])
+                      setVideoUrl('')
+                      setUrl('')
+                    }
+                  }}
+                  placeholder="Paste product info, sales scripts, objection handling, etc..."
+                  rows={6}
+                  className="font-mono text-sm"
+                />
+                {textContent && (
+                  <p className="text-xs text-green-600 flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>{textContent.length} characters</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex space-x-3">
+              <Button onClick={handleUpload} disabled={uploading}>
+                {uploading ? 'Uploading...' : 'Upload & Process'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Knowledge Sources List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Knowledge Sources</CardTitle>
+          <CardDescription>{knowledgeSources.length} sources uploaded</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading knowledge sources...</p>
+            </div>
+          ) : knowledgeSources.length === 0 ? (
+            <div className="text-center py-12">
+              <Upload className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 mb-2">No knowledge sources yet</h3>
+              <p className="text-slate-500 mb-4">Upload documents, videos, or content to get started</p>
+              <Button onClick={() => setShowUploadDialog(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Add Knowledge
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {knowledgeSources.map((source) => (
+                <div
+                  key={source.id}
+                  className="border rounded-lg p-4 flex items-start justify-between hover:bg-slate-50"
+                >
+                  <div className="flex items-start space-x-3 flex-1">
+                    <div className="p-2 bg-slate-100 rounded">
+                      {getTypeIcon(source.type)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-medium text-slate-900">{source.title}</h4>
+                        {getStatusIcon(source.status)}
+                        {source.category && (
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                            {source.category}
+                          </span>
+                        )}
+                      </div>
+                      {source.description && (
+                        <p className="text-sm text-slate-600 mt-1">{source.description}</p>
+                      )}
+                      {source.summary && (
+                        <p className="text-xs text-slate-500 mt-2 italic">{source.summary}</p>
+                      )}
+                      <div className="flex items-center space-x-4 mt-2 text-xs text-slate-500">
+                        {source.fileName && <span>📄 {source.fileName}</span>}
+                        {source.fileSize && <span>{(source.fileSize / 1024).toFixed(1)} KB</span>}
+                        {source.videoUrl && <span>🎥 Video</span>}
+                        <span>{new Date(source.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {source.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {source.tags.map((tag, idx) => (
+                            <span key={idx} className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(source.id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

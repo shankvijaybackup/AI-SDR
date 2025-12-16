@@ -1,0 +1,16 @@
+firstName,lastName,phone,email,company,jobTitle,linkedinUrl,notes,status
+Rajesh,Kumar,+919876543210,rajesh.kumar@tatasteel.com,Tata Steel,VP of IT Infrastructure,https://linkedin.com/in/rajeshkumar,Enterprise prospect - 50k+ employees - currently on ServiceNow,pending
+Priya,Sharma,+919876543211,priya.sharma@infosys.com,Infosys,Head of IT Operations,https://linkedin.com/in/priyasharma,Large IT services company - potential for internal ITSM,pending
+Michael,Chen,+14155559012,mchen@peppermoney.com.au,Pepper Money,CTO,https://linkedin.com/in/michaelchen,Existing customer - migrated from ServiceNow in 6 weeks,contacted
+Sarah,Johnson,+14155555678,sarah.j@techcorp.io,TechCorp,IT Director,https://linkedin.com/in/sarahj,Mid-market prospect - frustrated with Freshservice,pending
+David,Williams,+442071234567,d.williams@barclays.co.uk,Barclays,Head of Service Management,https://linkedin.com/in/davidwilliams,Enterprise banking - heavy ServiceNow user,pending
+Amanda,Foster,+14155551234,amanda.foster@dropbox.com,Dropbox,VP of Engineering,https://linkedin.com/in/amandafoster,Tech company - using Jira Service Management,pending
+James,Mitchell,+61298765432,james.m@commbank.com.au,Commonwealth Bank,IT Service Delivery Manager,https://linkedin.com/in/jamesmitchell,Large bank - looking to modernize ITSM,pending
+Lisa,Park,+14085551234,lisa.park@nvidia.com,NVIDIA,Director of IT,https://linkedin.com/in/lisapark,High-growth tech - scaling IT operations,pending
+Robert,Garcia,+14155553456,rgarcia@salesforce.com,Salesforce,Senior IT Manager,https://linkedin.com/in/robertgarcia,Enterprise SaaS - complex ITSM needs,pending
+Emily,Davis,+14155559876,emily.davis@stripe.com,Stripe,Head of Internal Tools,https://linkedin.com/in/emilydavis,Fintech - developer-first culture,pending
+Vikram,Patel,+919876543212,vikram.patel@wipro.com,Wipro,CIO,https://linkedin.com/in/vikrampatel,Large IT services - potential strategic partner,pending
+Jennifer,Lee,+14155554321,jennifer.lee@airbnb.com,Airbnb,IT Operations Lead,https://linkedin.com/in/jenniferlee,Travel tech - distributed workforce,pending
+Thomas,Anderson,+14155557890,tanderson@meta.com,Meta,Service Management Director,https://linkedin.com/in/thomasanderson,Big tech - massive scale requirements,pending
+Ananya,Reddy,+919876543213,ananya.r@hdfcbank.com,HDFC Bank,VP Technology,https://linkedin.com/in/ananyareddy,Large Indian bank - digital transformation focus,pending
+Chris,Taylor,+442071234568,chris.taylor@revolut.com,Revolut,Head of IT,https://linkedin.com/in/christaylor,Fast-growing fintech - modern tech stack,pending

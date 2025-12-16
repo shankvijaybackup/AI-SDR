@@ -1,0 +1,596 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send } from 'lucide-react'
+
+interface TeamUser {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  company: string | null
+  role: string
+  isActive: boolean
+  isEmailVerified: boolean
+  lastLoginAt: string | null
+  createdAt: string
+  _count: {
+    leads: number
+    calls: number
+  }
+}
+
+interface UserProfile {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  company: string | null
+  role: string
+  linkedinSessionCookie: string | null
+  isActive: boolean
+  isEmailVerified: boolean
+}
+
+export default function SettingsPage() {
+  const [linkedinCookie, setLinkedinCookie] = useState('')
+  const [hasLinkedIn, setHasLinkedIn] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [users, setUsers] = useState<TeamUser[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileSaving, setProfileSaving] = useState(false)
+  
+  // Invite user state
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteForm, setInviteForm] = useState({ email: '', firstName: '', lastName: '' })
+  const [inviting, setInviting] = useState(false)
+  const [inviteResult, setInviteResult] = useState<{ url: string; email: string } | null>(null)
+
+  useEffect(() => {
+    fetchUserData()
+    fetchUsers()
+    fetchProfile()
+  }, [])
+
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch('/api/user/linkedin')
+      if (response.ok) {
+        const data = await response.json()
+        setHasLinkedIn(data.hasLinkedIn)
+      }
+    } catch (error) {
+      console.error('Failed to fetch LinkedIn session:', error)
+    }
+  }
+
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true)
+      const response = await fetch('/api/users')
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data.users)
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error)
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch('/api/users/profile')
+      if (response.ok) {
+        const data = await response.json()
+        setProfile(data.user)
+        setHasLinkedIn(!!data.user.linkedinSessionCookie)
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error)
+    }
+  }
+
+  const handleToggleUserActive = async (userId: string, isActive: boolean) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, isActive }),
+      })
+      if (response.ok) {
+        fetchUsers()
+      }
+    } catch (error) {
+      console.error('Failed to toggle user status:', error)
+    }
+  }
+
+  const handleResendVerification = async (userId: string, email: string) => {
+    setMessage(null)
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setMessage({ 
+          type: 'success', 
+          text: data.emailSent 
+            ? `Verification email sent to ${email}` 
+            : `Verification link generated for ${email}. Check console for URL.`
+        })
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to resend verification' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to resend verification' })
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    if (!profile) return
+    setProfileSaving(true)
+    try {
+      const response = await fetch('/api/users/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          company: profile.company,
+          linkedinSessionCookie: linkedinCookie || profile.linkedinSessionCookie,
+        }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setProfile(data.user)
+        setHasLinkedIn(!!data.user.linkedinSessionCookie)
+        setLinkedinCookie('')
+        setMessage({ type: 'success', text: 'Profile saved successfully!' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save profile' })
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
+  const handleSaveLinkedIn = async () => {
+    if (!linkedinCookie.trim()) {
+      setMessage({ type: 'error', text: 'Please enter a LinkedIn session cookie' })
+      return
+    }
+
+    setSaving(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch('/api/user/linkedin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionCookie: linkedinCookie }),
+      })
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'LinkedIn session saved successfully!' })
+        setHasLinkedIn(true)
+        setLinkedinCookie('')
+      } else {
+        setMessage({ type: 'error', text: 'Failed to save LinkedIn session' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'An error occurred' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemoveLinkedIn = async () => {
+    setSaving(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch('/api/user/linkedin', {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'LinkedIn session removed' })
+        setHasLinkedIn(false)
+      } else {
+        setMessage({ type: 'error', text: 'Failed to remove LinkedIn session' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'An error occurred' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleInviteUser = async () => {
+    if (!inviteForm.email || !inviteForm.firstName || !inviteForm.lastName) {
+      setMessage({ type: 'error', text: 'Please fill in all fields' })
+      return
+    }
+
+    setInviting(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch('/api/auth/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inviteForm),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setInviteResult({ url: data.verificationUrl, email: inviteForm.email })
+        setMessage({ type: 'success', text: `Invitation sent to ${inviteForm.email}` })
+        setInviteForm({ email: '', firstName: '', lastName: '' })
+        fetchUsers() // Refresh users list
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to send invitation' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'An error occurred' })
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setMessage({ type: 'success', text: 'Link copied to clipboard!' })
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
+        <p className="text-slate-500 mt-2">Manage your account, team, and integrations</p>
+      </div>
+
+      {message && (
+        <div className={`p-4 rounded-md ${
+          message.type === 'success' 
+            ? 'bg-green-50 border border-green-200 text-green-700' 
+            : 'bg-red-50 border border-red-200 text-red-700'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      {/* My Profile */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <User className="w-5 h-5 text-slate-600" />
+              <CardTitle>My Profile</CardTitle>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)}>Edit Profile</Button>
+            <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Profile</DialogTitle>
+                  <DialogDescription>
+                    Update your profile information and LinkedIn integration
+                  </DialogDescription>
+                </DialogHeader>
+                {profile && (
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          value={profile.firstName}
+                          onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          value={profile.lastName}
+                          onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company">Company</Label>
+                      <Input
+                        id="company"
+                        value={profile.company || ''}
+                        onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" value={profile.email} disabled className="bg-slate-50" />
+                    </div>
+                    
+                    {/* LinkedIn Integration in Profile */}
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Linkedin className="w-4 h-4 text-blue-600" />
+                        <Label className="text-sm font-medium">LinkedIn Integration</Label>
+                      </div>
+                      {hasLinkedIn ? (
+                        <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                          <div className="flex items-center space-x-2">
+                            <Shield className="w-4 h-4 text-green-600" />
+                            <span className="text-sm text-green-700">Connected</span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700"
+                            onClick={handleRemoveLinkedIn}
+                          >
+                            Disconnect
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
+                            <p className="font-medium mb-1">How to get li_at cookie:</p>
+                            <p>LinkedIn → DevTools (F12) → Application → Cookies → Copy "li_at"</p>
+                          </div>
+                          <Input
+                            type="password"
+                            placeholder="Paste li_at cookie here"
+                            value={linkedinCookie}
+                            onChange={(e) => setLinkedinCookie(e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Button onClick={handleSaveProfile} disabled={profileSaving} className="w-full">
+                      {profileSaving ? 'Saving...' : 'Save Profile'}
+                    </Button>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {profile ? (
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-lg font-semibold text-primary">
+                  {profile.firstName[0]}{profile.lastName[0]}
+                </span>
+              </div>
+              <div className="flex-1">
+                <button 
+                  onClick={() => setProfileOpen(true)}
+                  className="text-left hover:underline"
+                >
+                  <h3 className="font-medium text-slate-900">{profile.firstName} {profile.lastName}</h3>
+                  <p className="text-sm text-slate-500">{profile.email}</p>
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                {hasLinkedIn ? (
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    <Linkedin className="w-3 h-3 mr-1" />
+                    LinkedIn Connected
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-slate-500">
+                    <Linkedin className="w-3 h-3 mr-1" />
+                    Not Connected
+                  </Badge>
+                )}
+                <Badge variant="outline">{profile.role}</Badge>
+              </div>
+            </div>
+          ) : (
+            <div className="animate-pulse flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-full bg-slate-200"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-slate-200 rounded w-1/4"></div>
+                <div className="h-3 bg-slate-200 rounded w-1/3"></div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Team Users */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <Users className="w-5 h-5 text-slate-600" />
+            <CardTitle>Team Members</CardTitle>
+          </div>
+          <CardDescription>
+            View and manage team members. Activate or deactivate user accounts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingUsers ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse flex items-center space-x-4 p-3 border rounded-lg">
+                  <div className="w-10 h-10 rounded-full bg-slate-200"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-1/4"></div>
+                    <div className="h-3 bg-slate-200 rounded w-1/3"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : users.length === 0 ? (
+            <p className="text-slate-500 text-center py-8">No team members found</p>
+          ) : (
+            <div className="space-y-3">
+              {users.map((user) => (
+                <div 
+                  key={user.id} 
+                  className={`flex items-center space-x-4 p-3 border rounded-lg ${
+                    !user.isActive ? 'bg-slate-50 opacity-60' : ''
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-primary">
+                      {user.firstName[0]}{user.lastName[0]}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <h4 className="font-medium text-slate-900 truncate">
+                        {user.firstName} {user.lastName}
+                      </h4>
+                      {user.isEmailVerified ? (
+                        <span title="Email verified"><CheckCircle className="w-4 h-4 text-green-500" /></span>
+                      ) : (
+                        <span title="Email not verified"><Mail className="w-4 h-4 text-amber-500" /></span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-500 truncate">{user.email}</p>
+                    <div className="flex items-center space-x-3 mt-1 text-xs text-slate-400">
+                      <span>{user._count.leads} leads</span>
+                      <span>{user._count.calls} calls</span>
+                      {user.lastLoginAt && (
+                        <span className="flex items-center">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Last login: {new Date(user.lastLoginAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                      {user.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                    {!user.isEmailVerified && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResendVerification(user.id, user.email)}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        <Mail className="w-4 h-4 mr-1" /> Resend Invite
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleUserActive(user.id, !user.isActive)}
+                      className={user.isActive ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+                    >
+                      {user.isActive ? (
+                        <><XCircle className="w-4 h-4 mr-1" /> Deactivate</>
+                      ) : (
+                        <><CheckCircle className="w-4 h-4 mr-1" /> Activate</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Invite User */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <UserPlus className="w-5 h-5 text-slate-600" />
+            <CardTitle>Invite New User</CardTitle>
+          </div>
+          <CardDescription>
+            Send an invitation to add a new team member. They will receive a verification link.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="invite-firstName">First Name</Label>
+              <Input
+                id="invite-firstName"
+                placeholder="John"
+                value={inviteForm.firstName}
+                onChange={(e) => setInviteForm({ ...inviteForm, firstName: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-lastName">Last Name</Label>
+              <Input
+                id="invite-lastName"
+                placeholder="Doe"
+                value={inviteForm.lastName}
+                onChange={(e) => setInviteForm({ ...inviteForm, lastName: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="invite-email">Email Address</Label>
+            <Input
+              id="invite-email"
+              type="email"
+              placeholder="john@company.com"
+              value={inviteForm.email}
+              onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+            />
+          </div>
+          <Button onClick={handleInviteUser} disabled={inviting} className="w-full">
+            {inviting ? (
+              <>Sending Invitation...</>
+            ) : (
+              <><Send className="w-4 h-4 mr-2" /> Send Invitation</>
+            )}
+          </Button>
+
+          {inviteResult && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
+              <p className="text-sm text-green-800">
+                <strong>Invitation created for {inviteResult.email}</strong>
+              </p>
+              <p className="text-xs text-green-700">
+                Share this verification link with the user (or they'll receive it via email):
+              </p>
+              <div className="flex items-center space-x-2">
+                <Input
+                  value={inviteResult.url}
+                  readOnly
+                  className="text-xs bg-white"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(inviteResult.url)}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-green-600">
+                Link expires in 7 days. User will be activated after verification.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

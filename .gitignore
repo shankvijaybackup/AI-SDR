@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Python virtual environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+voice-service/venv/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Environment files (IMPORTANT: Contains secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+app/.env
+backend/.env
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+coverage/
+.nyc_output/
+
+# Prisma
+app/prisma/migrations/*_migration_lock.toml
+
+# Misc
+*.log
+*.pid
+*.seed
+.cache/
+tmp/
+
+# Test files
+test-*.js
+!app/test-*.js
+
+# OS files
+Thumbs.db
