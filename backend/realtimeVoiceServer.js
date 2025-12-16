@@ -78,7 +78,7 @@ Name: ${leadName}
 Email: ${call.leadEmail || 'not on file'}
 Opening: ${script.substring(0, 200)}
 
-Start the conversation naturally and guide toward booking a demo.`;
+CRITICAL: Follow the script above as your primary guide for responses. Do NOT generate generic questions about IT service management. Use the script content to drive your responses and conversation flow. Only deviate from the script when the conversation naturally goes off-script.
 }
 
 /**
