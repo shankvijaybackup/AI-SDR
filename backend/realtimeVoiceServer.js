@@ -92,7 +92,7 @@ export function attachRealtimeVoiceServer(httpServer) {
 
   wss.on("connection", async (twilioWs, req) => {
     const connectionId = uuidv4();
-    console.log(`[Realtime] New Twilio connection: ${connectionId}`);
+    console.log('[Realtime] New Twilio connection: ' + connectionId);
 
     let streamSid = null;
     let callSid = null;
