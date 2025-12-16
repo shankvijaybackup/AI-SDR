@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 interface AddLeadDialogProps {
   open: boolean
@@ -64,17 +63,10 @@ export function AddLeadDialog({ open, onOpenChange, onSuccess }: AddLeadDialogPr
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value,
-    }))
-  }
-
-  const handleRegionChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      region: value,
     }))
   }
 
@@ -173,17 +165,19 @@ export function AddLeadDialog({ open, onOpenChange, onSuccess }: AddLeadDialogPr
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Region *
               </label>
-              <Select value={formData.region} onValueChange={handleRegionChange} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a region" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="India">India</SelectItem>
-                  <SelectItem value="UK">UK</SelectItem>
-                  <SelectItem value="Australia">Australia</SelectItem>
-                  <SelectItem value="US">US</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                name="region"
+                value={formData.region}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Select a region</option>
+                <option value="India">India</option>
+                <option value="UK">UK</option>
+                <option value="Australia">Australia</option>
+                <option value="US">US</option>
+              </select>
             </div>
 
             <div>
