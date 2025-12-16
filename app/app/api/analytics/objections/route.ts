@@ -37,13 +37,12 @@ export async function GET(req: NextRequest) {
       },
       select: {
         objections: true,
-        outcome: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    const counts: Record<string, { objection: string; count: number; booked: number; interested: number }> = {}
+    const counts: Record<string, { objection: string; count: number }> = {}
 
     for (const call of calls) {
       const objections = Array.isArray(call.objections) ? call.objections : []
@@ -51,11 +50,9 @@ export async function GET(req: NextRequest) {
         const key = String(obj || '').trim()
         if (!key) continue
         if (!counts[key]) {
-          counts[key] = { objection: key, count: 0, booked: 0, interested: 0 }
+          counts[key] = { objection: key, count: 0 }
         }
         counts[key].count += 1
-        if (call.outcome === 'booked') counts[key].booked += 1
-        if (call.outcome === 'interested') counts[key].interested += 1
       }
     }
 
