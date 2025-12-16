@@ -4,7 +4,7 @@ import { enrichLead } from '@/lib/linkedin-enrichment'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ leadId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await getCurrentUser()
@@ -12,8 +12,8 @@ export async function POST(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { leadId } = await params
-    const success = await enrichLead(leadId, currentUser.userId)
+    const { id } = await params
+    const success = await enrichLead(id, currentUser.userId)
 
     if (!success) {
       return NextResponse.json(
