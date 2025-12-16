@@ -87,13 +87,13 @@ export function getVoiceByLocation(region) {
     return getRandomVoice();
   }
   
-  // Normalize region name
-  const normalizedRegion = region?.charAt(0).toUpperCase() + region?.slice(1).toLowerCase();
+  // Normalize region name to uppercase for consistency with pool keys
+  const normalizedRegion = region.toUpperCase();
   
   const voicePool = REGIONAL_VOICE_POOLS[normalizedRegion];
   
   if (!voicePool) {
-    console.warn(`[Voice Rotation] No voice pool found for region: ${region}, using default`);
+    console.warn(`[Voice Rotation] No voice pool found for region: ${region} (normalized: ${normalizedRegion}), using default`);
     return getRandomVoice();
   }
   
