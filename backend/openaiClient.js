@@ -416,10 +416,17 @@ export async function getAiSdrReply({
   }
 
   // Check for company info requests
-  if (latestUserText && (latestUserText.toLowerCase().includes('atomicwork') || latestUserText.toLowerCase().includes('company'))) {
-    companyInfo = getCompanyInfo(latestUserText);
-    if (companyInfo) {
-      console.log(`[RAG] Retrieved company info`);
+  if (latestUserText) {
+    const lowerUserText = latestUserText.toLowerCase();
+    const mentionsAtomicwork = /\batomic\s*work\b/i.test(latestUserText) || lowerUserText.includes('atomicwork');
+    const isCompanyInfoQuestion =
+      /\b(company|who are you|what is|tell me about|background|founded|headquarter|location|based|office|pricing|cost|funding|investor|ceo|cto)\b/i.test(lowerUserText);
+
+    if (mentionsAtomicwork || isCompanyInfoQuestion) {
+      companyInfo = getCompanyInfo(latestUserText);
+      if (companyInfo) {
+        console.log(`[RAG] Retrieved company info`);
+      }
     }
   }
 
@@ -457,7 +464,7 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
   if (objectionResponse) {
     userContent += `\n\n[OBJECTION HANDLING GUIDE]\nThe prospect raised: "${objectionResponse.objection}"\nSuggested response: ${objectionResponse.response}\nFollow-up: ${objectionResponse.followUp}\n\nUse this as a guide, but make it conversational and natural. Add empathy and understanding.`;
   } else if (companyInfo) {
-    userContent += `\n\n[COMPANY INFO]\n${companyInfo}\n\nAnswer their question naturally, then smoothly return to the conversation.`;
+    userContent += `\n\n[COMPANY INFO]\n${companyInfo}\n\nAnswer their question naturally, then smoothly return to the conversation.\nCRITICAL: Only state leadership (CEO/CTO) or funding details if they are explicitly present in the company info above. If not present, say you don't have that detail on hand and offer to email a link after the call.`;
   } else if (ragContext) {
     userContent += `\n\n[RELEVANT CONTEXT]\n${ragContext.context}\n\nUse this information if relevant to answer their question or support your points.`;
   }

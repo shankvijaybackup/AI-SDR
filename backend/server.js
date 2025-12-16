@@ -370,26 +370,7 @@ app.post("/api/twilio/voice", async (req, res) => {
     language: "en-US"
   });
 
-  // Fallback if no speech detected
-  try {
-    const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
-    twiml.play(stillThereUrl);
-  } catch (err) {
-    twiml.pause({ length: 0.2 });
-  }
-  twiml.gather({
-    input: "speech",
-    action: "/api/twilio/handle-speech",
-    method: "POST",
-    timeout: 12,
-    speechTimeout: "auto",
-    speechModel: "phone_call",
-    enhanced: true,
-    profanityFilter: false,
-    language: "en-US"
-  });
-
-  // If no speech is captured even after the second gather, Twilio will continue to the next verb.
+  // If no speech is captured, Twilio continues to the next verb.
   // Redirect back to handle-speech so we can reprompt without replaying the greeting.
   twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
 
@@ -475,6 +456,31 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       addTranscript(callSid, { speaker: "prospect", text: speechResult });
     }
 
+    const normalizedSpeech = String(speechResult || "").toLowerCase();
+
+    const isOptOut =
+      /\b(do not call|don't call|stop calling|remove me|take me off|unsubscribe|opt out)\b/i.test(normalizedSpeech);
+    const isNotInterested =
+      /\b(not interested|no thanks|no thank you|not a fit|not for me|not now|no i'?m not|no, i'?m not|i'?m not interested)\b/i.test(normalizedSpeech);
+
+    if (isOptOut || isNotInterested) {
+      const closingLine = isOptOut
+        ? "Understood — I'll take you off our list. Sorry for the interruption."
+        : "Totally fair — I'll let you go. Have a good one!";
+      addTranscript(callSid, { speaker: "agent", text: closingLine });
+      try {
+        const audioUrl = await synthesizeTTS(closingLine, callSid);
+        console.log(`[AI Reply] Playing: ${audioUrl}`);
+        twiml.play(audioUrl);
+      } catch {
+        twiml.say({ voice: "Polly.Joanna" }, closingLine);
+      }
+      twiml.pause({ length: 0.8 });
+      twiml.hangup();
+      res.type("text/xml");
+      return res.send(twiml.toString());
+    }
+
     // If we just asked to VERIFY an email on file, handle the response deterministically.
     if (call.leadEmail) {
       const lastAgentLine = [...(call.transcript || [])]
@@ -556,23 +562,6 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
           profanityFilter: false,
           language: "en-US"
         });
-        try {
-          const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
-          twiml.play(stillThereUrl);
-        } catch {
-          twiml.pause({ length: 0.2 });
-        }
-        twiml.gather({
-          input: "speech",
-          action: "/api/twilio/handle-speech",
-          method: "POST",
-          timeout: 12,
-          speechTimeout: "auto",
-          speechModel: "phone_call",
-          enhanced: true,
-          profanityFilter: false,
-          language: "en-US"
-        });
         twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
         res.type("text/xml");
         return res.send(twiml.toString());
@@ -581,11 +570,17 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     // Deterministic email verification when we already have it on file:
     // If the prospect just agreed to a meeting/demo and we have leadEmail, immediately verify it.
-    if (
-      call.leadEmail &&
-      /let'?s meet|meet next week|schedule|book|demo|send.*times|tuesday|wednesday|thursday|friday|monday/i.test(speechResult) &&
-      call.transcript.length >= 6
-    ) {
+    const meetingIntentPositive =
+      /\b(let'?s|lets)\b.*\b(meet|book|schedule)\b/i.test(speechResult) ||
+      /\b(book|schedule)\b.*\b(time|demo|meeting|call)\b/i.test(speechResult) ||
+      /\b(send)\b.*\b(times|slots)\b/i.test(speechResult) ||
+      /\b(next week|monday|tuesday|wednesday|thursday|friday)\b.*\b(meet|demo|call)\b/i.test(speechResult) ||
+      /\b(demo|meeting|call)\b.*\b(next week|monday|tuesday|wednesday|thursday|friday)\b/i.test(speechResult);
+    const meetingIntentNegative =
+      /\b(not interested|no thanks|don't want|do not want|dont want|not a fit|stop calling)\b/i.test(normalizedSpeech) &&
+      /\b(demo|meeting|call|schedule|book)\b/i.test(normalizedSpeech);
+
+    if (call.leadEmail && meetingIntentPositive && !meetingIntentNegative && call.transcript.length >= 6) {
       const verifyEmailLine = `Perfect! I have your email as ${call.leadEmail}—is that still the best one to reach you?`;
       addTranscript(callSid, { speaker: "agent", text: verifyEmailLine });
       try {
@@ -609,26 +604,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
         language: "en-US"
       });
 
-      // Fallback if no speech detected
-      try {
-        const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
-        twiml.play(stillThereUrl);
-      } catch (err) {
-        twiml.pause({ length: 0.2 });
-      }
-      twiml.gather({
-        input: "speech",
-        action: "/api/twilio/handle-speech",
-        method: "POST",
-        timeout: 12,
-        speechTimeout: "auto",
-        speechModel: "phone_call",
-        enhanced: true,
-        profanityFilter: false,
-        language: "en-US"
-      });
-
-      // If Twilio still doesn't capture speech, keep looping without replaying the greeting.
+      // If Twilio doesn't capture speech, keep looping without replaying the greeting.
       twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
 
       res.type("text/xml");
@@ -682,25 +658,6 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       twiml.pause({ length: 0.3 });
       
       // Gather next response with Enhanced Speech Model
-      twiml.gather({
-        input: "speech",
-        action: "/api/twilio/handle-speech",
-        method: "POST",
-        timeout: 12,
-        speechTimeout: "auto",
-        speechModel: "phone_call",
-        enhanced: true,
-        profanityFilter: false,
-        language: "en-US"
-      });
-
-      // Fallback if no speech detected
-      try {
-        const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
-        twiml.play(stillThereUrl);
-      } catch (err) {
-        twiml.pause({ length: 0.2 });
-      }
       twiml.gather({
         input: "speech",
         action: "/api/twilio/handle-speech",
