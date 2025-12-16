@@ -23,7 +23,7 @@ PERSONALITY:
 - Warm, relaxed, confident (late 20s/30s human SDR)
 - Use contractions, fillers ("honestly", "totally fair")
 - Keep replies SHORT and punchy (<20 words per turn)
-- Sound human, not robotic`;
+- Sound human, not robotic
 
 PRODUCT (Atomicwork):
 - AI-native ITSM & ESM platform
@@ -74,13 +74,12 @@ RULES:
 - If they say goodbye, end gracefully
 
 LEAD INFO:
-Name: +leadName}
-Email: +call.leadEmail || 'not on file'}
-Opening: +script.substring(0, 200)}
+Name: ${leadName}
+Email: ${call.leadEmail || 'not on file'}
+Opening: ${script.substring(0, 200)}
 
-CRITICAL: Follow the script above as your primary guide for responses. Do NOT generate generic questions about IT service management. Use the script content to drive your responses and conversation flow. Only deviate from the script when the conversation naturally goes off-script.
+CRITICAL: Follow the script above as your primary guide for responses. Do NOT generate generic questions about IT service management. Use the script content to drive your responses and conversation flow. Only deviate from the script when the conversation naturally goes off-script.`;
 }
-
 /**
  * Attach Realtime Voice WebSocket server
  */
@@ -117,11 +116,11 @@ export function attachRealtimeVoiceServer(httpServer) {
           const call = getActiveCall(callSid);
           if (!call) {
             console.error('[Realtime] Call not found for CallSid: ' + callSid);
-            console.log([Realtime] Available call IDs:, Array.from(sessions.keys()));
+            console.log('[Realtime] Available call IDs:', Array.from(sessions.keys()));
             return;
           }
           
-          console.log([Realtime] Call metadata found:, { leadName: call.leadName, voicePersona: call.voicePersona });
+          console.log('[Realtime] Call metadata found:', { leadName: call.leadName, voicePersona: call.voicePersona });
 
           // Connect to OpenAI Realtime API
           try {
@@ -251,7 +250,7 @@ export function attachRealtimeVoiceServer(httpServer) {
     });
 
     twilioWs.on("close", () => {
-      console.log([Realtime] Twilio connection closed: +connectionId});
+      console.log('[Realtime] Twilio connection closed: ' + connectionId);
       if (openaiWs) {
         openaiWs.close();
       }
@@ -259,7 +258,7 @@ export function attachRealtimeVoiceServer(httpServer) {
     });
 
     twilioWs.on("error", (err) => {
-      console.error([Realtime] Twilio WebSocket error:, err);
+      console.error('[Realtime] Twilio WebSocket error:', err);
       if (openaiWs) {
         openaiWs.close();
       }
@@ -276,25 +275,25 @@ export function attachRealtimeVoiceServer(httpServer) {
 function handleOpenAIEvent(event, twilioWs, streamSid, callSid) {
   switch (event.type) {
     case "session.created":
-      console.log([Realtime] Session created: +event.session.id});
+      console.log('[Realtime] Session created: ' + event.session.id);
       break;
 
     case "session.updated":
-      console.log([Realtime] Session updated);
+      console.log('[Realtime] Session updated');
       break;
 
     case "input_audio_buffer.speech_started":
-      console.log([Realtime] User started speaking);
+      console.log('[Realtime] User started speaking');
       // Could interrupt AI here if needed
       break;
 
     case "input_audio_buffer.speech_stopped":
-      console.log([Realtime] User stopped speaking);
+      console.log('[Realtime] User stopped speaking');
       break;
 
     case "conversation.item.input_audio_transcription.completed":
       const userTranscript = event.transcript;
-      console.log([Realtime] User said: "+userTranscript}");
+      console.log('[Realtime] User said: "' + userTranscript + '"');
       updateCallTranscript(callSid, { speaker: "prospect", text: userTranscript });
       break;
 
@@ -318,16 +317,16 @@ function handleOpenAIEvent(event, twilioWs, streamSid, callSid) {
 
     case "response.audio_transcript.done":
       const aiTranscript = event.transcript;
-      console.log([Realtime] AI said: "+aiTranscript}");
+      console.log('[Realtime] AI said: "' + aiTranscript + '"');
       updateCallTranscript(callSid, { speaker: "agent", text: aiTranscript });
       break;
 
     case "response.done":
-      console.log([Realtime] Response completed);
+      console.log('[Realtime] Response completed');
       break;
 
     case "error":
-      console.error([Realtime] OpenAI error:, event.error);
+      console.error('[Realtime] OpenAI error:', event.error);
       break;
 
     default:
