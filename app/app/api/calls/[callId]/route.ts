@@ -4,9 +4,10 @@ import { getCurrentUser } from '@/lib/auth'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { callId: string } }
+  { params }: { params: Promise<{ callId: string }> }
 ) {
   try {
+    const { callId } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -17,7 +18,7 @@ export async function PATCH(
 
     const call = await prisma.call.findFirst({
       where: {
-        id: params.callId,
+        id: callId,
         userId: currentUser.userId,
       },
     })
@@ -47,9 +48,10 @@ export async function PATCH(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { callId: string } }
+  { params }: { params: Promise<{ callId: string }> }
 ) {
   try {
+    const { callId } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -57,7 +59,7 @@ export async function GET(
 
     const call = await prisma.call.findFirst({
       where: {
-        id: params.callId,
+        id: callId,
         userId: currentUser.userId,
       },
       include: {

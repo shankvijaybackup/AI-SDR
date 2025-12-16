@@ -19,9 +19,10 @@ const updateLeadSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -29,7 +30,7 @@ export async function GET(
 
     const lead = await prisma.lead.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: currentUser.userId,
       },
       include: {
@@ -52,9 +53,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -65,7 +67,7 @@ export async function PATCH(
 
     const lead = await prisma.lead.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: currentUser.userId,
       },
     })
@@ -75,7 +77,7 @@ export async function PATCH(
     }
 
     const updatedLead = await prisma.lead.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...validatedData,
         email: validatedData.email || null,
@@ -100,9 +102,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -110,7 +113,7 @@ export async function DELETE(
 
     const lead = await prisma.lead.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: currentUser.userId,
       },
     })
@@ -120,7 +123,7 @@ export async function DELETE(
     }
 
     await prisma.lead.delete({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     return NextResponse.json({ success: true })

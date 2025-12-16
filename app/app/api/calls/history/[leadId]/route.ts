@@ -4,9 +4,10 @@ import { getCurrentUser } from '@/lib/auth'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { leadId: string } }
+  { params }: { params: Promise<{ leadId: string }> }
 ) {
   try {
+    const { leadId } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -14,7 +15,7 @@ export async function GET(
 
     const calls = await prisma.call.findMany({
       where: {
-        leadId: params.leadId,
+        leadId: leadId,
         userId: currentUser.userId,
       },
       include: {

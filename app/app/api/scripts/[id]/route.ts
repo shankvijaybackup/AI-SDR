@@ -11,9 +11,10 @@ const updateScriptSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -21,7 +22,7 @@ export async function GET(
 
     const script = await prisma.script.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: currentUser.userId,
       },
     })
@@ -39,9 +40,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -52,7 +54,7 @@ export async function PATCH(
 
     const script = await prisma.script.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: currentUser.userId,
       },
     })
@@ -67,14 +69,14 @@ export async function PATCH(
         where: {
           userId: currentUser.userId,
           isDefault: true,
-          id: { not: params.id },
+          id: { not: id },
         },
         data: { isDefault: false },
       })
     }
 
     const updatedScript = await prisma.script.update({
-      where: { id: params.id },
+      where: { id: id },
       data: validatedData,
     })
 
@@ -94,9 +96,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -104,7 +107,7 @@ export async function DELETE(
 
     const script = await prisma.script.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: currentUser.userId,
       },
     })
@@ -114,7 +117,7 @@ export async function DELETE(
     }
 
     await prisma.script.delete({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     return NextResponse.json({ success: true })
