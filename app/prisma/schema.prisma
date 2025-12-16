@@ -80,26 +80,31 @@ model Script {
 }
 
 model Call {
-  id            String    @id @default(uuid())
-  userId        String
-  leadId        String
-  scriptId      String?
-  twilioCallSid String?   @unique
-  voicePersona  String    @default("female")
-  transcript    Json
-  duration      Int?
-  status        String    @default("initiated")
-  aiSummary     String?
-  interestLevel String?
-  objections    String[]
-  emailCaptured String?
-  nextSteps     String?
-  scheduledDemo DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  script        Script?   @relation(fields: [scriptId], references: [id])
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid())
+  userId           String
+  leadId           String
+  scriptId         String?
+  twilioCallSid    String?   @unique
+  voicePersona     String    @default("female")
+  transcript       Json
+  duration         Int?
+  status           String    @default("initiated")
+  aiSummary        String?
+  interestLevel    String?
+  outcome          String?
+  conversionStage  String?
+  sentimentScore   Float?
+  engagementScore  Float?
+  callQualityScore Float?
+  objections       String[]
+  emailCaptured    String?
+  nextSteps        String?
+  scheduledDemo    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  script           Script?   @relation(fields: [scriptId], references: [id])
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, leadId])
   @@index([twilioCallSid])
