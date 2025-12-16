@@ -16,6 +16,8 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false  # Set manually in Render dashboard
+      - key: DIRECT_DATABASE_URL
+        sync: false  # Set to direct Neon connection (non-pooler)
       - key: JWT_SECRET
         generateValue: true
       - key: NEXT_PUBLIC_APP_URL
