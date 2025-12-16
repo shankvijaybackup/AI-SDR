@@ -19,26 +19,17 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: NEXT_PUBLIC_APP_URL
-        fromService:
-          type: web
-          name: ai-sdr-app
-          property: url
+        sync: false  # Set after deploy: https://ai-sdr-app.onrender.com
       - key: NEXT_PUBLIC_BACKEND_URL
-        fromService:
-          type: web
-          name: ai-sdr-backend
-          property: url
+        sync: false  # Set after deploy: https://ai-sdr-backend.onrender.com
       - key: BACKEND_API_URL
-        fromService:
-          type: web
-          name: ai-sdr-backend
-          property: url
+        sync: false  # Set after deploy: https://ai-sdr-backend.onrender.com
       - key: SENDGRID_API_KEY
-        sync: false  # Set manually
+        sync: false
       - key: FROM_EMAIL
-        sync: false  # Set manually
+        sync: false
       - key: OPENAI_API_KEY
-        sync: false  # Set manually
+        sync: false
 
   # Express Backend
   - type: web
@@ -55,17 +46,11 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_ORIGIN
-        fromService:
-          type: web
-          name: ai-sdr-app
-          property: url
+        sync: false  # Set after deploy: https://ai-sdr-app.onrender.com
       - key: PUBLIC_BASE_URL
-        fromService:
-          type: web
-          name: ai-sdr-backend
-          property: url
+        sync: false  # Set after deploy: https://ai-sdr-backend.onrender.com
       - key: OPENAI_API_KEY
-        sync: false  # Set manually
+        sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
