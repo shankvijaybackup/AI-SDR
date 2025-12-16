@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { token } = verifySchema.parse(body)
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { magicLinkToken: token },
     })
 
