@@ -12,6 +12,7 @@ const updateLeadSchema = z.object({
   jobTitle: z.string().optional(),
   linkedinUrl: z.string().url().optional().or(z.literal('')),
   notes: z.string().optional(),
+  region: z.string().optional(),
   status: z.enum(['pending', 'scheduled', 'completed', 'not_interested']).optional(),
   interestLevel: z.enum(['high', 'medium', 'low', 'none']).optional(),
   nextFollowUp: z.string().optional(),

@@ -12,6 +12,7 @@ const createLeadSchema = z.object({
   jobTitle: z.string().optional(),
   linkedinUrl: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
   notes: z.string().optional(),
+  region: z.string().min(1, 'Region is required'),
 })
 
 export async function GET(request: NextRequest) {

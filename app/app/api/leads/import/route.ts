@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         linkedinUrl: lead.linkedinUrl || null,
         notes: lead.notes || null,
         status: lead.status || 'pending',
+        region: lead.region ? String(lead.region).trim() || null : null,
         linkedinEnriched: false,
       })),
       skipDuplicates: true,

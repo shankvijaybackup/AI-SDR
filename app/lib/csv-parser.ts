@@ -11,6 +11,7 @@ export const leadCsvSchema = z.object({
   linkedinUrl: z.string().url().optional().or(z.literal('')),
   notes: z.string().optional().or(z.literal('')),
   status: z.enum(['pending', 'contacted', 'interested', 'not_interested']).optional().or(z.literal('')),
+  region: z.string().optional().or(z.literal('')),
 })
 
 // Script CSV validation schema

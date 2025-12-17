@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
         jobTitle: lead.jobTitle || null,
         linkedinUrl: lead.linkedinUrl || null,
         notes: lead.notes || null,
+        region: lead.region ? String(lead.region).trim() || null : null,
       })),
       skipDuplicates: true,
     })
