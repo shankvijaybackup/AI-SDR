@@ -7,6 +7,12 @@ import {
   getCustomerStory
 } from "./services/rag-service.js";
 import { getEnhancedContext } from "./services/enhanced-rag-service.js";
+import { getGroqReply, buildGroqSystemPrompt } from "./groqClient.js";
+import { getCachedResponse, needsAI } from "./responseCache.js";
+
+// Feature flags for hybrid AI approach
+const USE_GROQ = process.env.USE_GROQ === 'true' && process.env.GROQ_API_KEY;
+const USE_CACHE = process.env.USE_RESPONSE_CACHE !== 'false'; // Enabled by default
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -390,21 +396,61 @@ export async function getAiSdrReply({
   sttConfidence,
   userId,
   leadEmail,
-  leadRegion
+  leadRegion,
+  voicePersona = 'Arabella'
 }) {
   const startTime = Date.now();
   const phase = inferPhase({ transcript, latestUserText });
   console.log(`[AI] Phase: ${phase}`);
 
+  // ===== STEP 1: Try cached response (0ms latency) =====
+  if (USE_CACHE) {
+    const cachedResponse = getCachedResponse(latestUserText, phase, {
+      voicePersona,
+      leadEmail,
+    });
+
+    if (cachedResponse) {
+      const elapsed = Date.now() - startTime;
+      console.log(`[AI] CACHE HIT in ${elapsed}ms: "${cachedResponse.substring(0, 50)}..."`);
+      return sanitizeReply(cachedResponse, phase);
+    }
+  }
+
+  // ===== STEP 2: Try Groq for fast AI (~200ms) =====
+  if (USE_GROQ && !needsAI(latestUserText, phase)) {
+    // For simple responses that don't need full context, use Groq
+    try {
+      const groqSystemPrompt = buildGroqSystemPrompt(phase, voicePersona);
+      const groqUserPrompt = `The prospect just said: "${latestUserText}"\n\nRespond naturally.`;
+
+      const groqReply = await getGroqReply({
+        systemPrompt: groqSystemPrompt,
+        userPrompt: groqUserPrompt,
+        maxTokens: 40,
+        temperature: 0.5,
+      });
+
+      if (groqReply && groqReply.length > 5) {
+        const elapsed = Date.now() - startTime;
+        console.log(`[AI] GROQ SUCCESS in ${elapsed}ms`);
+        return sanitizeReply(groqReply, phase);
+      }
+    } catch (err) {
+      console.warn('[AI] Groq failed, falling back to OpenAI:', err.message);
+    }
+  }
+
+  // ===== STEP 3: Full OpenAI with RAG (standard path) =====
   // RAG: Only use for complex phases to reduce latency
   let ragContext = null;
   let objectionResponse = null;
   let companyInfo = null;
 
   // Skip RAG for simple phases (rapport, closing, email_capture) - reduces latency by ~500ms
-  const needsRAG = ['discovery', 'consultative', 'pitch'].includes(phase);
+  const needsRAGContext = ['discovery', 'consultative', 'pitch'].includes(phase);
 
-  if (needsRAG && userId) {
+  if (needsRAGContext && userId) {
     // Try enhanced RAG with uploaded knowledge sources first
     ragContext = await getEnhancedContext(latestUserText, userId, phase);
     if (ragContext) {

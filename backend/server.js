@@ -36,6 +36,8 @@ import { voiceMediaStreamWebhook } from "./routes/voice-media-stream.js";
 import { initiateCall, getActiveCall, updateCallTranscript, endCall } from "./routes/initiate-call.js";
 import { synthesizeWithChatterbox as chatterboxSynthesize, healthCheck as chatterboxHealth } from "./chatterboxClient.js";
 import { startCampaign, handleCallComplete, controlCampaign } from "./services/bulkCallManager.js";
+import { synthesizeWithDeepgram, healthCheck as deepgramHealth } from "./deepgramTTSClient.js";
+import { getCachedResponse, needsAI } from "./responseCache.js";
 
 const app = express();
 
@@ -242,9 +244,22 @@ export async function synthesizeWithChatterboxTTS(text, callSid) {
   return publicUrl;
 }
 
-// ---------- Unified TTS Helper (Auto-switch) ----------
-// Use ElevenLabs or Chatterbox based on env config
-export async function synthesizeTTS(text, callSid) {
+// ---------- Unified TTS Helper (Auto-switch with Deepgram priority) ----------
+// Try Deepgram first (fastest ~100-200ms), then ElevenLabs, then Chatterbox
+// Set USE_DEEPGRAM=true in env to enable Deepgram (requires DEEPGRAM_API_KEY)
+const USE_DEEPGRAM = process.env.USE_DEEPGRAM === 'true' && process.env.DEEPGRAM_API_KEY;
+
+export async function synthesizeTTS(text, callSid, voicePersona = null) {
+  // Try Deepgram first if enabled (fastest: ~100-200ms)
+  if (USE_DEEPGRAM) {
+    try {
+      return await synthesizeWithDeepgram(text, callSid, voicePersona);
+    } catch (err) {
+      console.warn('[TTS] Deepgram failed, falling back to ElevenLabs:', err.message);
+    }
+  }
+
+  // Fallback to Chatterbox or ElevenLabs
   if (USE_CHATTERBOX) {
     return await synthesizeWithChatterboxTTS(text, callSid);
   } else {
