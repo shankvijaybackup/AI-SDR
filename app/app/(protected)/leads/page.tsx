@@ -211,26 +211,26 @@ export default function LeadsPage() {
           <p className="text-slate-500 mt-2">Manage your lead pipeline</p>
         </div>
         <div className="flex items-center space-x-3">
-          {selectedLeads.size > 0 && (
-            <>
-              <Button
-                onClick={handleBulkEnrich}
-                variant="outline"
-                disabled={enrichingLeads.size > 0}
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                {enrichingLeads.size > 0 ? 'Enriching...' : `Enrich ${selectedLeads.size}`}
-              </Button>
-              <Button
-                onClick={handleBulkDelete}
-                variant="destructive"
-                disabled={isDeleting}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {isDeleting ? 'Deleting...' : `Delete ${selectedLeads.size}`}
-              </Button>
-            </>
-          )}
+          {/* Bulk actions - always show for debugging */}
+          <Button
+            onClick={handleBulkEnrich}
+            variant="outline"
+            disabled={enrichingLeads.size > 0 || selectedLeads.size === 0}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {enrichingLeads.size > 0 ? 'Enriching...' : `Enrich ${selectedLeads.size}`}
+          </Button>
+          <Button
+            onClick={() => {
+              console.log('[DEBUG] Delete clicked, selectedLeads:', selectedLeads.size, Array.from(selectedLeads))
+              handleBulkDelete()
+            }}
+            variant="destructive"
+            disabled={isDeleting || selectedLeads.size === 0}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            {isDeleting ? 'Deleting...' : `Delete ${selectedLeads.size}`}
+          </Button>
           <Button onClick={() => setShowUpload(!showUpload)} variant="outline">
             <UploadIcon className="w-4 h-4 mr-2" />
             {showUpload ? 'Hide Upload' : 'Import CSV'}
@@ -503,6 +503,6 @@ export default function LeadsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }
