@@ -56,15 +56,12 @@ export default function CallingPage() {
 
   const fetchLeads = async () => {
     try {
-      // Fetch all leads that can be called (not just pending)
+      // Fetch all leads
       const response = await fetch('/api/leads')
       if (response.ok) {
         const data = await response.json()
-        // Filter out leads that are marked as not_interested
-        const callableLeads = data.leads.filter((lead: Lead) => 
-          lead.phone && lead.phone.length > 0
-        )
-        setLeads(callableLeads)
+        // Show all leads - calling page will indicate if phone is missing
+        setLeads(data.leads)
       }
     } catch (error) {
       console.error('Failed to fetch leads:', error)
@@ -89,14 +86,14 @@ export default function CallingPage() {
 
   const handleStartCall = async () => {
     if (!selectedLead || !selectedScript) return
-    
+
     setCallStatus('preparing')
     setBackendLogs([
       '[Initiate Call] Starting call...',
       `[Script] Using: ${selectedScript.name}`,
       `[Voice] Auto-selected from pool (Arabella, Anika, Brandon, Adam, Jane)`
     ])
-    
+
     try {
       // Enrich lead with LinkedIn data if available and not already enriched
       if (selectedLead.linkedinUrl && !selectedLead.linkedinEnriched) {
@@ -142,7 +139,7 @@ export default function CallingPage() {
 
       const data = await response.json()
       setCurrentCallId(data.callId)
-      
+
       setCallStatus('calling')
       setTranscript([
         {
@@ -170,10 +167,10 @@ export default function CallingPage() {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
         const response = await fetch(`${backendUrl}/api/calls/${callId}/status`)
-        
+
         if (response.ok) {
           const data = await response.json()
-          
+
           // Update transcript if new entries
           if (data.transcript && data.transcript.length > transcript.length) {
             const newTranscript = data.transcript.map((entry: any) => ({
@@ -182,11 +179,11 @@ export default function CallingPage() {
               timestamp: new Date(entry.timestamp)
             }))
             setTranscript(newTranscript)
-            
+
             // Add backend-style logs for each new entry
             const newEntries = data.transcript.slice(transcript.length)
             newEntries.forEach((entry: any) => {
-              const logEntry = entry.speaker === 'agent' 
+              const logEntry = entry.speaker === 'agent'
                 ? `[AI Reply] ${entry.text}`
                 : `[User Speech] ${entry.text}`
               setBackendLogs(prev => [...prev, logEntry].slice(-20)) // Keep last 20 logs
@@ -258,11 +255,10 @@ export default function CallingPage() {
                     <div
                       key={lead.id}
                       onClick={() => setSelectedLead(lead)}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedLead?.id === lead.id
-                          ? 'border-blue-600 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedLead?.id === lead.id
+                        ? 'border-blue-600 bg-blue-50'
+                        : lead.phone ? 'border-slate-200 hover:border-slate-300' : 'border-orange-200 bg-orange-50 hover:border-orange-300'
+                        }`}
                     >
                       <div className="flex items-start justify-between">
                         <div>
@@ -271,7 +267,11 @@ export default function CallingPage() {
                           </h3>
                           <p className="text-sm text-slate-500">{lead.company}</p>
                           <p className="text-sm text-slate-500">{lead.jobTitle}</p>
-                          <p className="text-xs text-slate-400 mt-1">{lead.phone}</p>
+                          {lead.phone ? (
+                            <p className="text-xs text-slate-400 mt-1">{lead.phone}</p>
+                          ) : (
+                            <p className="text-xs text-orange-600 mt-1">⚠️ No phone number</p>
+                          )}
                         </div>
                         {lead.linkedinEnriched && (
                           <Linkedin className="w-4 h-4 text-blue-600" />
@@ -299,11 +299,10 @@ export default function CallingPage() {
                   <div
                     key={script.id}
                     onClick={() => setSelectedScript(script)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedScript?.id === script.id
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedScript?.id === script.id
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="font-medium text-slate-900">{script.name}</h3>
@@ -399,19 +398,22 @@ export default function CallingPage() {
         )}
 
         {/* Start Call Button */}
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-2">
           <Button
             size="lg"
             onClick={handleStartCall}
-            disabled={!selectedLead || !selectedScript}
+            disabled={!selectedLead || !selectedScript || !selectedLead?.phone}
             className="px-8"
           >
             <Phone className="w-5 h-5 mr-2" />
             Start Call
           </Button>
+          {selectedLead && !selectedLead.phone && (
+            <p className="text-sm text-orange-600">⚠️ This lead has no phone number. Add one in the Leads page.</p>
+          )}
         </div>
       </div>
-  )
+    )
   }
 
   // Render live call interface
@@ -456,11 +458,10 @@ export default function CallingPage() {
               {transcript.map((entry, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg ${
-                    entry.speaker === 'rep'
-                      ? 'bg-blue-50 border border-blue-200'
-                      : 'bg-slate-50 border border-slate-200'
-                  }`}
+                  className={`p-3 rounded-lg ${entry.speaker === 'rep'
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'bg-slate-50 border border-slate-200'
+                    }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-slate-500">
