@@ -340,14 +340,14 @@ app.post("/api/twilio/voice", async (req, res) => {
   const callSid = req.body.CallSid;
   const callId = req.query.callId;
   const customScript = req.query.script ? decodeURIComponent(req.query.script) : null;
-  const voicePersona = req.query.voicePersona || 'female';
+  const voicePersona = req.query.voicePersona || 'Arabella'; // Default to a real name
 
   // Bridge metadata from the initiation request into call state (lead email, userId, region)
   const activeCall = callId ? getActiveCall(callId) : null;
 
   // Extract first line/sentence from script as opening greeting
-  // MUST include a proper greeting with "How are you?" 
-  let openingScript = "Hi, this is Alex from Atomicwork. How are you doing today?";
+  // Use voicePersona name instead of hardcoded "Alex"
+  let openingScript = `Hi, this is ${voicePersona} from Atomicwork. How are you doing today?`;
   if (customScript) {
     // Take the first TWO sentences to ensure we get the "How are you?" part
     // Split on sentence boundaries but keep delimiters
@@ -368,7 +368,8 @@ app.post("/api/twilio/voice", async (req, res) => {
     script: (activeCall && activeCall.script) ? activeCall.script : (customScript || "Default sales script"),
     leadName: (activeCall && activeCall.leadName) ? activeCall.leadName : (req.query.leadName || "there"),
     companyName: "",
-    userId: (activeCall && activeCall.userId) ? activeCall.userId : null
+    userId: (activeCall && activeCall.userId) ? activeCall.userId : null,
+    voicePersona: voicePersona // Store voice persona name in call state
   });
   updateCall(callSid, { status: "in-progress" });
 
