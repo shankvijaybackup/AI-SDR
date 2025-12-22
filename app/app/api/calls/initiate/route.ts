@@ -45,17 +45,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
-    // Fetch script
+    // Fetch script - allow user's own scripts OR shared scripts
     const script = await prisma.script.findFirst({
       where: {
         id: validatedData.scriptId,
-        userId: currentUser.userId,
+        OR: [
+          { userId: currentUser.userId },
+          { isShared: true },
+          { userId: null }, // Scripts without owner (default/seeded scripts)
+        ],
       },
     })
 
     if (!script) {
       return NextResponse.json({ error: 'Script not found' }, { status: 404 })
     }
+
+    // Fetch user's knowledge sources for context
+    const knowledgeSources = await prisma.knowledgeSource.findMany({
+      where: { userId: currentUser.userId },
+      select: {
+        title: true,
+        type: true,
+        content: true,
+      },
+      take: 5, // Limit to prevent context overload
+    })
 
     // Create call record (voicePersona will be set by backend)
     const call = await prisma.call.create({
@@ -79,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Build contextual script using LinkedIn enriched data if available
     if (lead.linkedinEnriched && lead.linkedinData) {
-      console.log('[LinkedIn] Building contextual script with enriched data')
+      console.log('[Call] Building contextual script with enriched data')
       personalizedScript = buildContextualScript(
         personalizedScript,
         {
@@ -92,9 +107,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Add knowledge base context for AI
+    if (knowledgeSources.length > 0) {
+      console.log(`[Call] Adding ${knowledgeSources.length} knowledge sources to context`)
+
+      // Build knowledge context string
+      const knowledgeContext = knowledgeSources.map(source => {
+        // Truncate content to prevent context overload
+        const truncatedContent = source.content.length > 1000
+          ? source.content.substring(0, 1000) + '...'
+          : source.content
+        return `=== ${source.title} (${source.type}) ===\n${truncatedContent}`
+      }).join('\n\n')
+
+      personalizedScript += `\n\n=== PRODUCT KNOWLEDGE ===
+Use the following knowledge when discussing our solution:
+
+${knowledgeContext}
+
+Remember to:
+- Connect the prospect's pain points to our solution
+- Use relevant talking points based on their role and interests
+- Reference specific features that address their focus areas`
+    }
+
     // Call Twilio backend to initiate call
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:4000'
-    
+
     try {
       const twilioResponse = await fetch(`${backendUrl}/api/twilio/initiate-call`, {
         method: 'POST',

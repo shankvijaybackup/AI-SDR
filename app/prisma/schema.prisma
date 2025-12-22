@@ -35,9 +35,26 @@ model User {
   knowledgeSources      KnowledgeSource[]
   leads                 Lead[]
   scripts               Script[]
+  bulkCallCampaigns     BulkCallCampaign[]
+  regionalPhoneNumbers  RegionalPhoneNumber[]
 
   @@index([isActive])
   @@index([isEmailVerified])
+}
+
+// Regional phone numbers for different countries/regions
+model RegionalPhoneNumber {
+  id          String   @id @default(uuid())
+  userId      String
+  region      String   // e.g., "ANZ", "US", "UK", "India", "EU"
+  phoneNumber String   // e.g., "+61341574513"
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, region])
+  @@index([userId])
 }
 
 model Lead {
@@ -76,8 +93,9 @@ model Script {
   createdBy String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  calls     Call[]
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calls              Call[]
+  user               User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bulkCallCampaigns  BulkCallCampaign[]
 
   @@index([userId])
   @@index([isShared])
@@ -88,6 +106,7 @@ model Call {
   userId           String
   leadId           String
   scriptId         String?
+  campaignId       String?   // Link to bulk call campaign
   twilioCallSid    String?   @unique
   voicePersona     String    @default("female")
   transcript       Json
@@ -109,9 +128,35 @@ model Call {
   lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   script           Script?   @relation(fields: [scriptId], references: [id])
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign         BulkCallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@index([userId, leadId])
   @@index([twilioCallSid])
+  @@index([campaignId])
+}
+
+model BulkCallCampaign {
+  id                String    @id @default(uuid())
+  userId            String
+  name              String
+  scriptId          String
+  status            String    @default("pending") // pending, running, paused, completed, cancelled
+  totalLeads        Int       @default(0)
+  completedCalls    Int       @default(0)
+  successfulCalls   Int       @default(0)
+  failedCalls       Int       @default(0)
+  currentLeadIndex  Int       @default(0)  // Index of current lead being called
+  leadIds           String[]  // Array of lead IDs to call
+  delayBetweenCalls Int       @default(5)  // seconds between calls
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  script            Script    @relation(fields: [scriptId], references: [id])
+  calls             Call[]
+
+  @@index([userId, status])
 }
 
 model KnowledgeSource {

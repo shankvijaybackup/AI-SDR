@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Phone, Users, FileText, Calendar, Settings, LogOut, BarChart3, BookOpen } from 'lucide-react'
+import { Phone, Users, FileText, Calendar, Settings, LogOut, BarChart3, BookOpen, PhoneCall } from 'lucide-react'
 
 interface User {
   id: string
@@ -59,6 +59,7 @@ export default function ProtectedLayout({
     { name: 'Leads', href: '/leads', icon: Users },
     { name: 'Scripts', href: '/scripts', icon: FileText },
     { name: 'Calling', href: '/calling', icon: Phone },
+    { name: 'Bulk Calling', href: '/bulk-calling', icon: PhoneCall },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
     { name: 'Follow-ups', href: '/follow-ups', icon: Calendar },
@@ -113,11 +114,10 @@ export default function ProtectedLayout({
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-                    isActive
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${isActive
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   <Icon className={`w-5 h-5 ${isActive ? 'text-white' : ''}`} />
                   <span className={`text-sm font-medium ${isActive ? 'text-white' : ''}`}>{item.name}</span>

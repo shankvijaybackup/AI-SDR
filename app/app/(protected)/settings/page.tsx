@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send } from 'lucide-react'
+import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe } from 'lucide-react'
 
 interface TeamUser {
   id: string
@@ -48,18 +48,76 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
-  
+
   // Invite user state
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteForm, setInviteForm] = useState({ email: '', firstName: '', lastName: '' })
   const [inviting, setInviting] = useState(false)
   const [inviteResult, setInviteResult] = useState<{ url: string; email: string } | null>(null)
 
+  // Regional phone numbers state
+  interface PhoneNumber { id: string; region: string; phoneNumber: string; isDefault: boolean }
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([])
+  const [phoneForm, setPhoneForm] = useState({ region: '', phoneNumber: '', isDefault: false })
+  const [savingPhone, setSavingPhone] = useState(false)
+
   useEffect(() => {
     fetchUserData()
     fetchUsers()
     fetchProfile()
+    fetchPhoneNumbers()
   }, [])
+
+  const fetchPhoneNumbers = async () => {
+    try {
+      const response = await fetch('/api/settings/phone-numbers')
+      if (response.ok) {
+        const data = await response.json()
+        setPhoneNumbers(data.phoneNumbers)
+      }
+    } catch (error) {
+      console.error('Failed to fetch phone numbers:', error)
+    }
+  }
+
+  const handleSavePhoneNumber = async () => {
+    if (!phoneForm.region || !phoneForm.phoneNumber) {
+      setMessage({ type: 'error', text: 'Please enter region and phone number' })
+      return
+    }
+    setSavingPhone(true)
+    try {
+      const response = await fetch('/api/settings/phone-numbers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(phoneForm),
+      })
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Phone number saved!' })
+        setPhoneForm({ region: '', phoneNumber: '', isDefault: false })
+        fetchPhoneNumbers()
+      } else {
+        const data = await response.json()
+        setMessage({ type: 'error', text: data.error || 'Failed to save' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save phone number' })
+    } finally {
+      setSavingPhone(false)
+    }
+  }
+
+  const handleDeletePhoneNumber = async (id: string) => {
+    try {
+      const response = await fetch(`/api/settings/phone-numbers?id=${id}`, { method: 'DELETE' })
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Phone number removed' })
+        fetchPhoneNumbers()
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to delete' })
+    }
+  }
 
   const fetchUserData = async () => {
     try {
@@ -126,10 +184,10 @@ export default function SettingsPage() {
       })
       const data = await response.json()
       if (response.ok) {
-        setMessage({ 
-          type: 'success', 
-          text: data.emailSent 
-            ? `Verification email sent to ${email}` 
+        setMessage({
+          type: 'success',
+          text: data.emailSent
+            ? `Verification email sent to ${email}`
             : `Verification link generated for ${email}. Check console for URL.`
         })
       } else {
@@ -266,11 +324,10 @@ export default function SettingsPage() {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-md ${
-          message.type === 'success' 
-            ? 'bg-green-50 border border-green-200 text-green-700' 
-            : 'bg-red-50 border border-red-200 text-red-700'
-        }`}>
+        <div className={`p-4 rounded-md ${message.type === 'success'
+          ? 'bg-green-50 border border-green-200 text-green-700'
+          : 'bg-red-50 border border-red-200 text-red-700'
+          }`}>
           {message.text}
         </div>
       )}
@@ -324,7 +381,7 @@ export default function SettingsPage() {
                       <Label htmlFor="email">Email</Label>
                       <Input id="email" value={profile.email} disabled className="bg-slate-50" />
                     </div>
-                    
+
                     {/* LinkedIn Integration in Profile */}
                     <div className="border-t pt-4 mt-4">
                       <div className="flex items-center space-x-2 mb-3">
@@ -337,9 +394,9 @@ export default function SettingsPage() {
                             <Shield className="w-4 h-4 text-green-600" />
                             <span className="text-sm text-green-700">Connected</span>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-red-600 hover:text-red-700"
                             onClick={handleRemoveLinkedIn}
                           >
@@ -361,7 +418,7 @@ export default function SettingsPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     <Button onClick={handleSaveProfile} disabled={profileSaving} className="w-full">
                       {profileSaving ? 'Saving...' : 'Save Profile'}
                     </Button>
@@ -380,7 +437,7 @@ export default function SettingsPage() {
                 </span>
               </div>
               <div className="flex-1">
-                <button 
+                <button
                   onClick={() => setProfileOpen(true)}
                   className="text-left hover:underline"
                 >
@@ -444,11 +501,10 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-3">
               {users.map((user) => (
-                <div 
-                  key={user.id} 
-                  className={`flex items-center space-x-4 p-3 border rounded-lg ${
-                    !user.isActive ? 'bg-slate-50 opacity-60' : ''
-                  }`}
+                <div
+                  key={user.id}
+                  className={`flex items-center space-x-4 p-3 border rounded-lg ${!user.isActive ? 'bg-slate-50 opacity-60' : ''
+                    }`}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-sm font-semibold text-primary">
@@ -589,6 +645,77 @@ export default function SettingsPage() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Regional Phone Numbers */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <Globe className="w-5 h-5 text-slate-600" />
+            <CardTitle>Regional Phone Numbers</CardTitle>
+          </div>
+          <CardDescription>
+            Configure Twilio phone numbers for different regions. Calls will use the matching regional number.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Existing numbers */}
+          {phoneNumbers.length > 0 && (
+            <div className="space-y-2">
+              {phoneNumbers.map((phone) => (
+                <div key={phone.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Phone className="w-4 h-4 text-slate-500" />
+                    <div>
+                      <p className="font-medium">{phone.region}</p>
+                      <p className="text-sm text-slate-500">{phone.phoneNumber}</p>
+                    </div>
+                    {phone.isDefault && <Badge variant="secondary">Default</Badge>}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => handleDeletePhoneNumber(phone.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add new number */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="phone-region">Region</Label>
+              <Input
+                id="phone-region"
+                placeholder="ANZ, US, UK, India..."
+                value={phoneForm.region}
+                onChange={(e) => setPhoneForm({ ...phoneForm, region: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="phone-number">Phone Number</Label>
+              <Input
+                id="phone-number"
+                placeholder="+14155551234"
+                value={phoneForm.phoneNumber}
+                onChange={(e) => setPhoneForm({ ...phoneForm, phoneNumber: e.target.value })}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={handleSavePhoneNumber} disabled={savingPhone}>
+                <Plus className="w-4 h-4 mr-1" />
+                {savingPhone ? 'Saving...' : 'Add'}
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">
+            Tip: Use region names like "ANZ", "US", "UK", "India", "EU". Phone must be E.164 format (+country code + number).
+          </p>
         </CardContent>
       </Card>
     </div>

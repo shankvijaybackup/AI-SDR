@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CsvUpload } from '@/components/csv-upload'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { CsvColumnMapper } from '@/components/csv-column-mapper'
 import { AddLeadDialog } from '@/components/add-lead-dialog'
-import { Search, Plus, Phone, Mail, Linkedin, Upload as UploadIcon, Trash2, Sparkles } from 'lucide-react'
+import LeadPersonaDisplay from '@/components/lead-persona-display'
+import { Search, Plus, Phone, Mail, Linkedin, Upload as UploadIcon, Trash2, Sparkles, Eye, RefreshCw } from 'lucide-react'
 
 interface Lead {
   id: string
@@ -21,6 +23,7 @@ interface Lead {
   interestLevel?: string
   region?: string
   linkedinEnriched: boolean
+  linkedinData?: any
   calls: any[]
 }
 
@@ -34,6 +37,8 @@ export default function LeadsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [enrichingLeads, setEnrichingLeads] = useState<Set<string>>(new Set())
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [showDetailDialog, setShowDetailDialog] = useState(false)
 
   useEffect(() => {
     fetchLeads()
@@ -43,7 +48,7 @@ export default function LeadsPage() {
     try {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.append('status', statusFilter)
-      
+
       const response = await fetch(`/api/leads?${params}`)
       if (response.ok) {
         const data = await response.json()
@@ -76,7 +81,7 @@ export default function LeadsPage() {
 
   const handleEnrichLead = async (leadId: string) => {
     setEnrichingLeads(prev => new Set(prev).add(leadId))
-    
+
     try {
       const response = await fetch(`/api/leads/${leadId}/enrich`, {
         method: 'POST',
@@ -103,19 +108,19 @@ export default function LeadsPage() {
 
   const handleBulkEnrich = async () => {
     if (selectedLeads.size === 0) return
-    
+
     const leadsToEnrich = Array.from(selectedLeads)
     setEnrichingLeads(new Set(leadsToEnrich))
-    
+
     let successCount = 0
     let failCount = 0
-    
+
     for (const leadId of leadsToEnrich) {
       try {
         const response = await fetch(`/api/leads/${leadId}/enrich`, {
           method: 'POST',
         })
-        
+
         if (response.ok) {
           successCount++
         } else {
@@ -125,7 +130,7 @@ export default function LeadsPage() {
         failCount++
       }
     }
-    
+
     setEnrichingLeads(new Set())
     await fetchLeads()
     alert(`Enrichment complete: ${successCount} succeeded, ${failCount} failed`)
@@ -134,7 +139,7 @@ export default function LeadsPage() {
 
   const handleBulkDelete = async () => {
     if (selectedLeads.size === 0) return
-    
+
     if (!confirm(`Are you sure you want to delete ${selectedLeads.size} lead${selectedLeads.size !== 1 ? 's' : ''}? This action cannot be undone.`)) {
       return
     }
@@ -194,16 +199,16 @@ export default function LeadsPage() {
         <div className="flex items-center space-x-3">
           {selectedLeads.size > 0 && (
             <>
-              <Button 
-                onClick={handleBulkEnrich} 
+              <Button
+                onClick={handleBulkEnrich}
                 variant="outline"
                 disabled={enrichingLeads.size > 0}
               >
                 <Sparkles className="w-4 h-4 mr-2" />
                 {enrichingLeads.size > 0 ? 'Enriching...' : `Enrich ${selectedLeads.size}`}
               </Button>
-              <Button 
-                onClick={handleBulkDelete} 
+              <Button
+                onClick={handleBulkDelete}
                 variant="destructive"
                 disabled={isDeleting}
               >
@@ -224,11 +229,7 @@ export default function LeadsPage() {
       </div>
 
       {showUpload && (
-        <CsvUpload
-          title="Import Leads from CSV"
-          description="Upload a CSV file with your leads. The file should include firstName, lastName, and phone as required fields."
-          endpoint="/api/leads/import"
-          sampleFormat={['firstName', 'lastName', 'phone', 'email', 'company', 'jobTitle', 'linkedinUrl', 'notes', 'status', 'region']}
+        <CsvColumnMapper
           onSuccess={() => {
             fetchLeads()
             setShowUpload(false)
@@ -370,8 +371,8 @@ export default function LeadsPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-2">
                           {lead.linkedinUrl && !lead.linkedinEnriched && (
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => handleEnrichLead(lead.id)}
                               disabled={enrichingLeads.has(lead.id)}
@@ -386,8 +387,15 @@ export default function LeadsPage() {
                               Enriched
                             </span>
                           )}
-                          <Button variant="outline" size="sm">
-                            View
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedLead(lead)
+                              setShowDetailDialog(true)
+                            }}
+                          >
+                            <Eye className="w-3 h-3 mr-1" /> View
                           </Button>
                         </div>
                       </td>
@@ -399,6 +407,80 @@ export default function LeadsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Lead Detail Dialog */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent>
+          <div className="max-h-[75vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                <div className="flex items-center justify-between">
+                  <span>{selectedLead?.firstName} {selectedLead?.lastName}</span>
+                  {selectedLead?.linkedinUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedLead && handleEnrichLead(selectedLead.id)}
+                      disabled={enrichingLeads.has(selectedLead?.id || '')}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-1 ${enrichingLeads.has(selectedLead?.id || '') ? 'animate-spin' : ''}`} />
+                      {selectedLead?.linkedinEnriched ? 'Re-Enrich' : 'Enrich'}
+                    </Button>
+                  )}
+                </div>
+              </DialogTitle>
+              <DialogDescription>
+                {selectedLead?.jobTitle && selectedLead?.company
+                  ? `${selectedLead.jobTitle} at ${selectedLead.company}`
+                  : selectedLead?.company || selectedLead?.jobTitle || 'No info'}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-4">
+              {/* Contact Info */}
+              <div className="flex items-center space-x-4 mb-6 p-3 bg-slate-50 rounded-lg">
+                {selectedLead?.email && (
+                  <a href={`mailto:${selectedLead.email}`} className="flex items-center text-sm text-slate-600 hover:text-primary">
+                    <Mail className="w-4 h-4 mr-1" /> {selectedLead.email}
+                  </a>
+                )}
+                {selectedLead?.phone && (
+                  <a href={`tel:${selectedLead.phone}`} className="flex items-center text-sm text-slate-600 hover:text-primary">
+                    <Phone className="w-4 h-4 mr-1" /> {selectedLead.phone}
+                  </a>
+                )}
+                {selectedLead?.linkedinUrl && (
+                  <a href={selectedLead.linkedinUrl} target="_blank" rel="noopener noreferrer" className="flex items-center text-sm text-blue-600 hover:underline">
+                    <Linkedin className="w-4 h-4 mr-1" /> LinkedIn
+                  </a>
+                )}
+              </div>
+
+              {/* Persona Display */}
+              {selectedLead?.linkedinEnriched && selectedLead?.linkedinData ? (
+                <LeadPersonaDisplay linkedinData={selectedLead.linkedinData} />
+              ) : (
+                <div className="text-center py-8 text-slate-400">
+                  <Sparkles className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No persona data available</p>
+                  {selectedLead?.linkedinUrl ? (
+                    <Button
+                      className="mt-4"
+                      onClick={() => selectedLead && handleEnrichLead(selectedLead.id)}
+                      disabled={enrichingLeads.has(selectedLead?.id || '')}
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      {enrichingLeads.has(selectedLead?.id || '') ? 'Enriching...' : 'Enrich with LinkedIn'}
+                    </Button>
+                  ) : (
+                    <p className="text-sm mt-2">Add a LinkedIn URL to generate persona</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

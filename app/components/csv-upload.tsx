@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Upload, CheckCircle, AlertCircle, FileText } from 'lucide-react'
+import { Upload, CheckCircle, AlertCircle, FileText, Sparkles } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface CsvUploadProps {
@@ -12,15 +12,18 @@ interface CsvUploadProps {
   endpoint: string
   sampleFormat: string[]
   onSuccess?: () => void
+  showAutoEnrich?: boolean  // Only show for leads import
 }
 
-export function CsvUpload({ title, description, endpoint, sampleFormat, onSuccess }: CsvUploadProps) {
+export function CsvUpload({ title, description, endpoint, sampleFormat, onSuccess, showAutoEnrich = false }: CsvUploadProps) {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [autoEnrich, setAutoEnrich] = useState(true) // Default to true for better UX
   const [result, setResult] = useState<{
     success: boolean
     message: string
     count?: number
+    enrichmentStarted?: number
     errors?: Array<{ row: number; errors: string[] }>
   } | null>(null)
 
@@ -43,6 +46,9 @@ export function CsvUpload({ title, description, endpoint, sampleFormat, onSucces
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (showAutoEnrich) {
+        formData.append('autoEnrich', autoEnrich.toString())
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -56,6 +62,7 @@ export function CsvUpload({ title, description, endpoint, sampleFormat, onSucces
           success: true,
           message: data.message,
           count: data.count,
+          enrichmentStarted: data.enrichmentStarted,
         })
         setFile(null)
         if (onSuccess) onSuccess()
@@ -91,6 +98,23 @@ export function CsvUpload({ title, description, endpoint, sampleFormat, onSucces
           </code>
         </div>
 
+        {/* Auto-Enrich Option (for leads only) */}
+        {showAutoEnrich && (
+          <label className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200 cursor-pointer hover:border-purple-300 transition-colors">
+            <input
+              type="checkbox"
+              checked={autoEnrich}
+              onChange={(e) => setAutoEnrich(e.target.checked)}
+              className="w-4 h-4 rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+            />
+            <Sparkles className="w-5 h-5 text-purple-500" />
+            <div>
+              <p className="text-sm font-medium text-slate-700">Auto-Enrich with LinkedIn</p>
+              <p className="text-xs text-slate-500">Automatically enrich leads that have LinkedIn URLs</p>
+            </div>
+          </label>
+        )}
+
         {/* File Input */}
         <div className="flex items-center gap-3">
           <label className="flex-1">
@@ -108,7 +132,7 @@ export function CsvUpload({ title, description, endpoint, sampleFormat, onSucces
               </span>
             </div>
           </label>
-          
+
           <Button
             onClick={handleUpload}
             disabled={!file || uploading}
@@ -140,6 +164,11 @@ export function CsvUpload({ title, description, endpoint, sampleFormat, onSucces
               <p className="font-medium">{result.message}</p>
               {result.count !== undefined && (
                 <p className="text-sm mt-1">Imported {result.count} records</p>
+              )}
+              {result.enrichmentStarted !== undefined && result.enrichmentStarted > 0 && (
+                <p className="text-sm mt-1 text-purple-600">
+                  ✨ Auto-enriching {result.enrichmentStarted} leads in background...
+                </p>
               )}
               {result.errors && result.errors.length > 0 && (
                 <div className="mt-2 space-y-1">

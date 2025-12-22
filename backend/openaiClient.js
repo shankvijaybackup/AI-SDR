@@ -1,10 +1,10 @@
 // backend/openaiClient.js
 import OpenAI from "openai";
-import { 
-  findObjectionResponse, 
-  getRelevantContext, 
+import {
+  findObjectionResponse,
+  getRelevantContext,
   getCompanyInfo,
-  getCustomerStory 
+  getCustomerStory
 } from "./services/rag-service.js";
 import { getEnhancedContext } from "./services/enhanced-rag-service.js";
 
@@ -25,14 +25,14 @@ function inferPhase({ transcript, latestUserText }) {
   const text = latestUserText.toLowerCase();
 
   // Check if permission was granted
-  const permissionGranted = transcript.some(t => 
-    t.speaker === 'prospect' && 
+  const permissionGranted = transcript.some(t =>
+    t.speaker === 'prospect' &&
     /yes|sure|yeah|go ahead|good time|let'?s talk|sounds good/i.test(t.text)
   );
 
   // Count how many discovery questions have been asked
-  const discoveryQuestions = transcript.filter(t => 
-    t.speaker === 'agent' && 
+  const discoveryQuestions = transcript.filter(t =>
+    t.speaker === 'agent' &&
     /what tools|how do you|how'?s|where do employees|what's your biggest|how are employees|tell me about/i.test(t.text)
   ).length;
 
@@ -43,8 +43,8 @@ function inferPhase({ transcript, latestUserText }) {
   );
 
   // CLOSING: After email is captured and confirmed, end gracefully
-  const emailCaptured = transcript.some(t => 
-    t.speaker === 'agent' && 
+  const emailCaptured = transcript.some(t =>
+    t.speaker === 'agent' &&
     /what'?s your email|email address|spelled|reach out.*monday|send.*confirmation/i.test(t.text)
   );
 
@@ -61,7 +61,7 @@ function inferPhase({ transcript, latestUserText }) {
       t.speaker === 'prospect' &&
       /let'?s meet|meet next week|schedule|book|demo|send.*times/i.test(t.text)
     );
-  
+
   const emailConfirmed = transcript.some(t =>
     t.speaker === 'prospect' &&
     /sure|sounds good|yeah|okay|right|thank you|thanks/i.test(t.text)
@@ -132,7 +132,7 @@ function inferPhase({ transcript, latestUserText }) {
  */
 function buildSystemPrompt(phase, customScript = null) {
   // If custom script provided, use it; otherwise fall back to Atomicwork default
-  const basePersona = customScript 
+  const basePersona = customScript
     ? `You are a friendly, emotionally intelligent SDR making an outbound sales call.
 
 Your script/talking points:
@@ -182,7 +182,7 @@ High-level rules:
 - Do **not** repeat the same question in new words.
 - Never say "as an AI" or anything that reveals you are an AI.
 - Do **not** assume the prospect is frustrated unless they clearly say so.
-- If prospect asks about Atomicwork, give a brief answer then pivot back to them.
+- **If prospect asks about Atomicwork**, give a REAL answer! Atomicwork is an AI-native service management platform based in San Francisco with an office in Bangalore. We help IT teams automate ticket resolution, access requests, and employee support using agentic AI. After answering, ask them a discovery question.
 
 **EMOTIONAL INTELLIGENCE & HUMAN BEHAVIOR:**
 - **Mirror their energy**: If they're enthusiastic, match it. If they're cautious, be more measured.
@@ -201,14 +201,14 @@ Conversation phases:
 
 1) RAPPORT phase ("rapport")
 - Goal: Build genuine human connection and GET EXPLICIT PERMISSION before discovery.
-- Respond warmly to their greeting.
+- **CRITICAL: Actually LISTEN to what the prospect says**. Don't assume they asked "how are you?".
+- If they say "Hi" or "Hello": Simply greet them back, introduce yourself, and ask if it's a good time. Example: "Hey! This is Alex from Atomicwork. Is this a good time to chat?"
+- If they say "Hi [Name]" (acknowledging you): Respond naturally. Example: "Hey! How are you? Just wanted to check—is now a good time for a quick chat?"
+- If they ask "How are you?": THEN you can respond "I'm doing great, thanks!" and ask permission.
+- If they ask "Who is this?" or "What company?": Answer clearly first! "This is Alex from Atomicwork. We help IT teams automate service management with AI. Is now a good time?"
+- DO NOT say "I'm doing great" unless they actually asked how you are.
 - Then IMMEDIATELY ask for permission to talk business.
 - DO NOT ask discovery questions until they say yes.
-- Example flow:
-  * Turn 1: "I'm doing great, thanks! Quick question—is this a good time to chat about how you're handling IT service management?"
-  * If they ask "Who is this?": "This is Alex from Atomicwork. We help IT teams automate service management. Is now a good time to chat?"
-  * If they say yes: Move to discovery.
-  * If they say no: "No worries at all, when works better for you?"
 - CRITICAL: Stay in rapport phase until they explicitly say yes, sure, go ahead, or similar.
 - Do NOT jump to discovery questions without permission.
 
@@ -294,6 +294,19 @@ YOUR BEHAVIOUR BY PHASE:
 - If phase = "pitch": NOW mention Atomicwork ONCE, tie to their pain, ask for demo/info.
 - If phase = "email_capture": Just collect email. NO PITCHING. Confirm spelling and next steps.
 - If phase = "closing": Say ONE brief thank you/goodbye and END. No more questions.
+
+**HANDLING "NOT INTERESTED" - STATE OF AI REPORT FALLBACK:**
+When prospect says "not interested", "no thanks", "I'm good", or similar rejections:
+1. DO NOT just hang up or give up immediately!
+2. Acknowledge respectfully: "Totally fair, I appreciate your honesty."
+3. THEN offer the State of AI Report as a value-add:
+   * "Quick thought before I let you go—we put together a State of AI in IT report with insights from CIOs and IT leaders. No sales pitch, just industry data. Can I send it over?"
+   * OR: "No worries at all. Would it be helpful if I sent you our State of AI report? It's just industry research—no strings attached."
+   * OR: "I hear you. Before I go—we recently published a State of AI in IT report based on conversations with 50+ IT leaders. Happy to share it if that's useful?"
+4. If they say yes to the report: "Great! What's the best email to send it to?" → Capture email, then close warmly.
+5. If they say no to the report: "Totally understand. Thanks for your time today!" → End gracefully.
+
+This is your LAST CHANCE to get their email and provide value. Use it!
 
 **HANDLING OFF-SCRIPT QUESTIONS:**
 If prospect asks about company details (location, size, funding, team, etc.) at ANY phase:
@@ -383,24 +396,24 @@ export async function getAiSdrReply({
   const phase = inferPhase({ transcript, latestUserText });
   console.log(`[AI] Phase: ${phase}`);
 
-  // RAG: Use enhanced context (uploaded KB + static KB)
+  // RAG: Only use for complex phases to reduce latency
   let ragContext = null;
   let objectionResponse = null;
   let companyInfo = null;
-  
-  if (userId) {
+
+  // Skip RAG for simple phases (rapport, closing, email_capture) - reduces latency by ~500ms
+  const needsRAG = ['discovery', 'consultative', 'pitch'].includes(phase);
+
+  if (needsRAG && userId) {
     // Try enhanced RAG with uploaded knowledge sources first
     ragContext = await getEnhancedContext(latestUserText, userId, phase);
     if (ragContext) {
       console.log(`[Enhanced RAG] Retrieved ${ragContext.type} from: ${ragContext.source}`);
-      if (ragContext.sources) {
-        console.log(`[Enhanced RAG] Sources: ${ragContext.sources.join(', ')}`);
-      }
     }
   }
-  
-  // Fallback to static RAG if no enhanced context found
-  if (!ragContext) {
+
+  // Fallback to static RAG only for pitch/consultative (most value there)
+  if (!ragContext && ['consultative', 'pitch'].includes(phase)) {
     ragContext = await getRelevantContext(latestUserText, phase);
     if (ragContext) {
       console.log(`[Static RAG] Retrieved context from: ${ragContext.sources.join(', ')}`);
@@ -423,10 +436,10 @@ export async function getAiSdrReply({
       /\b(company|who are you|what is|tell me about|background|founded|headquarter|location|based|office|pricing|cost|funding|investor|ceo|cto)\b/i.test(lowerUserText);
 
     if (mentionsAtomicwork || isCompanyInfoQuestion) {
-      companyInfo = getCompanyInfo(latestUserText);
-      if (companyInfo) {
-        console.log(`[RAG] Retrieved company info`);
-      }
+      // ALWAYS provide Atomicwork info when asked directly
+      const atomicworkInfo = `Atomicwork is an AI-native service management platform. Headquarters: San Francisco, California (with offices in Bangalore, India). We help IT, HR, and Finance teams automate employee support using agentic AI. Our Universal AI Agent "Atom" meets employees in Slack and Teams to resolve requests without portals or tickets. Key capabilities: identity & access management automation, 40-60% ticket deflection, 100+ preconfigured AI skills.`;
+      console.log(`[RAG] Retrieved company info for Atomicwork question`);
+      companyInfo = atomicworkInfo;
     }
   }
 
@@ -471,10 +484,10 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
 
   userContent += `\n\nRemember: you are Alex on a live call. Reply with what you would say **next**, given we are in phase "${phase}".`;
 
-  // Use faster model with timeout for voice calls
+  // Use faster model with tight timeout for voice calls
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-  
+  const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout - use fallback if slow
+
   try {
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini", // Fast model for voice
@@ -482,13 +495,13 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
         { role: "system", content: system },
         { role: "user", content: userContent }
       ],
-      max_tokens: 60, // Keep responses SHORT for voice
+      max_tokens: 50, // Reduced from 60 for faster voice responses
       temperature: 0.6, // More consistent
       presence_penalty: 0.2,
       frequency_penalty: 0.2,
       stream: false
     }, { signal: controller.signal });
-    
+
     clearTimeout(timeoutId);
 
     let raw =

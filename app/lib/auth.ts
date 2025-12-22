@@ -3,6 +3,11 @@ import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key'
+if (process.env.JWT_SECRET) {
+  console.log('[Auth] JWT_SECRET loaded from env (Length:', process.env.JWT_SECRET.length, ')')
+} else {
+  console.warn('[Auth] Using fallback JWT_SECRET!')
+}
 const TOKEN_NAME = 'auth-token'
 
 export interface JWTPayload {
@@ -25,7 +30,8 @@ export function generateToken(payload: JWTPayload): string {
 export function verifyToken(token: string): JWTPayload | null {
   try {
     return jwt.verify(token, JWT_SECRET) as JWTPayload
-  } catch {
+  } catch (error) {
+    console.error('[Auth] Token verification failed:', error)
     return null
   }
 }

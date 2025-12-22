@@ -35,8 +35,10 @@ import { voiceRealtimeWebhook } from "./routes/voice-realtime.js";
 import { voiceMediaStreamWebhook } from "./routes/voice-media-stream.js";
 import { initiateCall, getActiveCall, updateCallTranscript, endCall } from "./routes/initiate-call.js";
 import { synthesizeWithChatterbox as chatterboxSynthesize, healthCheck as chatterboxHealth } from "./chatterboxClient.js";
+import { startCampaign, handleCallComplete, controlCampaign } from "./services/bulkCallManager.js";
 
 const app = express();
+
 const PORT = process.env.PORT || 4000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
@@ -56,7 +58,7 @@ function getVoiceIdForCall(callSid) {
   if (callVoiceMap.has(callSid)) {
     return callVoiceMap.get(callSid);
   }
-  
+
   // Fallback to legacy alternating logic (shouldn't happen with new system)
   console.warn(`[Voice] No voice found for callSid ${callSid}, using fallback`);
   const useFemaleVoice = callVoiceMap.size % 2 === 0;
@@ -97,6 +99,31 @@ app.use(bodyParser.json());
 // Serve synthesized TTS files so Twilio can <Play> them
 app.use("/tts", express.static(TTS_DIR));
 
+// Import Persona Service
+import { generateCompanyPersona } from "./services/personaService.js";
+
+// ---------- PERSONA GENERATION ROUTE ----------
+app.post("/api/knowledge/persona", async (req, res) => {
+  try {
+    const { url, companyName, existingKnowledge } = req.body;
+    if (!url || !companyName) {
+      return res.status(400).json({ error: "Missing url or companyName" });
+    }
+
+    if (existingKnowledge) {
+      console.log(`[API] Received ${existingKnowledge.length} chars of existing knowledge`);
+    }
+
+    // Call the multi-AI service with optional existing knowledge
+    const persona = await generateCompanyPersona(url, companyName, existingKnowledge);
+
+    res.json({ persona });
+  } catch (err) {
+    console.error("[API] Persona generation failed:", err);
+    res.status(500).json({ error: "Failed to generate persona", details: err.message });
+  }
+});
+
 // ---------- ElevenLabs TTS Helper ----------
 
 // Timeout wrapper for async operations
@@ -128,8 +155,8 @@ export async function synthesizeWithElevenLabs(text, callSid) {
   }
 
   // Truncate long text to prevent slow TTS
-  const truncatedText = truncateForTTS(text, 180);
-  
+  const truncatedText = truncateForTTS(text, 150); // Reduced from 180 for faster TTS
+
   const voiceId = getVoiceIdForCall(callSid);
   const voiceType = voiceId === ELEVEN_VOICE_ID_FEMALE ? "Female" : "Male";
   console.log(`[ElevenLabs] Synthesizing (${voiceType}) for ${callSid}:`, truncatedText.substring(0, 50) + '...');
@@ -138,7 +165,7 @@ export async function synthesizeWithElevenLabs(text, callSid) {
 
   // Add timeout to prevent hanging
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced from 8s for faster fallback
 
   try {
     const res = await fetch(url, {
@@ -216,7 +243,7 @@ export async function synthesizeWithChatterboxTTS(text, callSid) {
 }
 
 // ---------- Unified TTS Helper (Auto-switch) ----------
-
+// Use ElevenLabs or Chatterbox based on env config
 export async function synthesizeTTS(text, callSid) {
   if (USE_CHATTERBOX) {
     return await synthesizeWithChatterboxTTS(text, callSid);
@@ -319,12 +346,21 @@ app.post("/api/twilio/voice", async (req, res) => {
   const activeCall = callId ? getActiveCall(callId) : null;
 
   // Extract first line/sentence from script as opening greeting
+  // MUST include a proper greeting with "How are you?" 
   let openingScript = "Hi, this is Alex from Atomicwork. How are you doing today?";
   if (customScript) {
-    // Extract first sentence or up to first newline
-    const firstLine = customScript.split(/[\n.!?]/)[0].trim();
-    if (firstLine && firstLine.length > 10) {
-      openingScript = firstLine;
+    // Take the first TWO sentences to ensure we get the "How are you?" part
+    // Split on sentence boundaries but keep delimiters
+    const sentences = customScript.match(/[^.!?]+[.!?]+/g) || [customScript];
+    if (sentences.length >= 2) {
+      // Take first two sentences
+      openingScript = sentences.slice(0, 2).join(' ').trim();
+    } else if (sentences.length === 1 && sentences[0].length > 10) {
+      openingScript = sentences[0].trim();
+    }
+    // Ensure it's not too long for TTS (max 200 chars)
+    if (openingScript.length > 200) {
+      openingScript = openingScript.substring(0, 200);
     }
   }
 
@@ -345,24 +381,24 @@ app.post("/api/twilio/voice", async (req, res) => {
 
   console.log(`[Script] Using opening: ${openingScript.substring(0, 80)}...`);
 
-  // Play greeting with TTS (auto-switches between Chatterbox/ElevenLabs)
+  // Play greeting with TTS (ElevenLabs with Polly fallback)
   try {
     const audioUrl = await synthesizeTTS(openingScript, callSid);
     console.log(`[Greeting] Playing: ${audioUrl}`);
     twiml.play(audioUrl);
   } catch (err) {
-    console.error("[Greeting] TTS failed, using Polly:", err);
+    console.error("[Greeting] TTS failed, using Polly:", err.message);
     twiml.say({ voice: "Polly.Joanna" }, openingScript);
   }
 
-  twiml.pause({ length: 0.5 });
+  twiml.pause({ length: 0.15 }); // Reduced from 0.2 for faster response
 
   // Gather with Enhanced Speech Model for better accuracy
   twiml.gather({
     input: "speech",
     action: "/api/twilio/handle-speech",
     method: "POST",
-    timeout: 12,
+    timeout: 10, // Reduced from 12 for snappier response
     speechTimeout: "auto",
     speechModel: "phone_call",  // Enhanced model for phone calls
     enhanced: true,              // Enable enhanced speech recognition
@@ -382,7 +418,7 @@ app.post("/api/twilio/voice", async (req, res) => {
 
 app.post("/api/twilio/handle-speech", async (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  
+
   try {
     const callSid = req.body.CallSid;
     const speechResult = req.body.SpeechResult || "";
@@ -408,18 +444,13 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     // If Twilio posts back with no speech (silence/timeout), reprompt + listen again.
     if (!String(speechResult || "").trim()) {
-      try {
-        const stillThereUrl = await synthesizeTTS("Are you still there?", callSid);
-        twiml.play(stillThereUrl);
-      } catch (err) {
-        twiml.pause({ length: 0.2 });
-      }
+      twiml.say({ voice: "Polly.Joanna" }, "Are you still there?");
 
       twiml.gather({
         input: "speech",
         action: "/api/twilio/handle-speech",
         method: "POST",
-        timeout: 12,
+        timeout: 10,
         speechTimeout: "auto",
         speechModel: "phone_call",
         enhanced: true,
@@ -439,7 +470,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
         input: "speech",
         action: "/api/twilio/handle-speech",
         method: "POST",
-        timeout: 12,
+        timeout: 10,
         speechTimeout: "auto",
         speechModel: "phone_call",
         enhanced: true,
@@ -463,10 +494,9 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
     const isNotInterested =
       /\b(not interested|no thanks|no thank you|not a fit|not for me|not now|no i'?m not|no, i'?m not|i'?m not interested)\b/i.test(normalizedSpeech);
 
-    if (isOptOut || isNotInterested) {
-      const closingLine = isOptOut
-        ? "Understood — I'll take you off our list. Sorry for the interruption."
-        : "Totally fair — I'll let you go. Have a good one!";
+    // Only hard-close for explicit opt-outs (do not call list requests)
+    if (isOptOut) {
+      const closingLine = "Understood — I'll take you off our list. Sorry for the interruption.";
       addTranscript(callSid, { speaker: "agent", text: closingLine });
       try {
         const audioUrl = await synthesizeTTS(closingLine, callSid);
@@ -475,11 +505,12 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       } catch {
         twiml.say({ voice: "Polly.Joanna" }, closingLine);
       }
-      twiml.pause({ length: 0.8 });
+      twiml.pause({ length: 0.5 });
       twiml.hangup();
       res.type("text/xml");
       return res.send(twiml.toString());
     }
+    // NOTE: "not interested" is now handled by AI, which will offer State of AI report as fallback
 
     // If we just asked to VERIFY an email on file, handle the response deterministically.
     if (call.leadEmail) {
@@ -555,7 +586,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
           input: "speech",
           action: "/api/twilio/handle-speech",
           method: "POST",
-          timeout: 12,
+          timeout: 10,
           speechTimeout: "auto",
           speechModel: "phone_call",
           enhanced: true,
@@ -596,7 +627,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
         input: "speech",
         action: "/api/twilio/handle-speech",
         method: "POST",
-        timeout: 12,
+        timeout: 10,
         speechTimeout: "auto",
         speechModel: "phone_call",
         enhanced: true,
@@ -624,30 +655,24 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     addTranscript(callSid, { speaker: "agent", text: reply });
 
-    // Play AI reply with TTS - use Polly as fast fallback
-    let audioPlayed = false;
+    // Play AI reply with TTS (ElevenLabs with Polly fallback)
     try {
       const audioUrl = await synthesizeTTS(reply, callSid);
       console.log(`[AI Reply] Playing: ${audioUrl}`);
       twiml.play(audioUrl);
-      audioPlayed = true;
     } catch (err) {
-      console.error("[TTS] Failed, using Polly:", err.message);
-    }
-    
-    if (!audioPlayed) {
-      // Fallback to Polly (faster, more reliable)
+      console.error("[AI Reply] TTS failed, using Polly:", err.message);
       twiml.say({ voice: "Polly.Joanna" }, reply);
     }
 
     // Check if this is a closing statement (thanks, goodbye, talk soon, etc.)
     // Be careful not to match "chat" or "good time to chat"
     const isClosing = /\b(thanks for your time|talk to you soon|have a great day|have a good day|have a wonderful day|looking forward to our call|appreciate your interest|goodbye|bye now|take care|speak soon|catch you later)\b/i.test(reply);
-    
+
     // Also check if conversation has gone on too long (10+ exchanges)
     const conversationLength = call.transcript.length;
     const shouldEnd = isClosing || conversationLength > 20;
-    
+
     if (shouldEnd) {
       // End the call gracefully after closing statement
       console.log(`[Call End] Closing detected (isClosing: ${isClosing}, length: ${conversationLength}), ending call gracefully`);
@@ -656,13 +681,13 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
     } else {
       // Continue conversation
       twiml.pause({ length: 0.3 });
-      
+
       // Gather next response with Enhanced Speech Model
       twiml.gather({
         input: "speech",
         action: "/api/twilio/handle-speech",
         method: "POST",
-        timeout: 12,
+        timeout: 10,
         speechTimeout: "auto",
         speechModel: "phone_call",
         enhanced: true,
@@ -679,12 +704,12 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
   } catch (err) {
     console.error("[Error] handle-speech failed:", err.message);
     console.error("[Error] Stack:", err.stack);
-    
+
     // More graceful error message
     twiml.say("I apologize, I'm having a technical issue on my end. I'll follow up with you via email shortly. Thanks for your time!");
     twiml.pause({ length: 1 });
     twiml.hangup();
-    
+
     res.type("text/xml");
     res.send(twiml.toString());
   }
@@ -695,6 +720,8 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 app.post("/api/twilio/status", async (req, res) => {
   const callSid = req.body.CallSid;
   const callStatus = req.body.CallStatus;
+  const callId = req.query.callId;
+  const campaignId = req.query.campaignId;
   const call = getCall(callSid);
 
   if (!call) {
@@ -709,6 +736,15 @@ app.post("/api/twilio/status", async (req, res) => {
       updateCall(callSid, { summary });
     } catch (err) {
       console.error("Error summarizing call:", err);
+    }
+  }
+
+  // Handle bulk campaign call completion
+  if (campaignId && (callStatus === "completed" || callStatus === "failed" || callStatus === "busy" || callStatus === "no-answer")) {
+    try {
+      await handleCallComplete(callId, campaignId, callStatus);
+    } catch (err) {
+      console.error("Error handling bulk call completion:", err);
     }
   }
 
@@ -731,6 +767,41 @@ app.get("/api/calls/:callId/status", (req, res) => {
     transcript: call.transcript,
     duration: call.duration,
   });
+});
+
+// ---------- Bulk Calling Routes ----------
+
+// Start a bulk calling campaign
+app.post("/api/bulk-calls/start", async (req, res) => {
+  try {
+    const { campaignId, userId } = req.body;
+    if (!campaignId || !userId) {
+      return res.status(400).json({ error: 'Missing campaignId or userId' });
+    }
+    const result = await startCampaign(campaignId, userId);
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('[BulkCall] Start error:', error);
+    res.status(500).json({ error: 'Failed to start campaign' });
+  }
+});
+
+// Control a bulk calling campaign (pause/resume/cancel)
+app.post("/api/bulk-calls/control", async (req, res) => {
+  try {
+    const { campaignId, action } = req.body;
+    if (!campaignId || !action) {
+      return res.status(400).json({ error: 'Missing campaignId or action' });
+    }
+    const result = await controlCampaign(campaignId, action);
+    res.json(result);
+  } catch (error) {
+    console.error('[BulkCall] Control error:', error);
+    res.status(500).json({ error: 'Failed to control campaign' });
+  }
 });
 
 // ---------- Start server ----------

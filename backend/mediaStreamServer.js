@@ -27,7 +27,7 @@ try {
 
 // Map callSid -> connection/session
 const sessions = new Map();
-const SPEECH_PAUSE_MS = 1200;
+const SPEECH_PAUSE_MS = 800; // Reduced from 1200ms for faster response
 
 function scheduleOpenAiResponse(streamSid) {
   const sessionInfo = sessions.get(streamSid);
@@ -97,7 +97,7 @@ export function attachMediaStreamServer(httpServer) {
             ws.close();
             return;
           }
-          
+
           console.log(`[MediaStream] Call found: ${call.leadName}, Script: ${call.script?.substring(0, 50)}...`);
 
           // Play greeting first
@@ -105,7 +105,7 @@ export function attachMediaStreamServer(httpServer) {
             const openingScript = call.script || "Hi, this is Alex from Atomicwork. How are you doing today?";
             const audioUrl = await synthesizeTTS(openingScript, callSid);
             console.log(`[Greeting] Synthesized: ${audioUrl}`);
-            
+
             const mulawAudio = await convertMp3ToMulaw(audioUrl);
             console.log(`[Greeting] Sending audio to Twilio...`);
             sendAudioToTwilio(ws, twilioStreamSid, mulawAudio);
@@ -122,28 +122,28 @@ export function attachMediaStreamServer(httpServer) {
 
             deepgramConnection.on("Results", async (data) => {
               const result = extractTranscript(data);
-              
+
               if (result.isFinal && result.text) {
                 console.log(`[Deepgram] Transcript: "${result.text}" (confidence: ${result.confidence.toFixed(2)})`);
                 currentTranscript = result.text;
                 lastSpeechTime = Date.now();
-                
+
                 // Clear existing timer
                 if (speechTimer) clearTimeout(speechTimer);
-                
-                // Wait for speech to finish (1.5s of silence)
+
+                // Wait for speech to finish (1s of silence - reduced from 1.5s)
                 speechTimer = setTimeout(async () => {
                   if (!currentTranscript) return;
-                  
+
                   const call = getActiveCall(callSid);
                   if (!call) {
                     console.error(`[MediaStream] Call not found for CallSid: ${callSid}`);
                     return;
                   }
-                  
+
                   // Add to transcript
                   updateCallTranscript(callSid, { speaker: "prospect", text: currentTranscript });
-                  
+
                   // Get AI reply
                   console.log(`[AI] Processing: "${currentTranscript}"`);
                   const reply = await getAiSdrReply({
@@ -154,14 +154,14 @@ export function attachMediaStreamServer(httpServer) {
                     userId: call.userId,
                     leadEmail: call.leadEmail
                   });
-                  
+
                   updateCallTranscript(callSid, { speaker: "agent", text: reply });
-                  
+
                   // Play AI reply
                   try {
                     const audioUrl = await synthesizeTTS(reply, callSid);
                     console.log(`[AI Reply] Synthesized: ${audioUrl}`);
-                    
+
                     const mulawAudio = await convertMp3ToMulaw(audioUrl);
                     console.log(`[AI Reply] Sending audio to Twilio...`);
                     sendAudioToTwilio(ws, twilioStreamSid, mulawAudio);
@@ -169,9 +169,9 @@ export function attachMediaStreamServer(httpServer) {
                   } catch (err) {
                     console.error("[AI Reply] Error:", err);
                   }
-                  
+
                   currentTranscript = "";
-                }, 1500);
+                }, 1000); // Reduced from 1500ms
               }
             });
 
@@ -190,7 +190,7 @@ export function attachMediaStreamServer(httpServer) {
 
         case "media": {
           const { payload } = data.media; // base64 μ-law audio from Twilio
-          
+
           // Send audio to Deepgram for transcription
           if (deepgramConnection && deepgramReady) {
             const audioBuffer = Buffer.from(payload, "base64");

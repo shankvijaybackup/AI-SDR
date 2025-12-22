@@ -3,13 +3,63 @@ import { getVoiceByLocation } from '../utils/voice-rotation.js';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const publicBaseUrl = process.env.PUBLIC_BASE_URL;
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+// Fallback phone numbers from env (used if DB lookup fails)
+const FALLBACK_PHONES = {
+  default: process.env.TWILIO_PHONE_NUMBER,
+  anz: process.env.TWILIO_PHONE_NUMBER_ANZ || '+61341574513',
+};
 
 const client = twilio(accountSid, authToken);
 
 // Store active calls
 const activeCalls = new Map();
+
+// Get phone number from database via API
+async function getPhoneNumberFromDB(userId, region) {
+  try {
+    const url = `${frontendUrl}/api/settings/phone-numbers/lookup?userId=${userId}&region=${encodeURIComponent(region || '')}`;
+    const response = await fetch(url, { timeout: 3000 });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.phoneNumber) {
+        console.log(`[Phone] DB lookup: ${data.phoneNumber} for region ${data.region}`);
+        return data.phoneNumber;
+      }
+    }
+  } catch (err) {
+    console.log(`[Phone] DB lookup failed, using fallback:`, err.message);
+  }
+  return null;
+}
+
+// Get the appropriate phone number based on lead's region
+async function getPhoneNumberForRegion(region, userId) {
+  // Try database lookup first (if userId available)
+  if (userId) {
+    const dbPhone = await getPhoneNumberFromDB(userId, region);
+    if (dbPhone) return dbPhone;
+  }
+
+  // Fallback to env vars
+  if (!region) {
+    console.log(`[Phone] Using default: ${FALLBACK_PHONES.default}`);
+    return FALLBACK_PHONES.default;
+  }
+
+  const r = region.toLowerCase().trim();
+
+  // ANZ/Oceania
+  if (['australia', 'au', 'aus', 'new zealand', 'nz', 'anz', 'oceania'].some(x => r.includes(x))) {
+    console.log(`[Phone] ANZ fallback: ${FALLBACK_PHONES.anz}`);
+    return FALLBACK_PHONES.anz;
+  }
+
+  console.log(`[Phone] Default: ${FALLBACK_PHONES.default}`);
+  return FALLBACK_PHONES.default;
+}
 
 async function initiateCall(req, res) {
   try {
@@ -24,8 +74,13 @@ async function initiateCall(req, res) {
     const voicePersona = selectedVoice.name; // Use voice name as persona
     const voiceId = selectedVoice.id;
 
+    // Select phone number based on lead's region (from DB or env fallback)
+    const userId = req.body.userId || null;
+    const fromNumber = await getPhoneNumberForRegion(region, userId);
+
     console.log(`[Initiate Call] Starting call to ${phoneNumber} for ${leadName}`);
     console.log(`[Initiate Call] Region: ${region || 'Not specified'}`);
+    console.log(`[Initiate Call] From: ${fromNumber}`);
     console.log(`[Initiate Call] Voice: ${voicePersona} (${selectedVoice.gender}), ID: ${voiceId}`);
     console.log(`[Initiate Call] Script: ${script.substring(0, 50)}...`);
 
@@ -48,7 +103,7 @@ async function initiateCall(req, res) {
     const call = await client.calls.create({
       url: `${publicBaseUrl}/api/twilio/voice?callId=${callId}&voicePersona=${voicePersona}&script=${encodeURIComponent(script)}`,
       to: phoneNumber,
-      from: twilioPhoneNumber,
+      from: fromNumber, // Use region-specific phone number
       statusCallback: `${publicBaseUrl}/api/twilio/status?callId=${callId}`,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       record: true,
@@ -64,7 +119,7 @@ async function initiateCall(req, res) {
       activeCalls.set(call.sid, callData);
       activeCalls.set(callId, callData);
       console.log(`[Initiate Call] Call stored by both callId=${callId} and twilioSid=${call.sid}`);
-      
+
       // Register voice for this call in server.js
       const { setVoiceForCall } = await import('../server.js');
       setVoiceForCall(call.sid, voiceId);

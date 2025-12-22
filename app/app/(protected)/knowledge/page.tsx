@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle, Bot, Globe, Sparkles } from 'lucide-react'
 
 interface KnowledgeSource {
   id: string
@@ -29,7 +29,14 @@ export default function KnowledgePage() {
   const [uploading, setUploading] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
 
-  // Form state
+  // Persona Gen State
+  const [showPersonaDialog, setShowPersonaDialog] = useState(false)
+  const [companyName, setCompanyName] = useState('')
+  const [companyUrl, setCompanyUrl] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [generatedPersona, setGeneratedPersona] = useState<any>(null)
+
+  // Upload Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('product')
@@ -57,6 +64,98 @@ export default function KnowledgePage() {
     }
   }
 
+  const handleGeneratePersona = async () => {
+    if (!companyName || !companyUrl) {
+      alert("Please enter both Company Name and URL")
+      return
+    }
+
+    setGenerating(true)
+    setGeneratedPersona(null)
+
+    try {
+      // Step 1: Search existing knowledge base for content about this company
+      let existingKnowledge = ""
+      const searchTerms = companyName.toLowerCase().split(/\s+/)
+
+      // Filter knowledge sources that might contain info about this company
+      const relevantSources = sources.filter(source => {
+        const titleMatch = searchTerms.some(term =>
+          source.title?.toLowerCase().includes(term)
+        )
+        const descMatch = searchTerms.some(term =>
+          source.description?.toLowerCase().includes(term)
+        )
+        // Exclude any previously generated personas for this company
+        const isNotPersona = source.type !== 'text' || !source.title?.includes('AI Persona')
+        return (titleMatch || descMatch) && isNotPersona
+      })
+
+      if (relevantSources.length > 0) {
+        console.log(`[Persona] Found ${relevantSources.length} existing knowledge sources about "${companyName}"`)
+        existingKnowledge = relevantSources.map(s =>
+          `[${s.title}]: ${s.description || ''} ${s.summary || ''}`
+        ).join('\n\n')
+      }
+
+      // Step 2: Call backend with both company info AND existing knowledge
+      const res = await fetch("/api/knowledge/persona", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName,
+          url: companyUrl,
+          existingKnowledge: existingKnowledge || undefined
+        })
+      })
+
+      if (!res.ok) throw new Error("Generation failed")
+
+      const data = await res.json()
+      setGeneratedPersona(data.persona)
+    } catch (err) {
+      console.error("Persona Gen Error:", err)
+      alert("Failed to generate persona. Check console.")
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleSavePersona = async () => {
+    if (!generatedPersona) return
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('title', `${companyName} - AI Persona`)
+      formData.append('description', `Multi-AI generated persona for ${companyName}`)
+      formData.append('type', 'text')
+      formData.append('category', 'sales')
+      formData.append('tags', 'persona, ai-generated, company-research')
+      formData.append('content', JSON.stringify(generatedPersona, null, 2))
+
+      const response = await fetch('/api/knowledge/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        alert('Persona saved to Knowledge Base!')
+        setShowPersonaDialog(false)
+        setGeneratedPersona(null)
+        setCompanyName('')
+        setCompanyUrl('')
+        fetchKnowledgeSources()
+      } else {
+        alert('Failed to save persona')
+      }
+    } catch (err) {
+      console.error('Save error:', err)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleUpload = async () => {
     if (!title) {
       alert('Please enter a title')
@@ -65,7 +164,7 @@ export default function KnowledgePage() {
 
     // Auto-detect upload type based on what user provided
     let uploadType: 'document' | 'video' | 'url' | 'text'
-    
+
     if (files.length > 0) {
       uploadType = 'document'
     } else if (videoUrl) {
@@ -194,11 +293,100 @@ export default function KnowledgePage() {
           <h1 className="text-3xl font-bold text-slate-900">Knowledge Base</h1>
           <p className="text-slate-500 mt-2">Upload documents, videos, and content to power your AI SDR</p>
         </div>
-        <Button onClick={() => setShowUploadDialog(true)}>
-          <Upload className="w-4 h-4 mr-2" />
-          Add Knowledge
-        </Button>
+        <div className="flex space-x-3">
+          <Button variant="outline" onClick={() => setShowPersonaDialog(true)} className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+            <Sparkles className="w-4 h-4 mr-2" />
+            Generate Persona
+          </Button>
+          <Button onClick={() => setShowUploadDialog(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Add Knowledge
+          </Button>
+        </div>
       </div>
+
+      {/* Persona Dialog */}
+      {showPersonaDialog && (
+        <Card className="border-2 border-indigo-500 shadow-xl">
+          <CardHeader className="bg-indigo-50 border-b border-indigo-100">
+            <CardTitle className="flex items-center text-indigo-900">
+              <Bot className="w-5 h-5 mr-2" />
+              AI Company Persona Generator
+            </CardTitle>
+            <CardDescription>
+              Uses <strong>Perplexity</strong> (Research), <strong>Gemini</strong> (Analysis), and <strong>OpenAI</strong> (Synthesis) to build a deep company profile.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            {!generatedPersona ? (
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label>Company Name</Label>
+                  <Input
+                    placeholder="e.g. Atomicwork"
+                    value={companyName}
+                    onChange={e => setCompanyName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Website URL</Label>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                      <Globe className="w-4 h-4" />
+                    </span>
+                    <Input
+                      className="rounded-l-none"
+                      placeholder="https://atomicwork.com"
+                      value={companyUrl}
+                      onChange={e => setCompanyUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowPersonaDialog(false)}>Cancel</Button>
+                  <Button onClick={handleGeneratePersona} disabled={generating} className="bg-indigo-600 hover:bg-indigo-700">
+                    {generating ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Researching (approx 20s)...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Generate with AI
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in fade-in duration-500">
+                <div className="bg-green-50 p-4 rounded-md border border-green-200">
+                  <h3 className="font-bold text-green-900 flex items-center">
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Persona Generated Successfully!
+                  </h3>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-md border text-sm space-y-2 max-h-96 overflow-y-auto font-mono">
+                  <pre>{JSON.stringify(generatedPersona, null, 2)}</pre>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <Button variant="ghost" onClick={() => setGeneratedPersona(null)}>Back</Button>
+                  <div className="space-x-2">
+                    <Button variant="outline" onClick={() => setShowPersonaDialog(false)}>Close</Button>
+                    <Button onClick={handleSavePersona} disabled={uploading}>
+                      {uploading ? 'Saving...' : 'Save to Knowledge Base'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {showUploadDialog && (
         <Card className="border-2 border-primary">
@@ -285,7 +473,7 @@ export default function KnowledgePage() {
                     const newFiles = Array.from(e.target.files || [])
                     const combined = [...files, ...newFiles]
                     // Remove duplicates by name
-                    const unique = combined.filter((file, index, self) => 
+                    const unique = combined.filter((file, index, self) =>
                       index === self.findIndex(f => f.name === file.name)
                     )
                     if (unique.length > 10) {
