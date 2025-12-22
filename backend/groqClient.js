@@ -4,9 +4,17 @@
 
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
+// Lazy initialization - only create client when actually needed
+let groqClient = null;
+
+function getGroqClient() {
+    if (!groqClient && process.env.GROQ_API_KEY) {
+        groqClient = new Groq({
+            apiKey: process.env.GROQ_API_KEY,
+        });
+    }
+    return groqClient;
+}
 
 // Available Groq models (all free)
 const MODELS = {
@@ -39,7 +47,11 @@ export async function getGroqReply({
     const startTime = Date.now();
 
     try {
-        const completion = await groq.chat.completions.create({
+        const client = getGroqClient();
+        if (!client) {
+            throw new Error('Groq client not initialized');
+        }
+        const completion = await client.chat.completions.create({
             model: DEFAULT_MODEL,
             messages: [
                 { role: 'system', content: systemPrompt },
@@ -95,7 +107,11 @@ export async function healthCheck() {
 
     try {
         const startTime = Date.now();
-        const completion = await groq.chat.completions.create({
+        const client = getGroqClient();
+        if (!client) {
+            return { available: false, reason: 'Groq client not initialized' };
+        }
+        const completion = await client.chat.completions.create({
             model: DEFAULT_MODEL,
             messages: [{ role: 'user', content: 'Say "ok"' }],
             max_tokens: 5,
