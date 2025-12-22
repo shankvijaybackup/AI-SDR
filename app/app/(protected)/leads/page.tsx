@@ -88,7 +88,21 @@ export default function LeadsPage() {
       })
 
       if (response.ok) {
-        await fetchLeads()
+        // Fetch fresh leads
+        const params = new URLSearchParams()
+        if (statusFilter !== 'all') params.append('status', statusFilter)
+        const leadsResponse = await fetch(`/api/leads?${params}`)
+        if (leadsResponse.ok) {
+          const data = await leadsResponse.json()
+          setLeads(data.leads)
+          // Update selectedLead if it's the one we just enriched
+          if (selectedLead?.id === leadId) {
+            const updatedLead = data.leads.find((l: Lead) => l.id === leadId)
+            if (updatedLead) {
+              setSelectedLead(updatedLead)
+            }
+          }
+        }
         alert('Lead enriched successfully with LinkedIn data!')
       } else {
         const error = await response.json()
