@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuth } from '@/lib/auth'
-import bcrypt from 'bcrypt'
+import { getCurrentUser, hashPassword } from '@/lib/auth'
 
 // POST - Reset password for a user (admin only)
 export async function POST(request: NextRequest) {
     try {
-        const auth = await verifyAuth(request)
-        if (!auth) {
+        const user = await getCurrentUser()
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         // Only admins can reset passwords
-        if (auth.role !== 'admin') {
+        if (user.role !== 'admin') {
             return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
         }
 
@@ -28,10 +27,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Hash the new password
-        const hashedPassword = await bcrypt.hash(newPassword, 12)
+        const hashedPassword = await hashPassword(newPassword)
 
         // Update user
-        const user = await prisma.user.update({
+        const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: { password: hashedPassword },
             select: { id: true, email: true, firstName: true, lastName: true }
@@ -39,8 +38,8 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: `Password reset for ${user.email}`,
-            user
+            message: `Password reset for ${updatedUser.email}`,
+            user: updatedUser
         })
     } catch (error) {
         console.error('Password reset error:', error)
