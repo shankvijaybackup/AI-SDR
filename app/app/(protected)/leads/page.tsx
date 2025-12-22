@@ -315,8 +315,12 @@ export default function LeadsPage() {
                       <input
                         type="checkbox"
                         checked={selectedLeads.size === filteredLeads.length && filteredLeads.length > 0}
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300"
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleSelectAll(e.target.checked)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 rounded border-gray-300 cursor-pointer"
                       />
                     </th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Name</th>
@@ -335,8 +339,12 @@ export default function LeadsPage() {
                         <input
                           type="checkbox"
                           checked={selectedLeads.has(lead.id)}
-                          onChange={(e) => handleSelectLead(lead.id, e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300"
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleSelectLead(lead.id, e.target.checked)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 rounded border-gray-300 cursor-pointer"
                         />
                       </td>
                       <td className="py-3 px-4">
