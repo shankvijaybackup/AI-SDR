@@ -38,6 +38,7 @@ import { synthesizeWithChatterbox as chatterboxSynthesize, healthCheck as chatte
 import { startCampaign, handleCallComplete, controlCampaign } from "./services/bulkCallManager.js";
 import { synthesizeWithDeepgram, healthCheck as deepgramHealth } from "./deepgramTTSClient.js";
 import { getCachedResponse, needsAI } from "./responseCache.js";
+import { addFillerToResponse, getFillerPhrase } from "./fillerWords.js";
 
 const app = express();
 
@@ -364,9 +365,12 @@ app.post("/api/twilio/voice", async (req, res) => {
   // Use voicePersona name instead of hardcoded "Alex"
   let openingScript = `Hi, this is ${voicePersona} from Atomicwork. How are you doing today?`;
   if (customScript) {
+    // Replace {{repName}} placeholder with actual voice persona name
+    const processedScript = customScript.replace(/\{\{repName\}\}/gi, voicePersona);
+
     // Take the first TWO sentences to ensure we get the "How are you?" part
     // Split on sentence boundaries but keep delimiters
-    const sentences = customScript.match(/[^.!?]+[.!?]+/g) || [customScript];
+    const sentences = processedScript.match(/[^.!?]+[.!?]+/g) || [processedScript];
     if (sentences.length >= 2) {
       // Take first two sentences
       openingScript = sentences.slice(0, 2).join(' ').trim();
@@ -746,10 +750,43 @@ app.post("/api/twilio/status", async (req, res) => {
 
   updateCall(callSid, { status: callStatus });
 
+  // ===== AUTOMATED POST-CALL PROCESSING =====
   if (callStatus === "completed") {
+    console.log(`[Post-Call] Call ${callSid} completed. Processing transcript and summary...`);
+
     try {
+      // Generate AI summary
       const summary = await summarizeCall({ transcript: call.transcript });
       updateCall(callSid, { summary });
+      console.log(`[Post-Call] Summary generated: ${summary?.substring(0, 50)}...`);
+
+      // Save transcript and summary to database via frontend API
+      if (callId) {
+        const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        try {
+          // Save transcript and summary to database
+          const updateResponse = await fetch(`${FRONTEND_URL}/api/calls/${callId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              transcript: call.transcript,
+              summary: summary,
+              duration: Math.floor((Date.now() - new Date(call.createdAt).getTime()) / 1000),
+              status: 'completed',
+              voicePersona: call.voicePersona || 'Arabella'
+            })
+          });
+
+          if (updateResponse.ok) {
+            console.log(`[Post-Call] ✅ Transcript and summary saved to database for call ${callId}`);
+          } else {
+            console.error(`[Post-Call] Failed to save to database:`, await updateResponse.text());
+          }
+        } catch (dbErr) {
+          console.error(`[Post-Call] Error saving to database:`, dbErr.message);
+        }
+      }
     } catch (err) {
       console.error("Error summarizing call:", err);
     }

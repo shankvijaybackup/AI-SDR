@@ -34,14 +34,20 @@ function suggestMapping(csvColumn: string): string | null {
         'surname': 'lastName',
         'familyname': 'lastName',
 
-        // Phone variations
+        // Phone variations (including Searcher/Apollo export columns)
         'phone': 'phone',
         'phonenumber': 'phone',
         'mobile': 'phone',
         'mobilephone': 'phone',
+        'mobilenumber': 'phone',      // For mobile_number column
         'cell': 'phone',
         'cellphone': 'phone',
         'telephone': 'phone',
+        'worknumber': 'phone',        // For work_number column
+        'workphone': 'phone',
+        'businessphone': 'phone',
+        'sourcednumber': 'phone',     // For sourced_number column
+        'manuallyaddednumber': 'phone', // For manually_added_number column
 
         // Email variations
         'email': 'email',
