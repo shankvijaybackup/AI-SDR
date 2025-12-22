@@ -195,49 +195,81 @@ Return JSON only, no markdown.`
  * Build prompt for AI persona analysis
  */
 function buildPersonaPrompt(profile: Partial<EnhancedLinkedInData>): string {
-    let context = `Analyze this LinkedIn profile and generate a sales persona:\n\n`
+    // Check if we have rich data or minimal data
+    const hasRichData = !!(profile.summary || profile.skills?.length || profile.recentPosts?.length || profile.experience?.length);
+
+    let context = '';
+
+    if (hasRichData) {
+        context = `Analyze this LinkedIn profile and generate a sales persona:\n\n`;
+    } else {
+        // Minimal data fallback - be explicit about what we DON'T have
+        context = `Generate a sales persona for a B2B outreach call to this prospect. 
+        
+IMPORTANT: We only have basic information about this person (name, title, company). 
+Do NOT mention "LinkedIn" as a platform or topic in your analysis.
+Focus entirely on their ROLE, COMPANY, and INDUSTRY.
+Generate realistic, role-appropriate content based on what someone in their position typically cares about.
+
+Analyze this prospect:\n\n`;
+    }
 
     if (profile.firstName || profile.lastName) {
-        context += `Name: ${profile.firstName} ${profile.lastName}\n`
+        context += `Name: ${profile.firstName} ${profile.lastName}\n`;
     }
     if (profile.headline) {
-        context += `Headline: ${profile.headline}\n`
+        context += `Headline: ${profile.headline}\n`;
     }
     if (profile.jobTitle && profile.company) {
-        context += `Role: ${profile.jobTitle} at ${profile.company}\n`
+        context += `Role: ${profile.jobTitle} at ${profile.company}\n`;
+    } else if (profile.jobTitle) {
+        context += `Role: ${profile.jobTitle}\n`;
+    } else if (profile.company) {
+        context += `Company: ${profile.company}\n`;
     }
     if (profile.summary) {
-        context += `Summary: ${profile.summary}\n`
+        context += `Summary: ${profile.summary}\n`;
     }
     if (profile.skills?.length) {
-        context += `Skills: ${profile.skills.slice(0, 10).join(', ')}\n`
+        context += `Skills: ${profile.skills.slice(0, 10).join(', ')}\n`;
     }
     if (profile.experience?.length) {
-        context += `Experience: ${profile.experience.slice(0, 3).map(e => `${e.title} at ${e.company}`).join('; ')}\n`
+        context += `Experience: ${profile.experience.slice(0, 3).map(e => `${e.title} at ${e.company}`).join('; ')}\n`;
     }
     if (profile.recentPosts?.length) {
-        context += `\nRecent Posts:\n`
+        context += `\nRecent Posts:\n`;
         profile.recentPosts.slice(0, 3).forEach(post => {
-            context += `- ${post.text.substring(0, 200)}...\n`
-        })
+            context += `- ${post.text.substring(0, 200)}...\n`;
+        });
+    }
+
+    // Add industry context for minimal data scenarios
+    if (!hasRichData && profile.company) {
+        context += `\nNote: Base your analysis on what a ${profile.jobTitle || 'professional'} at a company like ${profile.company} would typically focus on.\n`;
     }
 
     context += `
 Return a JSON object with these fields:
 {
   "discProfile": "D|I|S|C|DI|DC|IS|SC" (primary and secondary type),
-  "discDescription": "Brief description of their personality style",
-  "communicationStyle": "How they prefer to communicate",
-  "keyInterests": ["3-5 key professional interests"],
-  "focusAreas": ["3-5 areas they focus on in their role"],
-  "talkingPoints": ["3-5 personalized conversation starters"],
-  "approachRecommendation": "How to approach this person in a sales call",
-  "painPoints": ["2-3 likely pain points based on role"],
-  "motivators": ["2-3 things that motivate them"]
-}`
-
-    return context
+  "discDescription": "Brief description of their personality style based on their role",
+  "communicationStyle": "How they likely prefer to communicate",
+  "keyInterests": ["3-5 key professional interests relevant to their role"],
+  "focusAreas": ["3-5 areas they likely focus on in their current role"],
+  "talkingPoints": ["3-5 personalized conversation starters about their industry/role"],
+  "approachRecommendation": "How to approach this person in a B2B sales call",
+  "painPoints": ["2-3 likely pain points based on their role and company type"],
+  "motivators": ["2-3 things that likely motivate someone in their position"]
 }
+
+CRITICAL: 
+- Make talking points about THEIR INDUSTRY and ROLE, not about any social media platform
+- Focus on business challenges relevant to their job title
+- Pain points should relate to their actual work, not networking or content creation`
+
+    return context;
+}
+
 
 /**
  * Generate persona using rule-based analysis (fallback)
