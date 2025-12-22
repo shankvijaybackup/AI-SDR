@@ -2,17 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, hashPassword } from '@/lib/auth'
 
-// POST - Reset password for a user (admin only)
+// POST - Reset password for a user (authenticated users only)
 export async function POST(request: NextRequest) {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        // Only admins can reset passwords
-        if (user.role !== 'admin') {
-            return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
         }
 
         const body = await request.json()
