@@ -4,7 +4,9 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build": "npx prisma generate",
+    "start": "node server.js"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.2",

@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model User {
+  id                    String            @id @default(uuid())
+  email                 String            @unique
+  password              String
+  firstName             String
+  lastName              String
+  company               String?
+  role                  String            @default("SDR")
+  linkedinSessionCookie String?
+  
+  // Activation & Verification
+  isActive              Boolean   @default(false)
+  isEmailVerified       Boolean   @default(false)
+  emailVerificationToken String?  @unique
+  emailVerificationExpiry DateTime?
+  magicLinkToken        String?   
+  resetToken            String?   @unique
+  resetTokenExpiry      DateTime?
+  magicLinkExpiry       DateTime?
+  lastLoginAt           DateTime?
+
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  calls                 Call[]
+  knowledgeSources      KnowledgeSource[]
+  leads                 Lead[]
+  scripts               Script[]
+  bulkCallCampaigns     BulkCallCampaign[]
+  regionalPhoneNumbers  RegionalPhoneNumber[]
+
+  @@index([isActive])
+  @@index([isEmailVerified])
+}
+
+// Regional phone numbers for different countries/regions
+model RegionalPhoneNumber {
+  id          String   @id @default(uuid())
+  userId      String
+  region      String   // e.g., "ANZ", "US", "UK", "India", "EU"
+  phoneNumber String   // e.g., "+61341574513"
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, region])
+  @@index([userId])
+}
+
+model Lead {
+  id               String    @id @default(uuid())
+  userId           String
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String
+  company          String?
+  jobTitle         String?
+  linkedinUrl      String?
+  notes            String?
+  linkedinEnriched Boolean   @default(false)
+  linkedinData     Json?
+  status           String    @default("pending")
+  interestLevel    String?
+  region           String?   // India, UK, Australia, US
+  nextFollowUp     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  calls            Call[]
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, interestLevel])
+}
+
+model Script {
+  id        String   @id @default(uuid())
+  userId    String?
+  name      String
+  content   String
+  isDefault Boolean  @default(false)
+  isShared  Boolean  @default(false)
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  calls              Call[]
+  user               User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bulkCallCampaigns  BulkCallCampaign[]
+
+  @@index([userId])
+  @@index([isShared])
+}
+
+model Call {
+  id               String    @id @default(uuid())
+  userId           String
+  leadId           String
+  scriptId         String?
+  campaignId       String?   // Link to bulk call campaign
+  twilioCallSid    String?   @unique
+  voicePersona     String    @default("female")
+  transcript       Json
+  duration         Int?
+  status           String    @default("initiated")
+  aiSummary        String?
+  interestLevel    String?
+  outcome          String?
+  conversionStage  String?
+  sentimentScore   Float?
+  engagementScore  Float?
+  callQualityScore Float?
+  objections       String[]
+  emailCaptured    String?
+  nextSteps        String?
+  scheduledDemo    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  script           Script?   @relation(fields: [scriptId], references: [id])
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign         BulkCallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([userId, leadId])
+  @@index([twilioCallSid])
+  @@index([campaignId])
+}
+
+model BulkCallCampaign {
+  id                String    @id @default(uuid())
+  userId            String
+  name              String
+  scriptId          String
+  status            String    @default("pending") // pending, running, paused, completed, cancelled
+  totalLeads        Int       @default(0)
+  completedCalls    Int       @default(0)
+  successfulCalls   Int       @default(0)
+  failedCalls       Int       @default(0)
+  currentLeadIndex  Int       @default(0)  // Index of current lead being called
+  leadIds           String[]  // Array of lead IDs to call
+  delayBetweenCalls Int       @default(5)  // seconds between calls
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  script            Script    @relation(fields: [scriptId], references: [id])
+  calls             Call[]
+
+  @@index([userId, status])
+}
+
+model KnowledgeSource {
+  id              String   @id @default(uuid())
+  userId          String?
+  title           String
+  description     String?
+  type            String
+  fileUrl         String?
+  fileName        String?
+  fileSize        Int?
+  mimeType        String?
+  videoUrl        String?
+  videoDuration   Int?
+  videoTranscript String?
+  content         String
+  summary         String?
+  embeddings      Json?
+  chunks          Json?
+  tags            String[]
+  category        String?
+  isActive        Boolean  @default(true)
+  isShared        Boolean  @default(false)
+  createdBy       String?
+  status          String   @default("pending")
+  processingError String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([isShared])
+  @@index([category])
+  @@index([status])
+}

@@ -3,8 +3,8 @@
  * Handles sequential execution of bulk calling campaigns
  */
 
-// Use the Prisma client from the app folder (where it's properly generated)
-import { PrismaClient } from '../../app/node_modules/@prisma/client/default.js';
+// Import Prisma client (installed in backend's node_modules)
+import { PrismaClient } from '@prisma/client';
 
 // Initialize Prisma client for backend
 const prisma = new PrismaClient();
