@@ -495,10 +495,10 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
         { role: "system", content: system },
         { role: "user", content: userContent }
       ],
-      max_tokens: 50, // Reduced from 60 for faster voice responses
-      temperature: 0.6, // More consistent
-      presence_penalty: 0.2,
-      frequency_penalty: 0.2,
+      max_tokens: 40, // Reduced to 40 for faster responses (keeps replies short)
+      temperature: 0.5, // Lower = more consistent + faster
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1,
       stream: false
     }, { signal: controller.signal });
 
