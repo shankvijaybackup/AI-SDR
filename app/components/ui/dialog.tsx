@@ -13,8 +13,8 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div 
-        className="fixed inset-0 bg-black/50" 
+      <div
+        className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
       />
       <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -26,10 +26,11 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
 interface DialogContentProps {
   children: React.ReactNode
+  className?: string
 }
 
-export function DialogContent({ children }: DialogContentProps) {
-  return <div className="p-6">{children}</div>
+export function DialogContent({ children, className }: DialogContentProps) {
+  return <div className={`p-6 ${className || ''}`}>{children}</div>
 }
 
 interface DialogHeaderProps {
@@ -58,8 +59,10 @@ export function DialogDescription({ children }: DialogDescriptionProps) {
 
 interface DialogFooterProps {
   children: React.ReactNode
+  className?: string
 }
 
-export function DialogFooter({ children }: DialogFooterProps) {
-  return <div className="flex justify-end space-x-2 mt-6">{children}</div>
+export function DialogFooter({ children, className }: DialogFooterProps) {
+  return <div className={`flex justify-end space-x-2 mt-6 ${className || ''}`}>{children}</div>
 }
+
