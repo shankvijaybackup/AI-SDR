@@ -79,7 +79,7 @@ export default function KnowledgePage() {
       const searchTerms = companyName.toLowerCase().split(/\s+/)
 
       // Filter knowledge sources that might contain info about this company
-      const relevantSources = sources.filter(source => {
+      const relevantSources = knowledgeSources.filter(source => {
         const titleMatch = searchTerms.some(term =>
           source.title?.toLowerCase().includes(term)
         )
