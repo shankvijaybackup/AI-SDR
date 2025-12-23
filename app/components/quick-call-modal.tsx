@@ -159,9 +159,11 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <div className="flex items-center justify-between">
-                        <DialogTitle className="flex items-center gap-3">
-                            <Phone className="w-5 h-5 text-green-600" />
-                            Quick Call
+                        <DialogTitle>
+                            <div className="flex items-center gap-3">
+                                <Phone className="w-5 h-5 text-green-600" />
+                                Quick Call
+                            </div>
                         </DialogTitle>
                         <CallStatusBadge status={realTimeStatus as any} />
                     </div>
