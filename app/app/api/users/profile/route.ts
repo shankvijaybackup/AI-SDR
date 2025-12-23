@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
         email: true,
         firstName: true,
         lastName: true,
-        company: true,
+        companyName: true,
+        companyId: true,
         role: true,
         linkedinSessionCookie: true,
         isActive: true,
@@ -54,7 +55,7 @@ export async function PATCH(request: NextRequest) {
       data: {
         ...(firstName && { firstName }),
         ...(lastName && { lastName }),
-        ...(company !== undefined && { company }),
+        ...(company !== undefined && { companyName: company }),
         ...(linkedinSessionCookie !== undefined && { linkedinSessionCookie }),
       },
       select: {
@@ -62,7 +63,8 @@ export async function PATCH(request: NextRequest) {
         email: true,
         firstName: true,
         lastName: true,
-        company: true,
+        companyName: true,
+        companyId: true,
         role: true,
         linkedinSessionCookie: true,
         isActive: true,

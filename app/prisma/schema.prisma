@@ -29,8 +29,39 @@ model Company {
   campaigns           BulkCallCampaign[]
   knowledgeSources    KnowledgeSource[]
   invites             CompanyInvite[]
+  settings            CompanySettings?
 
   @@index([slug])
+}
+
+model CompanySettings {
+  id                 String   @id @default(uuid())
+  companyId          String   @unique
+  
+  // API Keys (stored encrypted in production)
+  twilioAccountSid   String?
+  twilioAuthToken    String?
+  openaiApiKey       String?
+  googleAiApiKey     String?
+  elevenLabsApiKey   String?
+  deepgramApiKey     String?
+  
+  // Feature Flags
+  aiCallingEnabled   Boolean  @default(true)
+  knowledgeBaseEnabled Boolean @default(true)
+  
+  // Billing
+  trialEndsAt        DateTime?
+  stripeCustomerId   String?
+  stripePriceId      String?
+  subscriptionStatus String?  @default("trialing") // trialing, active, past_due, canceled
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
 }
 
 model CompanyInvite {

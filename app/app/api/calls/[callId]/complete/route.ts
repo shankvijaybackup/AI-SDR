@@ -57,28 +57,64 @@ export async function POST(
                 const analysis = await analyzeCall(transcript, leadName, company)
 
                 if (analysis) {
-                    // Update call with analysis - use correct field name 'analysis' not 'aiAnalysis'
+                    // Update call with full analysis including follow-up fields
                     await prisma.call.update({
                         where: { id: callId },
                         data: {
                             aiSummary: analysis.aiSummary,
-                            interestLevel: analysis.interestLevel || 'unknown'
+                            interestLevel: analysis.interestLevel || 'unknown',
+                            nextSteps: analysis.nextSteps,
+                            scheduledDemo: analysis.scheduledDemo,
+                            objections: analysis.objections || [],
+                            emailCaptured: analysis.emailCaptured,
                         }
                     })
 
-                    // Update lead with outcome from call
+                    // Determine lead status and follow-up based on call outcome
+                    const leadUpdateData: {
+                        status?: string
+                        interestLevel?: string
+                        notes?: string
+                        nextFollowUp?: Date | null
+                    } = {}
+
                     if (analysis.interestLevel) {
-                        await prisma.lead.update({
-                            where: { id: existingCall.lead.id },
-                            data: {
-                                status: analysis.interestLevel === 'high' ? 'qualified' :
-                                    analysis.interestLevel === 'medium' ? 'contacted' : 'pending',
-                                notes: analysis.aiSummary || ''
+                        leadUpdateData.interestLevel = analysis.interestLevel
+
+                        if (analysis.interestLevel === 'high') {
+                            leadUpdateData.status = 'qualified'
+                        } else if (analysis.interestLevel === 'medium') {
+                            leadUpdateData.status = 'contacted'
+                            // Set callback for medium interest if no demo scheduled
+                            if (!analysis.scheduledDemo) {
+                                // Follow up in 3 days for medium interest
+                                leadUpdateData.nextFollowUp = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
                             }
-                        })
+                        } else if (analysis.interestLevel === 'low') {
+                            leadUpdateData.status = 'contacted'
+                            // Follow up in 7 days for low interest
+                            if (!analysis.scheduledDemo) {
+                                leadUpdateData.nextFollowUp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                            }
+                        } else {
+                            leadUpdateData.status = 'not_interested'
+                        }
+
+                        leadUpdateData.notes = analysis.aiSummary || ''
                     }
 
+                    await prisma.lead.update({
+                        where: { id: existingCall.lead.id },
+                        data: leadUpdateData
+                    })
+
                     console.log(`[Call Complete API] ✅ AI analysis generated for call ${callId}`)
+                    if (analysis.scheduledDemo) {
+                        console.log(`[Call Complete API] 📅 Demo scheduled: ${analysis.scheduledDemo}`)
+                    }
+                    if (analysis.nextSteps) {
+                        console.log(`[Call Complete API] 📋 Next steps: ${analysis.nextSteps}`)
+                    }
                 }
             } catch (analysisErr) {
                 console.error(`[Call Complete API] AI analysis failed:`, analysisErr)

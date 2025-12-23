@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
 import { createRealtimeSession, sendAudioFromTwilioPayload } from "./realtimeClient.js";
-import { createDeepgramConnection, extractTranscript } from "./deepgramClient.js";
+import { createDeepgramConnection, extractTranscript, MIN_CONFIDENCE_THRESHOLD } from "./deepgramClient.js";
 import { getAiSdrReply } from "./openaiClient.js";
 import { synthesizeTTS } from "./server.js";
 import { getActiveCall, updateCallTranscript } from "./routes/initiate-call.js";
@@ -123,15 +123,36 @@ export function attachMediaStreamServer(httpServer) {
             deepgramConnection.on("Results", async (data) => {
               const result = extractTranscript(data);
 
+              // Handle interim results for context but don't process yet
+              if (!result.isFinal && result.text) {
+                // Log interim for debugging
+                console.log(`[Deepgram] Interim: "${result.text.substring(0, 50)}..."`);
+                return;
+              }
+
+              // Only process final results with sufficient confidence
               if (result.isFinal && result.text) {
-                console.log(`[Deepgram] Transcript: "${result.text}" (confidence: ${result.confidence.toFixed(2)})`);
-                currentTranscript = result.text;
+                // Reject low-confidence transcripts
+                if (result.confidence < MIN_CONFIDENCE_THRESHOLD) {
+                  console.log(`[Deepgram] Rejected low confidence (${result.confidence.toFixed(2)}): "${result.text}"`);
+                  return;
+                }
+
+                // Reject very short or garbage transcripts
+                const cleanText = result.text.trim();
+                if (cleanText.length < 2 || /^[^\w]+$/.test(cleanText)) {
+                  console.log(`[Deepgram] Rejected invalid transcript: "${cleanText}"`);
+                  return;
+                }
+
+                console.log(`[Deepgram] ✓ Final: "${cleanText}" (confidence: ${result.confidence.toFixed(2)})`);
+                currentTranscript = cleanText;
                 lastSpeechTime = Date.now();
 
                 // Clear existing timer
                 if (speechTimer) clearTimeout(speechTimer);
 
-                // Wait for speech to finish (1s of silence - reduced from 1.5s)
+                // Wait for speech to finish (800ms of silence for faster response)
                 speechTimer = setTimeout(async () => {
                   if (!currentTranscript) return;
 
@@ -141,8 +162,14 @@ export function attachMediaStreamServer(httpServer) {
                     return;
                   }
 
-                  // Add to transcript
-                  updateCallTranscript(callSid, { speaker: "prospect", text: currentTranscript });
+                  // Add to transcript with timestamp
+                  const timestamp = new Date().toISOString();
+                  updateCallTranscript(callSid, {
+                    speaker: "prospect",
+                    text: currentTranscript,
+                    timestamp,
+                    confidence: result.confidence
+                  });
 
                   // Get AI reply
                   console.log(`[AI] Processing: "${currentTranscript}"`);
@@ -155,7 +182,12 @@ export function attachMediaStreamServer(httpServer) {
                     leadEmail: call.leadEmail
                   });
 
-                  updateCallTranscript(callSid, { speaker: "agent", text: reply });
+                  // Add agent reply to transcript with timestamp
+                  updateCallTranscript(callSid, {
+                    speaker: "agent",
+                    text: reply,
+                    timestamp: new Date().toISOString()
+                  });
 
                   // Play AI reply
                   try {
@@ -171,7 +203,7 @@ export function attachMediaStreamServer(httpServer) {
                   }
 
                   currentTranscript = "";
-                }, 1000); // Reduced from 1500ms
+                }, 800); // Reduced to 800ms for faster response
               }
             });
 

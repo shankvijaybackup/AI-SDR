@@ -119,10 +119,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
-  
+
   /* Dark mode text visibility fixes */
   .dark h1,
   .dark h2,
@@ -132,33 +133,33 @@
   .dark h6 {
     color: white !important;
   }
-  
+
   .dark th {
     color: rgb(226 232 240) !important;
   }
-  
+
   .dark td {
     color: rgb(203 213 225) !important;
   }
-  
+
   .dark p {
     color: rgb(203 213 225);
   }
-  
+
   .dark strong {
     color: white;
   }
-  
+
   /* Input placeholders in dark mode */
   .dark input::placeholder {
     color: rgb(100 116 139);
   }
-  
+
   /* Links in dark mode */
   .dark a:not(.no-dark-override) {
     color: rgb(203 213 225);
   }
-  
+
   .dark a:not(.no-dark-override):hover {
     color: white;
   }
@@ -168,18 +169,24 @@
 
 /* Liquid Gradient Animation */
 @keyframes liquid-gradient {
-  0%, 100% {
+
+  0%,
+  100% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
 }
 
 @keyframes liquid-morph {
-  0%, 100% {
+
+  0%,
+  100% {
     border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
   }
+
   50% {
     border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
   }
@@ -189,24 +196,31 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.3);
   }
+
   50% {
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(139, 92, 246, 0.5);
   }
 }
 
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-3px);
   }
@@ -230,12 +244,10 @@
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.3),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      transparent);
   transition: left 0.5s;
 }
 
@@ -303,12 +315,10 @@
 
 /* Shimmer Effect */
 .shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s linear infinite;
 }
@@ -329,12 +339,10 @@
   left: -50%;
   width: 200%;
   height: 200%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    rgba(59, 130, 246, 0.1) 60deg,
-    transparent 120deg
-  );
+  background: conic-gradient(from 0deg,
+      transparent 0deg,
+      rgba(59, 130, 246, 0.1) 60deg,
+      transparent 120deg);
   animation: rotate 4s linear infinite;
   opacity: 0;
   transition: opacity 0.3s;
@@ -370,7 +378,7 @@
 .input-liquid:focus {
   outline: none;
   border-color: transparent;
-  box-shadow: 
+  box-shadow:
     0 0 0 2px rgba(59, 130, 246, 0.3),
     0 0 20px rgba(59, 130, 246, 0.2);
 }
@@ -426,7 +434,7 @@
 
 .card-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 
+  box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(59, 130, 246, 0.1);
 }
@@ -445,3 +453,152 @@
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%);
 }
 
+/* ==================== PREMIUM DARK MODE BUTTON STYLING ==================== */
+
+/* All buttons in dark mode - smooth transitions */
+.dark button,
+.dark [role="button"],
+.dark .btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Primary buttons in dark mode */
+.dark button[class*="bg-blue"],
+.dark button[class*="bg-primary"],
+.dark .bg-blue-600,
+.dark .bg-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3) !important;
+}
+
+.dark button[class*="bg-blue"]:hover,
+.dark button[class*="bg-primary"]:hover,
+.dark .bg-blue-600:hover,
+.dark .bg-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%) !important;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+/* Outline/Ghost buttons in dark mode */
+.dark button[class*="variant-outline"],
+.dark button[class*="variant-ghost"],
+.dark [class*="border-slate"] {
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  background: rgba(30, 41, 59, 0.5) !important;
+}
+
+.dark button[class*="variant-outline"]:hover,
+.dark button[class*="variant-ghost"]:hover {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+}
+
+/* Cards and containers in dark mode */
+.dark .bg-white,
+.dark [class*="bg-slate-50"] {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+/* Tables in dark mode */
+.dark table th {
+  background: rgba(30, 41, 59, 0.8) !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+.dark table td {
+  border-color: rgba(148, 163, 184, 0.1) !important;
+}
+
+.dark table tr:hover td {
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Input fields in dark mode */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  color: #f1f5f9 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: rgba(59, 130, 246, 0.6) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+  outline: none !important;
+}
+
+/* Dropdown menus in dark mode */
+.dark [role="menu"],
+.dark [class*="dropdown"] {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+.dark [role="menuitem"]:hover {
+  background: rgba(59, 130, 246, 0.15) !important;
+}
+
+/* Badge/tag styling in dark mode */
+.dark .bg-green-100,
+.dark .bg-blue-100,
+.dark .bg-purple-100,
+.dark .bg-yellow-100,
+.dark .bg-red-100 {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #93c5fd !important;
+}
+
+/* Icons in dark mode hover */
+.dark svg:hover {
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.5));
+}
+
+/* Modal/dialog styling in dark mode */
+.dark [role="dialog"] {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+}
+
+/* Scrollbar styling in dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+/* Fix for stat cards with colored backgrounds */
+.dark [class*="bg-green-50"],
+.dark [class*="bg-blue-50"],
+.dark [class*="bg-purple-50"],
+.dark [class*="bg-yellow-50"] {
+  background: rgba(30, 41, 59, 0.6) !important;
+}
+
+.dark [class*="text-green-600"],
+.dark [class*="text-blue-600"],
+.dark [class*="text-purple-600"] {
+  color: #93c5fd !important;
+}

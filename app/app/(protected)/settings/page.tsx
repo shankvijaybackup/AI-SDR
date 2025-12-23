@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe } from 'lucide-react'
+import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe, Building2, Crown, Loader2 } from 'lucide-react'
 
 interface TeamUser {
   id: string
@@ -31,7 +31,8 @@ interface UserProfile {
   email: string
   firstName: string
   lastName: string
-  company: string | null
+  companyName: string | null
+  companyId: string | null
   role: string
   linkedinSessionCookie: string | null
   isActive: boolean
@@ -61,11 +62,38 @@ export default function SettingsPage() {
   const [phoneForm, setPhoneForm] = useState({ region: '', phoneNumber: '', isDefault: false })
   const [savingPhone, setSavingPhone] = useState(false)
 
+  // Organization state
+  interface Organization {
+    id: string
+    name: string
+    slug: string
+    plan: string
+    billingEmail: string | null
+    stats: { users: number; leads: number; calls: number }
+    settings: {
+      aiCallingEnabled: boolean
+      knowledgeBaseEnabled: boolean
+      trialEndsAt: string | null
+      subscriptionStatus: string | null
+      hasOpenaiKey: boolean
+      hasTwilioKey: boolean
+      hasElevenLabsKey: boolean
+      hasDeepgramKey: boolean
+      hasGoogleAiKey: boolean
+    } | null
+  }
+  const [organization, setOrganization] = useState<Organization | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [loadingOrg, setLoadingOrg] = useState(true)
+
+
+
   useEffect(() => {
     fetchUserData()
     fetchUsers()
     fetchProfile()
     fetchPhoneNumbers()
+    fetchOrganization()
   }, [])
 
   const fetchPhoneNumbers = async () => {
@@ -79,6 +107,24 @@ export default function SettingsPage() {
       console.error('Failed to fetch phone numbers:', error)
     }
   }
+
+  const fetchOrganization = async () => {
+    try {
+      setLoadingOrg(true)
+      const response = await fetch('/api/settings/organization')
+      if (response.ok) {
+        const data = await response.json()
+        setOrganization(data.organization)
+        setIsAdmin(data.isAdmin)
+      }
+    } catch (error) {
+      console.error('Failed to fetch organization:', error)
+    } finally {
+      setLoadingOrg(false)
+    }
+  }
+
+
 
   const handleSavePhoneNumber = async () => {
     if (!phoneForm.region || !phoneForm.phoneNumber) {
@@ -208,7 +254,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           firstName: profile.firstName,
           lastName: profile.lastName,
-          company: profile.company,
+          company: profile.companyName,
           linkedinSessionCookie: linkedinCookie || profile.linkedinSessionCookie,
         }),
       })
@@ -319,8 +365,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-500 mt-2">Manage your account, team, and integrations</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Settings</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">Manage your account, team, and integrations</p>
       </div>
 
       {message && (
@@ -332,12 +378,76 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* My Profile */}
+      {/* Organization Settings - Admin Only */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Building2 className="w-5 h-5 text-purple-600" />
+                <CardTitle className="text-slate-900 dark:text-white">Organization</CardTitle>
+                <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">Admin</Badge>
+              </div>
+            </div>
+            <CardDescription>
+              Manage your organization settings and billing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingOrg ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              </div>
+            ) : organization ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-500 dark:text-slate-400">Company Name</Label>
+                    <p className="font-medium text-slate-900 dark:text-white">{organization.name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-slate-500 dark:text-slate-400">Plan</Label>
+                    <Badge className="capitalize" variant={organization.plan === 'trial' ? 'secondary' : 'default'}>
+                      {organization.plan}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{organization.stats.users}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Team Members</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{organization.stats.leads}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Total Leads</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{organization.stats.calls}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Calls Made</p>
+                  </div>
+                </div>
+                {organization.settings?.trialEndsAt && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      <AlertCircle className="w-4 h-4 inline mr-1" />
+                      Trial ends: {new Date(organization.settings.trialEndsAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-slate-500 dark:text-slate-400">No organization found</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <User className="w-5 h-5 text-slate-600" />
+              <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               <CardTitle>My Profile</CardTitle>
             </div>
             <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)}>Edit Profile</Button>
@@ -373,8 +483,8 @@ export default function SettingsPage() {
                       <Label htmlFor="company">Company</Label>
                       <Input
                         id="company"
-                        value={profile.company || ''}
-                        onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                        value={profile.companyName || ''}
+                        onChange={(e) => setProfile({ ...profile, companyName: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -439,10 +549,10 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <button
                   onClick={() => setProfileOpen(true)}
-                  className="text-left hover:underline"
+                  className="text-left hover:underline text-slate-900 dark:text-white"
                 >
-                  <h3 className="font-medium text-slate-900">{profile.firstName} {profile.lastName}</h3>
-                  <p className="text-sm text-slate-500">{profile.email}</p>
+                  <h3 className="font-medium">{profile.firstName} {profile.lastName}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{profile.email}</p>
                 </button>
               </div>
               <div className="flex items-center space-x-2">
@@ -476,7 +586,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center space-x-2">
-            <Users className="w-5 h-5 text-slate-600" />
+            <Users className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             <CardTitle>Team Members</CardTitle>
           </div>
           <CardDescription>
@@ -503,8 +613,7 @@ export default function SettingsPage() {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className={`flex items-center space-x-4 p-3 border rounded-lg ${!user.isActive ? 'bg-slate-50 opacity-60' : ''
-                    }`}
+                  className={`flex items-center space-x-4 p-3 border rounded-lg dark:border-slate-700 ${!user.isActive ? 'bg-slate-50 dark:bg-slate-800/50 opacity-60' : ''}`}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-sm font-semibold text-primary">
@@ -513,7 +622,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2">
-                      <h4 className="font-medium text-slate-900 truncate">
+                      <h4 className="font-medium text-slate-900 dark:text-white truncate">
                         {user.firstName} {user.lastName}
                       </h4>
                       {user.isEmailVerified ? (
@@ -522,8 +631,8 @@ export default function SettingsPage() {
                         <span title="Email not verified"><Mail className="w-4 h-4 text-amber-500" /></span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500 truncate">{user.email}</p>
-                    <div className="flex items-center space-x-3 mt-1 text-xs text-slate-400">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
+                    <div className="flex items-center space-x-3 mt-1 text-xs text-slate-400 dark:text-slate-500">
                       <span>{user._count.leads} leads</span>
                       <span>{user._count.calls} calls</span>
                       {user.lastLoginAt && (
@@ -572,7 +681,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center space-x-2">
-            <UserPlus className="w-5 h-5 text-slate-600" />
+            <UserPlus className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             <CardTitle>Invite New User</CardTitle>
           </div>
           <CardDescription>
@@ -652,7 +761,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center space-x-2">
-            <Globe className="w-5 h-5 text-slate-600" />
+            <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             <CardTitle>Regional Phone Numbers</CardTitle>
           </div>
           <CardDescription>
@@ -664,12 +773,12 @@ export default function SettingsPage() {
           {phoneNumbers.length > 0 && (
             <div className="space-y-2">
               {phoneNumbers.map((phone) => (
-                <div key={phone.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div key={phone.id} className="flex items-center justify-between p-3 border dark:border-slate-700 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <Phone className="w-4 h-4 text-slate-500" />
                     <div>
-                      <p className="font-medium">{phone.region}</p>
-                      <p className="text-sm text-slate-500">{phone.phoneNumber}</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{phone.region}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{phone.phoneNumber}</p>
                     </div>
                     {phone.isDefault && <Badge variant="secondary">Default</Badge>}
                   </div>
@@ -713,11 +822,11 @@ export default function SettingsPage() {
               </Button>
             </div>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Tip: Use region names like "ANZ", "US", "UK", "India", "EU". Phone must be E.164 format (+country code + number).
           </p>
         </CardContent>
       </Card>
-    </div>
+    </div >
   )
 }
