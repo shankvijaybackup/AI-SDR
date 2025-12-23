@@ -3,6 +3,15 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Phone, TrendingUp, Users, Calendar, Clock, Target, Award, AlertCircle } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+
+// Chart colors
+const INTEREST_COLORS = {
+  high: '#22c55e',
+  medium: '#eab308',
+  low: '#f97316',
+  not_interested: '#ef4444',
+}
 
 type TimeRange = '7d' | '30d' | '90d' | 'all'
 
@@ -189,56 +198,44 @@ export default function AnalyticsPage() {
             <CardDescription>Distribution of lead interest after calls</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="text-sm font-medium">High Interest</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-slate-600">{legacy.interestBreakdown.high}</span>
-                  <span className="text-xs text-slate-400">
-                    ({legacy.totalCalls > 0 ? ((legacy.interestBreakdown.high / legacy.totalCalls) * 100).toFixed(0) : 0}%)
-                  </span>
-                </div>
+            {legacy.totalCalls === 0 ? (
+              <div className="flex items-center justify-center h-48 text-slate-500">
+                No calls yet
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <span className="text-sm font-medium">Medium Interest</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-slate-600">{legacy.interestBreakdown.medium}</span>
-                  <span className="text-xs text-slate-400">
-                    ({legacy.totalCalls > 0 ? ((legacy.interestBreakdown.medium / legacy.totalCalls) * 100).toFixed(0) : 0}%)
-                  </span>
-                </div>
+            ) : (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'High Interest', value: legacy.interestBreakdown.high, color: INTEREST_COLORS.high },
+                        { name: 'Medium', value: legacy.interestBreakdown.medium, color: INTEREST_COLORS.medium },
+                        { name: 'Low', value: legacy.interestBreakdown.low, color: INTEREST_COLORS.low },
+                        { name: 'Not Interested', value: legacy.interestBreakdown.not_interested, color: INTEREST_COLORS.not_interested },
+                      ].filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={3}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {[
+                        { name: 'High Interest', value: legacy.interestBreakdown.high, color: INTEREST_COLORS.high },
+                        { name: 'Medium', value: legacy.interestBreakdown.medium, color: INTEREST_COLORS.medium },
+                        { name: 'Low', value: legacy.interestBreakdown.low, color: INTEREST_COLORS.low },
+                        { name: 'Not Interested', value: legacy.interestBreakdown.not_interested, color: INTEREST_COLORS.not_interested },
+                      ].filter(d => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                  <span className="text-sm font-medium">Low Interest</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-slate-600">{legacy.interestBreakdown.low}</span>
-                  <span className="text-xs text-slate-400">
-                    ({legacy.totalCalls > 0 ? ((legacy.interestBreakdown.low / legacy.totalCalls) * 100).toFixed(0) : 0}%)
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="text-sm font-medium">Not Interested</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-slate-600">{legacy.interestBreakdown.not_interested}</span>
-                  <span className="text-xs text-slate-400">
-                    ({legacy.totalCalls > 0 ? ((legacy.interestBreakdown.not_interested / legacy.totalCalls) * 100).toFixed(0) : 0}%)
-                  </span>
-                </div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -311,12 +308,11 @@ export default function AnalyticsPage() {
                     <p className="text-xs text-slate-500">{call.company}</p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      call.interestLevel === 'high' ? 'bg-green-100 text-green-800' :
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${call.interestLevel === 'high' ? 'bg-green-100 text-green-800' :
                       call.interestLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      call.interestLevel === 'low' ? 'bg-orange-100 text-orange-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                        call.interestLevel === 'low' ? 'bg-orange-100 text-orange-800' :
+                          'bg-red-100 text-red-800'
+                      }`}>
                       {call.interestLevel || 'pending'}
                     </span>
                   </div>

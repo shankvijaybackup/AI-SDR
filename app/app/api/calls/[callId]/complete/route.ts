@@ -15,7 +15,7 @@ export async function POST(
         }
 
         const body = await request.json()
-        const { transcript, summary, duration, status, voicePersona } = body
+        const { transcript, summary, duration, status, voicePersona, disconnectReason } = body
 
         console.log(`[Call Complete API] Saving call ${callId} - transcript entries: ${transcript?.length || 0}`)
 
@@ -37,7 +37,8 @@ export async function POST(
                 transcript: transcript || [],
                 aiSummary: summary || null,
                 duration: duration || 0,
-                status: status || 'completed'
+                status: status || 'completed',
+                disconnectReason: disconnectReason || null
             }
         })
 

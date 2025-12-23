@@ -13,6 +13,8 @@ const TOKEN_NAME = 'auth-token'
 export interface JWTPayload {
   userId: string
   email: string
+  companyId?: string  // Company the user belongs to
+  role?: string       // admin, member
 }
 
 export async function hashPassword(password: string): Promise<string> {

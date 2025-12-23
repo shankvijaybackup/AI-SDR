@@ -84,7 +84,7 @@ async function initiateCall(req, res) {
     console.log(`[Initiate Call] Voice: ${voicePersona} (${selectedVoice.gender}), ID: ${voiceId}`);
     console.log(`[Initiate Call] Script: ${script.substring(0, 50)}...`);
 
-    // Store call metadata
+    // Store call metadata with events tracking
     activeCalls.set(callId, {
       callId,
       phoneNumber,
@@ -97,6 +97,10 @@ async function initiateCall(req, res) {
       startTime: new Date(),
       transcript: [],
       userId: req.body.userId || null,
+      // Track call events for UI display
+      callEvents: [
+        { event: 'initiated', timestamp: new Date().toISOString(), details: `Calling ${phoneNumber}` }
+      ],
     });
 
     // Initiate Twilio call using traditional voice (WORKING - Media Stream has issues)
@@ -105,7 +109,11 @@ async function initiateCall(req, res) {
       to: phoneNumber,
       from: fromNumber, // Use region-specific phone number
       statusCallback: `${publicBaseUrl}/api/twilio/status?callId=${callId}`,
-      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'canceled', 'failed'],
+      timeout: 30, // Disconnect after ~5 rings (30 seconds)
+      machineDetection: 'DetectMessageEnd', // Detect voicemail/answering machines
+      asyncAmd: true, // Don't block on AMD detection
+      asyncAmdStatusCallback: `${publicBaseUrl}/api/twilio/amd-status?callId=${callId}`, // AMD callback
       record: true,
     });
 

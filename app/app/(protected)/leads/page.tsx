@@ -8,7 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { CsvColumnMapper } from '@/components/csv-column-mapper'
 import { AddLeadDialog } from '@/components/add-lead-dialog'
 import LeadPersonaDisplay from '@/components/lead-persona-display'
-import { Search, Plus, Phone, Mail, Linkedin, Upload as UploadIcon, Trash2, Sparkles, Eye, RefreshCw } from 'lucide-react'
+import { QuickCallModal } from '@/components/quick-call-modal'
+import { Search, Plus, Phone, Mail, Linkedin, Upload as UploadIcon, Trash2, Sparkles, Eye, RefreshCw, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 
 interface Lead {
   id: string
@@ -39,6 +41,7 @@ export default function LeadsPage() {
   const [enrichingLeads, setEnrichingLeads] = useState<Set<string>>(new Set())
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
+  const [callLead, setCallLead] = useState<Lead | null>(null)  // For quick call modal
 
   useEffect(() => {
     fetchLeads()
@@ -325,6 +328,7 @@ export default function LeadsPage() {
                     </th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Name</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Company</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Phone</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Region</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Contact</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-slate-700">Status</th>
@@ -349,9 +353,12 @@ export default function LeadsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div>
-                          <p className="font-medium text-slate-900">
+                          <Link
+                            href={`/leads/${lead.id}`}
+                            className="font-medium text-slate-900 hover:text-primary hover:underline"
+                          >
                             {lead.firstName} {lead.lastName}
-                          </p>
+                          </Link>
                           {lead.jobTitle && (
                             <p className="text-sm text-slate-500">{lead.jobTitle}</p>
                           )}
@@ -359,6 +366,11 @@ export default function LeadsPage() {
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-700">
                         {lead.company || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-slate-700">
+                        <a href={`tel:${lead.phone}`} className="hover:text-primary hover:underline">
+                          {lead.phone}
+                        </a>
                       </td>
                       <td className="py-3 px-4">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
@@ -372,9 +384,13 @@ export default function LeadsPage() {
                               <Mail className="w-4 h-4" />
                             </a>
                           )}
-                          <a href={`tel:${lead.phone}`} className="text-slate-600 hover:text-primary">
+                          <button
+                            onClick={() => setCallLead(lead)}
+                            className="text-green-600 hover:text-green-700 transition-colors"
+                            title="AI Call"
+                          >
                             <Phone className="w-4 h-4" />
-                          </a>
+                          </button>
                           {lead.linkedinUrl && (
                             <a href={lead.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-primary">
                               <Linkedin className="w-4 h-4" />
@@ -503,6 +519,14 @@ export default function LeadsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Quick Call Modal */}
+      <QuickCallModal
+        open={!!callLead}
+        onOpenChange={(open) => !open && setCallLead(null)}
+        lead={callLead}
+        onCallComplete={() => fetchLeads()}
+      />
     </div >
   )
 }

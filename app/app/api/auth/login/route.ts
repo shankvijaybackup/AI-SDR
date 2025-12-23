@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
     const token = generateToken({
       userId: user.id,
       email: user.email,
+      companyId: user.companyId || undefined,
+      role: user.role,
     })
 
     await setAuthCookie(token)
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        company: user.company,
+        companyId: user.companyId,
         role: user.role,
       },
     })

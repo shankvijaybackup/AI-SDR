@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 interface Call {
   id: string
   status: string
+  disconnectReason: string | null
   duration: number | null
   transcript: any[]
   aiSummary: string | null
@@ -98,6 +99,18 @@ export function CallHistoryDialog({ open, onOpenChange, leadId, leadName }: Call
             </Button>
 
             <div className="space-y-4">
+              {/* Disconnect Reason */}
+              {selectedCall.disconnectReason && (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-800">
+                      {selectedCall.disconnectReason}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Call Summary */}
               <div className="bg-slate-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-2">

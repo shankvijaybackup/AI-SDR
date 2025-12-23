@@ -737,21 +737,185 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
 // ---------- Twilio Status Callback ----------
 
+// Disconnect reason mapping
+const DISCONNECT_REASONS = {
+  'no-answer': 'No answer after 5 rings',
+  'busy': 'Line busy',
+  'failed': 'Call failed to connect',
+  'canceled': 'Call was canceled',
+  'voicemail': 'Reached voicemail - call ended automatically',
+};
+
+// AMD (Answering Machine Detection) Status Callback
+app.post("/api/twilio/amd-status", async (req, res) => {
+  const { CallSid, AnsweredBy, MachineDetectionDuration } = req.body;
+  const callId = req.query.callId;
+
+  console.log(`[AMD] CallSid=${CallSid}, AnsweredBy=${AnsweredBy}, Duration=${MachineDetectionDuration}ms`);
+
+  // Track AMD event
+  const activeCall = getActiveCall(callId);
+
+  // If voicemail/machine detected, hang up immediately
+  if (AnsweredBy === 'machine_start' || AnsweredBy === 'machine_end_beep' ||
+    AnsweredBy === 'machine_end_silence' || AnsweredBy === 'machine_end_other' ||
+    AnsweredBy === 'fax') {
+
+    console.log(`[AMD] Voicemail/machine detected for call ${callId}, hanging up`);
+
+    // Add voicemail event
+    if (activeCall && activeCall.callEvents) {
+      activeCall.callEvents.push({
+        event: 'voicemail',
+        timestamp: new Date().toISOString(),
+        details: '📠 Voicemail detected - hanging up automatically'
+      });
+      activeCall.disconnectReason = DISCONNECT_REASONS.voicemail;
+    }
+
+    // Hang up the call via Twilio API
+    try {
+      const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+
+      await twilioClient.calls(CallSid).update({ status: 'completed' });
+      console.log(`[AMD] Call ${CallSid} hung up successfully`);
+
+      // Update database with voicemail reason
+      if (callId) {
+        const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+        try {
+          await fetch(`${FRONTEND_URL}/api/calls/${callId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              transcript: [],
+              status: 'voicemail',
+              disconnectReason: DISCONNECT_REASONS.voicemail,
+              duration: 0
+            })
+          });
+          console.log(`[AMD] Voicemail status saved to database for call ${callId}`);
+        } catch (dbErr) {
+          console.error(`[AMD] Failed to save voicemail status:`, dbErr.message);
+        }
+      }
+    } catch (err) {
+      console.error('[AMD] Failed to hang up call:', err.message);
+    }
+  } else if (AnsweredBy === 'human') {
+    console.log(`[AMD] Human detected for call ${callId}, continuing call`);
+    // Add human detected event
+    if (activeCall && activeCall.callEvents) {
+      activeCall.callEvents.push({
+        event: 'human_detected',
+        timestamp: new Date().toISOString(),
+        details: '👤 Human answered - proceeding with conversation'
+      });
+    }
+  }
+
+  res.sendStatus(200);
+});
+
 app.post("/api/twilio/status", async (req, res) => {
   const callSid = req.body.CallSid;
   const callStatus = req.body.CallStatus;
   const callId = req.query.callId;
   const campaignId = req.query.campaignId;
+  const callDuration = parseInt(req.body.CallDuration) || 0;
   const call = getCall(callSid);
 
+  // Human-readable event messages
+  const EVENT_MESSAGES = {
+    'initiated': 'Call initiated',
+    'ringing': '📞 Ringing... waiting for answer',
+    'in-progress': '✅ Call answered - conversation started',
+    'answered': '✅ Call answered',
+    'completed': callDuration > 0 ? `Call completed (${callDuration}s)` : 'Call ended',
+    'no-answer': '❌ No answer after 5 rings',
+    'busy': '❌ Line busy',
+    'failed': '❌ Call failed to connect',
+    'canceled': '❌ Call canceled',
+  };
+
+  // Log all status updates
+  console.log(`[Status] CallSid=${callSid}, Status=${callStatus}, Duration=${callDuration}s`);
+
+  // Track event for both activeCalls and call state
+  const eventMessage = EVENT_MESSAGES[callStatus] || callStatus;
+  const newEvent = {
+    event: callStatus,
+    timestamp: new Date().toISOString(),
+    details: eventMessage
+  };
+
+  // Update active call events (from initiate-call.js)
+  const activeCall = getActiveCall(callId);
+  if (activeCall) {
+    if (activeCall.callEvents) {
+      activeCall.callEvents.push(newEvent);
+    }
+    // Update status so frontend polling can detect disconnects
+    activeCall.status = callStatus;
+    if (['no-answer', 'busy', 'failed', 'canceled', 'completed'].includes(callStatus)) {
+      activeCall.disconnectReason = DISCONNECT_REASONS[callStatus] || callStatus;
+    }
+  }
+
   if (!call) {
+    // Still handle disconnect reasons even if call not in memory
+    if (callId && ['no-answer', 'busy', 'failed', 'canceled'].includes(callStatus)) {
+      console.log(`[Status] Disconnect: ${callStatus} - ${DISCONNECT_REASONS[callStatus]}`);
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+      try {
+        await fetch(`${FRONTEND_URL}/api/calls/${callId}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: [],
+            status: callStatus,
+            disconnectReason: DISCONNECT_REASONS[callStatus] || callStatus,
+            duration: 0
+          })
+        });
+        console.log(`[Status] Disconnect reason saved for call ${callId}`);
+      } catch (err) {
+        console.error(`[Status] Failed to save disconnect reason:`, err.message);
+      }
+    }
     return res.sendStatus(200);
   }
 
   updateCall(callSid, { status: callStatus });
 
+  // ===== HANDLE DISCONNECT REASONS (no-answer, busy, failed) =====
+  if (['no-answer', 'busy', 'failed', 'canceled'].includes(callStatus)) {
+    console.log(`[Status] Call ${callSid} ended: ${DISCONNECT_REASONS[callStatus]}`);
+
+    if (callId) {
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+      try {
+        await fetch(`${FRONTEND_URL}/api/calls/${callId}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: call.transcript || [],
+            status: callStatus,
+            disconnectReason: DISCONNECT_REASONS[callStatus],
+            duration: 0
+          })
+        });
+        console.log(`[Status] Disconnect reason saved for call ${callId}`);
+      } catch (err) {
+        console.error(`[Status] Failed to save disconnect reason:`, err.message);
+      }
+    }
+  }
+
   // ===== AUTOMATED POST-CALL PROCESSING =====
-  if (callStatus === "completed") {
+  if (callStatus === "completed" && callDuration > 0) {
     console.log(`[Post-Call] Call ${callSid} completed. Processing transcript and summary...`);
 
     try {
@@ -772,8 +936,9 @@ app.post("/api/twilio/status", async (req, res) => {
             body: JSON.stringify({
               transcript: call.transcript,
               summary: summary,
-              duration: Math.floor((Date.now() - new Date(call.createdAt).getTime()) / 1000),
+              duration: callDuration || Math.floor((Date.now() - new Date(call.createdAt).getTime()) / 1000),
               status: 'completed',
+              disconnectReason: null, // Completed calls have no disconnect reason
               voicePersona: call.voicePersona || 'Arabella'
             })
           });
@@ -819,6 +984,8 @@ app.get("/api/calls/:callId/status", (req, res) => {
     status: call.status || 'active',
     transcript: call.transcript,
     duration: call.duration,
+    callEvents: call.callEvents || [], // Timeline of call events
+    disconnectReason: call.disconnectReason || null,
   });
 });
 

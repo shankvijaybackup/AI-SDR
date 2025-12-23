@@ -27,7 +27,14 @@ export async function GET(request: NextRequest) {
     const interestLevel = searchParams.get('interestLevel')
     const search = searchParams.get('search')
 
-    const where: any = { userId: currentUser.userId }
+    const where: any = {}
+
+    // Multi-tenancy: filter by companyId if present, otherwise by userId
+    if (currentUser.companyId) {
+      where.companyId = currentUser.companyId
+    } else {
+      where.userId = currentUser.userId
+    }
 
     if (status) where.status = status
     if (interestLevel) where.interestLevel = interestLevel
@@ -72,6 +79,7 @@ export async function POST(request: NextRequest) {
       data: {
         ...validatedData,
         userId: currentUser.userId,
+        companyId: currentUser.companyId,  // Multi-tenancy
         email: validatedData.email || null,
         linkedinUrl: validatedData.linkedinUrl || null,
       },
