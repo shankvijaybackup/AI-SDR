@@ -50,25 +50,36 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        // Upsert the phone number
-        const result = await prisma.regionalPhoneNumber.upsert({
+        // Find existing phone number for this user and region
+        const existing = await prisma.regionalPhoneNumber.findFirst({
             where: {
-                userId_region: {
-                    userId: currentUser.userId,
-                    region: region.toUpperCase(),
-                },
-            },
-            create: {
                 userId: currentUser.userId,
                 region: region.toUpperCase(),
-                phoneNumber: cleanPhone,
-                isDefault: isDefault || false,
-            },
-            update: {
-                phoneNumber: cleanPhone,
-                isDefault: isDefault || false,
             },
         })
+
+        let result
+        if (existing) {
+            // Update existing
+            result = await prisma.regionalPhoneNumber.update({
+                where: { id: existing.id },
+                data: {
+                    phoneNumber: cleanPhone,
+                    isDefault: isDefault || false,
+                },
+            })
+        } else {
+            // Create new
+            result = await prisma.regionalPhoneNumber.create({
+                data: {
+                    userId: currentUser.userId,
+                    region: region.toUpperCase(),
+                    phoneNumber: cleanPhone,
+                    isDefault: isDefault || false,
+                },
+            })
+        }
+
 
         return NextResponse.json({ success: true, phoneNumber: result })
     } catch (error) {
