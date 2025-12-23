@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.errors }, { status: 400 })
+            return NextResponse.json({ error: error.issues }, { status: 400 })
         }
         console.error('Failed to update follow-up:', error)
         return NextResponse.json({ error: 'Failed to update follow-up' }, { status: 500 })
