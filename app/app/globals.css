@@ -163,3 +163,285 @@
     color: white;
   }
 }
+
+/* ==================== LIQUID APPLE-LIKE EFFECTS ==================== */
+
+/* Liquid Gradient Animation */
+@keyframes liquid-gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes liquid-morph {
+  0%, 100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  50% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(139, 92, 246, 0.5);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Liquid Button - Primary */
+.btn-liquid {
+  position: relative;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #3b82f6 100%);
+  background-size: 200% 200%;
+  animation: liquid-gradient 3s ease infinite;
+  border: none;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-liquid::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.btn-liquid:hover::before {
+  left: 100%;
+}
+
+.btn-liquid:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 10px 40px rgba(59, 130, 246, 0.4);
+}
+
+.btn-liquid:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Liquid Icon Container */
+.icon-liquid {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-liquid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(139, 92, 246, 0.5));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.icon-liquid:hover::before {
+  opacity: 1;
+}
+
+.icon-liquid:hover {
+  transform: scale(1.1) rotate(5deg);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+}
+
+.icon-liquid svg {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-liquid:hover svg {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+}
+
+/* Morphing Blob Background */
+.blob-morph {
+  animation: liquid-morph 8s ease-in-out infinite;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+}
+
+/* Shimmer Effect */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Glass Card with Liquid Border */
+.glass-liquid {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-liquid::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(59, 130, 246, 0.1) 60deg,
+    transparent 120deg
+  );
+  animation: rotate 4s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.glass-liquid:hover::before {
+  opacity: 1;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Floating Action Button */
+.fab-liquid {
+  position: relative;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  border-radius: 50%;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: float 3s ease-in-out infinite;
+}
+
+.fab-liquid:hover {
+  transform: scale(1.15);
+  box-shadow: 0 8px 30px rgba(59, 130, 246, 0.6);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+/* Premium Input Focus */
+.input-liquid:focus {
+  outline: none;
+  border-color: transparent;
+  box-shadow: 
+    0 0 0 2px rgba(59, 130, 246, 0.3),
+    0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+/* Nav Item Liquid Effect */
+.nav-liquid {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-liquid::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(-50%);
+  border-radius: 2px;
+}
+
+.nav-liquid:hover::after,
+.nav-liquid.active::after {
+  width: 80%;
+}
+
+.nav-liquid:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+}
+
+/* Gradient Text */
+.text-gradient {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+  background-size: 200% 200%;
+  animation: liquid-gradient 4s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Badge Pulse */
+.badge-pulse {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Card Hover Lift */
+.card-lift {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(59, 130, 246, 0.1);
+}
+
+/* Dark mode adjustments for liquid effects */
+.dark .glass-liquid {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .icon-liquid {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+}
+
+.dark .icon-liquid:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%);
+}
+
