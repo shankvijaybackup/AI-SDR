@@ -98,7 +98,7 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
                 leadName: `${lead.firstName} ${lead.lastName}`.trim(),
                 leadEmail: lead.email || '',
                 leadCompany: companyName, // Add extracted company name
-                region: 'in', // Changed to 'in' for India
+                region: 'us', // Changed back to 'us' since it was working before
                 userId: 'current-user-id' // This should be replaced with actual user ID from auth context
             }
 
