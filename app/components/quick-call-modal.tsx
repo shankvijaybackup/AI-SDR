@@ -76,42 +76,17 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
         setLogs(['[Initiate Call] Starting call...'])
 
         try {
-            const callId = crypto.randomUUID()
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
-
-            // Extract company name from script
-            const scriptContent = selectedScript.content || ''
-            const companyMatch = scriptContent.match(/from\s+([^\s,.]+)/i)
-            const companyName = companyMatch ? companyMatch[1] : (lead.company || 'Our Company')
-
-            // Prepare the script with lead information
-            const scriptWithLeadInfo = selectedScript.content
-                .replace('{{leadName}}', `${lead.firstName} ${lead.lastName}`.trim())
-                .replace('{{company}}', lead.company || 'your company')
-                .replace('{{jobTitle}}', lead.jobTitle || '')
-
-            // Prepare the request payload
-            const payload = {
-                callId,
-                phoneNumber: lead.phone,
-                script: scriptWithLeadInfo,
-                leadName: `${lead.firstName} ${lead.lastName}`.trim(),
-                leadEmail: lead.email || '',
-                leadCompany: companyName, // Add extracted company name
-                region: 'us', // Changed back to 'us' since it was working before
-                userId: 'current-user-id' // This should be replaced with actual user ID from auth context
-            }
-
-            // Log the payload for debugging
-            console.log('Call initiation payload:', JSON.stringify(payload, null, 2))
-
-            const response = await fetch(`${backendUrl}/api/twilio/initiate-call`, {
+            // Call the Next.js API route (not the backend directly)
+            // This ensures proper authentication, database operations, and enrichment
+            const response = await fetch('/api/calls/initiate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({
+                    leadId: lead.id,
+                    scriptId: selectedScript.id,
+                }),
             })
 
             // Check if the response is OK (status 200-299)
@@ -121,7 +96,7 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
             }
 
             const data = await response.json()
-            setCurrentCallId(data.callId) // Should be same as callId we sent
+            setCurrentCallId(data.callId)
             setCallStatus('ringing')
             setRealTimeStatus('ringing')
             setLogs(prev => [...prev, `[Call] Created: ${data.callId.substring(0, 8)}...`])
@@ -139,29 +114,30 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
     const pollCallStatus = async (callId: string) => {
         const pollInterval = setInterval(async () => {
             try {
-                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
-                const response = await fetch(`${backendUrl}/api/calls/${callId}/status`)
+                // Use Next.js API route instead of backend directly
+                const response = await fetch(`/api/calls/${callId}`)
 
                 if (response.ok) {
                     const data = await response.json()
+                    const callData = data.call
 
                     // Update status
-                    if (data.status) {
-                        setRealTimeStatus(data.status)
+                    if (callData.status) {
+                        setRealTimeStatus(callData.status)
                     }
 
                     // Update transcript
-                    if (data.transcript && data.transcript.length > transcript.length) {
-                        setTranscript(data.transcript)
+                    if (callData.transcript && callData.transcript.length > transcript.length) {
+                        setTranscript(callData.transcript)
                     }
 
                     // Check if ended
                     const endedStatuses = ['completed', 'failed', 'voicemail', 'no-answer', 'busy', 'canceled']
-                    if (endedStatuses.includes(data.status)) {
+                    if (endedStatuses.includes(callData.status)) {
                         clearInterval(pollInterval)
                         setCallStatus('ended')
-                        setLogs(prev => [...prev, `[Call End] ${data.disconnectReason || data.status}`])
-                    } else if (data.status === 'in-progress' || data.status === 'answered') {
+                        setLogs(prev => [...prev, `[Call End] ${callData.disconnectReason || callData.status}`])
+                    } else if (callData.status === 'in-progress' || callData.status === 'answered') {
                         setCallStatus('in-progress')
                     }
                 }
