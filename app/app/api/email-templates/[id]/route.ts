@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthenticatedUser } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/auth'
 
 // GET /api/email-templates/[id] - Get a specific template
 export async function GET(
@@ -9,7 +9,7 @@ export async function GET(
 ) {
     try {
         const { id } = await params
-        const user = await getAuthenticatedUser()
+        const user = await getCurrentUser()
         if (!user || !user.companyId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -36,7 +36,7 @@ export async function PUT(
 ) {
     try {
         const { id } = await params
-        const user = await getAuthenticatedUser()
+        const user = await getCurrentUser()
         if (!user || !user.companyId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -83,7 +83,7 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params
-        const user = await getAuthenticatedUser()
+        const user = await getCurrentUser()
         if (!user || !user.companyId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
