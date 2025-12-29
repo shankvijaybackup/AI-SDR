@@ -210,6 +210,9 @@ model Call {
   scriptId         String?
   campaignId       String?   // Link to bulk call campaign
   twilioCallSid    String?   @unique
+  companyName      String?   // Company name for display
+  fromNumber       String?   // Phone number used for calling
+  retryCount       Int       @default(0)  // Number of retry attempts
   voicePersona     String    @default("female")
   transcript       Json
   duration         Int?
@@ -237,11 +240,24 @@ model Call {
   script           Script?   @relation(fields: [scriptId], references: [id])
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaign         BulkCallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  callLogs         CallLog[]
 
   @@index([companyId])
   @@index([userId, leadId])
   @@index([twilioCallSid])
   @@index([campaignId])
+}
+
+model CallLog {
+  id        String   @id @default(uuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  status    String   // call status: initiated, ringing, answered, completed, etc.
+  details   String?  // Additional details about the status change
+  timestamp DateTime @default(now())
+
+  @@index([callId])
+  @@index([timestamp])
 }
 
 // ==================== CAMPAIGNS ====================

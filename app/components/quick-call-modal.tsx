@@ -79,6 +79,11 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
             const callId = crypto.randomUUID()
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
 
+            // Extract company name from script
+            const scriptContent = selectedScript.content || ''
+            const companyMatch = scriptContent.match(/from\s+([^\s,.]+)/i)
+            const companyName = companyMatch ? companyMatch[1] : (lead.company || 'Our Company')
+
             // Prepare the script with lead information
             const scriptWithLeadInfo = selectedScript.content
                 .replace('{{leadName}}', `${lead.firstName} ${lead.lastName}`.trim())
@@ -92,7 +97,8 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
                 script: scriptWithLeadInfo,
                 leadName: `${lead.firstName} ${lead.lastName}`.trim(),
                 leadEmail: lead.email || '',
-                region: 'us', // Default region, can be made dynamic based on lead's location
+                leadCompany: companyName, // Add extracted company name
+                region: 'in', // Changed to 'in' for India
                 userId: 'current-user-id' // This should be replaced with actual user ID from auth context
             }
 

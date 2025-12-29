@@ -10,6 +10,7 @@ const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 const FALLBACK_PHONES = {
   default: process.env.TWILIO_PHONE_NUMBER,
   anz: process.env.TWILIO_PHONE_NUMBER_ANZ || '+61341574513',
+  in: process.env.TWILIO_PHONE_NUMBER_IN || process.env.TWILIO_PHONE_NUMBER, // India phone number
 };
 
 const client = twilio(accountSid, authToken);
@@ -51,6 +52,12 @@ async function getPhoneNumberForRegion(region, userId) {
 
   const r = region.toLowerCase().trim();
 
+  // India
+  if (['india', 'in', 'indian'].some(x => r.includes(x))) {
+    console.log(`[Phone] India fallback: ${FALLBACK_PHONES.in}`);
+    return FALLBACK_PHONES.in;
+  }
+
   // ANZ/Oceania
   if (['australia', 'au', 'aus', 'new zealand', 'nz', 'anz', 'oceania'].some(x => r.includes(x))) {
     console.log(`[Phone] ANZ fallback: ${FALLBACK_PHONES.anz}`);
@@ -63,7 +70,7 @@ async function getPhoneNumberForRegion(region, userId) {
 
 async function initiateCall(req, res) {
   try {
-    const { callId, phoneNumber, script, leadName, leadEmail, region } = req.body;
+    const { callId, phoneNumber, script, leadName, leadEmail, leadCompany, region } = req.body;
 
     if (!callId || !phoneNumber || !script) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -84,12 +91,17 @@ async function initiateCall(req, res) {
     console.log(`[Initiate Call] Voice: ${voicePersona} (${selectedVoice.gender}), ID: ${voiceId}`);
     console.log(`[Initiate Call] Script: ${script.substring(0, 50)}...`);
 
-    // Extract caller company from script (heuristic)
-    let companyName = 'Atomicwork'; // Default
-    const companyMatch = script.match(/(?:from|at)\s+([A-Z][A-Za-z0-9\s&]+?)(?:\.|,|\s+is|\s+Is|\n)/);
-    if (companyMatch && companyMatch[1]) {
-      companyName = companyMatch[1].trim();
-      console.log(`[Initiate Call] Extracted company name from script: ${companyName}`);
+    // Use company name from request or extract from script as fallback
+    let companyName = leadCompany || 'Atomicwork'; // Use provided company or default
+    if (!leadCompany) {
+      // Fallback to extracting from script if not provided
+      const companyMatch = script.match(/(?:from|at)\s+([A-Z][A-Za-z0-9\s&]+?)(?:\.|,|\s+is|\s+Is|\n)/);
+      if (companyMatch && companyMatch[1]) {
+        companyName = companyMatch[1].trim();
+        console.log(`[Initiate Call] Extracted company name from script: ${companyName}`);
+      }
+    } else {
+      console.log(`[Initiate Call] Using provided company name: ${companyName}`);
     }
 
     // Store call metadata with events tracking
@@ -119,11 +131,17 @@ async function initiateCall(req, res) {
       from: fromNumber, // Use region-specific phone number
       statusCallback: `${publicBaseUrl}/api/twilio/status?callId=${callId}`,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'canceled', 'failed'],
-      timeout: 30, // Disconnect after ~5 rings (30 seconds)
+      timeout: region === 'in' ? 45 : 30, // Longer timeout for international calls
       machineDetection: 'DetectMessageEnd', // Detect voicemail/answering machines
       asyncAmd: true, // Don't block on AMD detection
       asyncAmdStatusCallback: `${publicBaseUrl}/api/twilio/amd-status?callId=${callId}`, // AMD callback
       record: true,
+      // Add international calling settings
+      ...(region === 'in' && {
+        // Additional settings for India calls
+        statusCallbackMethod: 'POST',
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'canceled', 'failed']
+      })
     });
 
     console.log(`[Initiate Call] Twilio call created: ${call.sid}`);
@@ -177,10 +195,60 @@ function endCall(callId) {
   return call;
 }
 
+async function retryFailedCall(callId, maxRetries = 3) {
+  try {
+    // Get call details from database
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const response = await fetch(`${FRONTEND_URL}/api/calls/${callId}`);
+    if (!response.ok) {
+      throw new Error('Call not found');
+    }
+    const callData = await response.json();
+
+    if (callData.retryCount >= maxRetries) {
+      throw new Error('Maximum retry attempts reached');
+    }
+
+    // Check if last status was a failure
+    const lastStatus = callData.status;
+    if (!['no-answer', 'busy', 'failed'].includes(lastStatus)) {
+      throw new Error('Call does not need to be retried');
+    }
+
+    // Increment retry count and create new call
+    const newCallId = crypto.randomUUID();
+    const retryPayload = {
+      callId: newCallId,
+      phoneNumber: callData.lead.phone,
+      script: callData.script.content,
+      leadName: `${callData.lead.firstName} ${callData.lead.lastName}`.trim(),
+      leadEmail: callData.lead.email || '',
+      leadCompany: callData.companyName || callData.lead.company || 'Our Company',
+      region: callData.region || 'us',
+      userId: callData.userId,
+      isRetry: true,
+      originalCallId: callId
+    };
+
+    console.log(`[Retry] Retrying call ${callId} as ${newCallId} (attempt ${callData.retryCount + 1}/${maxRetries})`);
+
+    // Initiate new call
+    return await initiateCall({ body: retryPayload }, {
+      json: (data) => ({ success: true, data }),
+      status: (code) => ({ json: (data) => ({ success: false, data, code }) })
+    });
+
+  } catch (error) {
+    console.error('[Retry] Error retrying call:', error);
+    throw error;
+  }
+}
+
 export {
   initiateCall,
   getActiveCall,
   updateCallTranscript,
   endCall,
-  activeCalls
+  activeCalls,
+  retryFailedCall
 };
