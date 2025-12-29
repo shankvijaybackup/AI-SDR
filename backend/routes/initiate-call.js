@@ -84,11 +84,20 @@ async function initiateCall(req, res) {
     console.log(`[Initiate Call] Voice: ${voicePersona} (${selectedVoice.gender}), ID: ${voiceId}`);
     console.log(`[Initiate Call] Script: ${script.substring(0, 50)}...`);
 
+    // Extract caller company from script (heuristic)
+    let companyName = 'Atomicwork'; // Default
+    const companyMatch = script.match(/(?:from|at)\s+([A-Z][A-Za-z0-9\s&]+?)(?:\.|,|\s+is|\s+Is|\n)/);
+    if (companyMatch && companyMatch[1]) {
+      companyName = companyMatch[1].trim();
+      console.log(`[Initiate Call] Extracted company name from script: ${companyName}`);
+    }
+
     // Store call metadata with events tracking
     activeCalls.set(callId, {
       callId,
       phoneNumber,
       script,
+      companyName, // Store extracted company
       voicePersona,
       voiceId, // Store the actual ElevenLabs voice ID
       leadName,

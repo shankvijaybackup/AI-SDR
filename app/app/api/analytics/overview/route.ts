@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
     // Multi-tenancy: Analytics aggregates ALL calls across all users
     const calls = await prisma.call.findMany({
       where: {
+        companyId: currentUser.companyId,
         createdAt: {
           gte: startDate,
         },
@@ -76,28 +77,28 @@ export async function GET(req: NextRequest) {
     const avgDuration =
       callsWithDuration.length > 0
         ? callsWithDuration.reduce((sum, c) => sum + (c.duration || 0), 0) /
-          callsWithDuration.length
+        callsWithDuration.length
         : 0;
 
     const callsWithSentiment = calls.filter((c) => c.sentimentScore !== null);
     const avgSentiment =
       callsWithSentiment.length > 0
         ? callsWithSentiment.reduce((sum, c) => sum + (c.sentimentScore || 0), 0) /
-          callsWithSentiment.length
+        callsWithSentiment.length
         : 0;
 
     const callsWithEngagement = calls.filter((c) => c.engagementScore !== null);
     const avgEngagement =
       callsWithEngagement.length > 0
         ? callsWithEngagement.reduce((sum, c) => sum + (c.engagementScore || 0), 0) /
-          callsWithEngagement.length
+        callsWithEngagement.length
         : 0;
 
     const callsWithQuality = calls.filter((c) => c.callQualityScore !== null);
     const avgQuality =
       callsWithQuality.length > 0
         ? callsWithQuality.reduce((sum, c) => sum + (c.callQualityScore || 0), 0) /
-          callsWithQuality.length
+        callsWithQuality.length
         : 0;
 
     // Top objections

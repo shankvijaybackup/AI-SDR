@@ -94,6 +94,8 @@ app.use(
   })
 );
 
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
 // Twilio sends x-www-form-urlencoded to webhooks
 app.use("/api/twilio", bodyParser.urlencoded({ extended: false }));
 // Frontend sends JSON
@@ -670,7 +672,9 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       sttConfidence: Number(confidence || 0),
       userId: call.userId,
       leadEmail: call.leadEmail,
-      leadRegion: call.leadRegion
+      leadRegion: call.leadRegion,
+      voicePersona: call.voicePersona,
+      companyName: call.companyName
     });
 
     addTranscript(callSid, { speaker: "agent", text: reply });
@@ -773,36 +777,47 @@ app.post("/api/twilio/amd-status", async (req, res) => {
       activeCall.disconnectReason = DISCONNECT_REASONS.voicemail;
     }
 
-    // Hang up the call via Twilio API
-    try {
-      const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
-      const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+    // Update database with voicemail reason and check for drop
+    if (callId) {
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+      try {
+        const vmRes = await fetch(`${FRONTEND_URL}/api/calls/${callId}/voicemail`, {
+          method: 'POST',
+        });
 
-      await twilioClient.calls(CallSid).update({ status: 'completed' });
-      console.log(`[AMD] Call ${CallSid} hung up successfully`);
-
-      // Update database with voicemail reason
-      if (callId) {
-        const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-        try {
-          await fetch(`${FRONTEND_URL}/api/calls/${callId}/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              transcript: [],
-              status: 'voicemail',
-              disconnectReason: DISCONNECT_REASONS.voicemail,
-              duration: 0
-            })
-          });
-          console.log(`[AMD] Voicemail status saved to database for call ${callId}`);
-        } catch (dbErr) {
-          console.error(`[AMD] Failed to save voicemail status:`, dbErr.message);
+        if (vmRes.ok) {
+          const vmData = await vmRes.json();
+          if (vmData.dropped && vmData.audioUrl) {
+            console.log(`[AMD] Dropping voicemail message: ${vmData.audioUrl}`);
+            // Play voicemail using TwiML
+            await twilioClient.calls(CallSid).update({
+              twiml: `<Response><Play>${vmData.audioUrl}</Play><Hangup/></Response>`
+            });
+            return res.sendStatus(200);
+          }
         }
+      } catch (dbErr) {
+        console.error('[AMD] Failed to check for voicemail drop:', dbErr);
       }
-    } catch (err) {
-      console.error('[AMD] Failed to hang up call:', err.message);
+
+      // Fallback: just update status and hangup
+      try {
+        await fetch(`${FRONTEND_URL}/api/calls/${callId}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: [],
+            status: 'voicemail',
+            disconnectReason: 'Voicemail (No Drop)',
+            duration: 0
+          })
+        });
+        await twilioClient.calls(CallSid).update({ status: 'completed' });
+      } catch (e) {
+        console.error('[AMD] Error ending call:', e);
+      }
+    } else {
+      await twilioClient.calls(CallSid).update({ status: 'completed' });
     }
   } else if (AnsweredBy === 'human') {
     console.log(`[AMD] Human detected for call ${callId}, continuing call`);

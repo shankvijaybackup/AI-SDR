@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const calls = await prisma.call.findMany({
       where: {
-        userId: currentUser.userId,
+        companyId: currentUser.companyId,
         createdAt: { gte: startDate },
       },
       select: {

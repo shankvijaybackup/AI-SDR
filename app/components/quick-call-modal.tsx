@@ -11,6 +11,7 @@ interface Lead {
     id: string
     firstName: string
     lastName: string
+    email?: string
     phone: string
     company?: string
     jobTitle?: string
@@ -21,6 +22,7 @@ interface Lead {
 interface Script {
     id: string
     name: string
+    content: string
     isDefault?: boolean
 }
 
@@ -74,24 +76,46 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
         setLogs(['[Initiate Call] Starting call...'])
 
         try {
+            const callId = crypto.randomUUID()
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
+
+            // Prepare the script with lead information
+            const scriptWithLeadInfo = selectedScript.content
+                .replace('{{leadName}}', `${lead.firstName} ${lead.lastName}`.trim())
+                .replace('{{company}}', lead.company || 'your company')
+                .replace('{{jobTitle}}', lead.jobTitle || '')
+
+            // Prepare the request payload
+            const payload = {
+                callId,
+                phoneNumber: lead.phone,
+                script: scriptWithLeadInfo,
+                leadName: `${lead.firstName} ${lead.lastName}`.trim(),
+                leadEmail: lead.email || '',
+                region: 'us', // Default region, can be made dynamic based on lead's location
+                userId: 'current-user-id' // This should be replaced with actual user ID from auth context
+            }
+
+            // Log the payload for debugging
+            console.log('Call initiation payload:', JSON.stringify(payload, null, 2))
+
             const response = await fetch(`${backendUrl}/api/twilio/initiate-call`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    leadId: lead.id,
-                    scriptId: selectedScript.id,
-                    leadName: `${lead.firstName} ${lead.lastName}`,
-                    leadPhone: lead.phone,
-                    leadCompany: lead.company,
-                    leadJobTitle: lead.jobTitle,
-                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload),
             })
 
-            if (!response.ok) throw new Error('Failed to initiate call')
+            // Check if the response is OK (status 200-299)
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+            }
 
             const data = await response.json()
-            setCurrentCallId(data.callId)
+            setCurrentCallId(data.callId) // Should be same as callId we sent
             setCallStatus('ringing')
             setRealTimeStatus('ringing')
             setLogs(prev => [...prev, `[Call] Created: ${data.callId.substring(0, 8)}...`])
@@ -102,7 +126,7 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
             console.error('Call failed:', error)
             setCallStatus('ended')
             setRealTimeStatus('failed')
-            setLogs(prev => [...prev, '[Error] Failed to start call'])
+            setLogs(prev => [...prev, `[Error] Failed to start call: ${error instanceof Error ? error.message : String(error)}`])
         }
     }
 

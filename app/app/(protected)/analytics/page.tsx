@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Phone, TrendingUp, Users, Calendar, Clock, Target, Award, AlertCircle } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { StatsOverview } from '@/components/analytics/StatsOverview'
+import { OutcomeDistribution } from '@/components/analytics/OutcomeDistribution'
+import { ObjectionsChart } from '@/components/analytics/ObjectionsChart'
+import { Loader2 } from 'lucide-react'
+
 
 // Chart colors
-const INTEREST_COLORS = {
-  high: '#22c55e',
-  medium: '#eab308',
-  low: '#f97316',
-  not_interested: '#ef4444',
-}
+
 
 type TimeRange = '7d' | '30d' | '90d' | 'all'
 
@@ -61,6 +59,9 @@ export default function AnalyticsPage() {
   const [legacy, setLegacy] = useState<LegacyAnalyticsData | null>(null)
   const [overview, setOverview] = useState<OverviewAnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [funnelData, setFunnelData] = useState<any[]>([])
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [heatmapData, setHeatmapData] = useState<any[]>([])
 
   useEffect(() => {
     fetchAnalytics()
@@ -70,20 +71,20 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
-      const [legacyRes, overviewRes] = await Promise.all([
+      const [legacyRes, overviewRes, funnelRes, perfRes, heatmapRes] = await Promise.all([
         fetch('/api/analytics'),
         fetch(`/api/analytics/overview?range=${range}`),
+        fetch('/api/analytics/funnel'),
+        fetch('/api/analytics/performance'),
+        fetch('/api/analytics/heatmap')
       ])
 
-      if (legacyRes.ok) {
-        const legacyData = await legacyRes.json()
-        setLegacy(legacyData)
-      }
+      if (legacyRes.ok) setLegacy(await legacyRes.json())
+      if (overviewRes.ok) setOverview(await overviewRes.json())
+      if (funnelRes.ok) setFunnelData(await funnelRes.json())
+      if (perfRes.ok) setLeaderboard(await perfRes.json())
+      if (heatmapRes.ok) setHeatmapData(await heatmapRes.json())
 
-      if (overviewRes.ok) {
-        const overviewData = await overviewRes.json()
-        setOverview(overviewData)
-      }
     } catch (error) {
       console.error('Failed to fetch analytics:', error)
     } finally {
@@ -107,8 +108,11 @@ export default function AnalyticsPage() {
     )
   }
 
-  const conversionRate = `${overview.summary.conversionRate.toFixed(1)}%`
-  const interestRate = `${overview.summary.interestRate.toFixed(1)}%`
+
+
+  // Heatmap helper
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
   return (
     <div className="space-y-6">
@@ -134,161 +138,105 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Calls</CardTitle>
-            <Phone className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{overview.summary.totalCalls}</div>
-            <p className="text-xs text-muted-foreground">
-              {legacy.callsToday} today
-            </p>
-          </CardContent>
-        </Card>
+      <StatsOverview overview={overview} legacy={legacy} />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{legacy.totalLeads}</div>
-            <p className="text-xs text-muted-foreground">
-              In pipeline
-            </p>
-          </CardContent>
-        </Card>
+      {/* Funnel & Interest */}
+      <OutcomeDistribution funnelData={funnelData} interestBreakdown={legacy.interestBreakdown} />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Duration</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.floor(overview.summary.avgDuration / 60)}m {overview.summary.avgDuration % 60}s
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Per call
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{conversionRate}</div>
-            <p className="text-xs text-muted-foreground">
-              Interest rate: {interestRate}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Interest Breakdown & Demos */}
+      {/* Top Objections & Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Interest Level Breakdown</CardTitle>
-            <CardDescription>Distribution of lead interest after calls</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {legacy.totalCalls === 0 ? (
-              <div className="flex items-center justify-center h-48 text-slate-500">
-                No calls yet
-              </div>
-            ) : (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'High Interest', value: legacy.interestBreakdown.high, color: INTEREST_COLORS.high },
-                        { name: 'Medium', value: legacy.interestBreakdown.medium, color: INTEREST_COLORS.medium },
-                        { name: 'Low', value: legacy.interestBreakdown.low, color: INTEREST_COLORS.low },
-                        { name: 'Not Interested', value: legacy.interestBreakdown.not_interested, color: INTEREST_COLORS.not_interested },
-                      ].filter(d => d.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={3}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                      labelLine={false}
-                    >
-                      {[
-                        { name: 'High Interest', value: legacy.interestBreakdown.high, color: INTEREST_COLORS.high },
-                        { name: 'Medium', value: legacy.interestBreakdown.medium, color: INTEREST_COLORS.medium },
-                        { name: 'Low', value: legacy.interestBreakdown.low, color: INTEREST_COLORS.low },
-                        { name: 'Not Interested', value: legacy.interestBreakdown.not_interested, color: INTEREST_COLORS.not_interested },
-                      ].filter(d => d.value > 0).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ObjectionsChart data={overview.topObjections} />
 
+        {/* Leaderboard - moved here to sit next to Objections */}
         <Card>
           <CardHeader>
-            <CardTitle>Success Metrics</CardTitle>
-            <CardDescription>Key outcomes from your calls</CardDescription>
+            <CardTitle>Agent Performance</CardTitle>
+            <CardDescription>Top performing agents by success rate</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-medium">Demos Scheduled</span>
-                </div>
-                <span className="text-2xl font-bold text-green-600">{legacy.demosScheduled}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <Award className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm font-medium">Emails Captured</span>
-                </div>
-                <span className="text-2xl font-bold text-blue-600">{legacy.emailsCaptured}</span>
-              </div>
+              {leaderboard.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">No data available</p>
+              ) : (
+                leaderboard.map((agent, i) => (
+                  <div key={agent.agentId} className="flex items-center justify-between p-3 border rounded-lg bg-white">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-xs
+                                      ${i === 0 ? 'bg-yellow-100 text-yellow-700' :
+                          i === 1 ? 'bg-slate-200 text-slate-700' :
+                            'bg-orange-50 text-orange-700'}`}>
+                        {i + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{agent.name}</p>
+                        <p className="text-xs text-slate-500">{agent.totalCalls} calls</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-green-600">{agent.successRate}%</div>
+                      <p className="text-xs text-slate-500">Success Rate</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Objections */}
+      {/* Heatmap */}
       <Card>
         <CardHeader>
-          <CardTitle>Top Objections</CardTitle>
-          <CardDescription>Most common objections raised by leads</CardDescription>
+          <CardTitle>Call Heatmap (Pickup Rates)</CardTitle>
+          <CardDescription>Best times to call (darker = higher pickup rate)</CardDescription>
         </CardHeader>
         <CardContent>
-          {overview.topObjections.length === 0 ? (
-            <p className="text-sm text-slate-500">No objections recorded yet</p>
-          ) : (
-            <div className="space-y-2">
-              {overview.topObjections.map((obj, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm">{obj.objection}</span>
-                  </div>
-                  <span className="text-sm font-medium text-slate-600">{obj.count}x</span>
-                </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px] grid grid-cols-[auto_repeat(24,1fr)] gap-1">
+              {/* Header Row */}
+              <div className="h-8"></div>
+              {HOURS.map(h => (
+                <div key={h} className="text-[10px] text-center text-slate-400">{h}</div>
+              ))}
+
+              {/* Rows */}
+              {DAYS.map((day, dayIdx) => (
+                <>
+                  <div key={`label-${day}`} className="text-xs text-slate-500 font-medium pr-2 flex items-center justify-end">{day}</div>
+                  {HOURS.map(hour => {
+                    const cell = heatmapData.find(d => d.day === dayIdx && d.hour === hour)
+                    const rate = cell ? cell.pickupRate : 0
+                    const count = cell ? cell.calls : 0
+
+                    let bg = 'bg-slate-100'
+                    if (count > 0) {
+                      if (rate > 75) bg = 'bg-green-600'
+                      else if (rate > 50) bg = 'bg-green-400'
+                      else if (rate > 25) bg = 'bg-green-300'
+                      else bg = 'bg-green-200'
+                    }
+
+                    return (
+                      <div
+                        key={`${day}-${hour}`}
+                        className={`h-8 w-full rounded-sm ${bg} hover:ring-2 ring-blue-400 transition-all cursor-help relative group`}
+                      >
+                        {count > 0 && (
+                          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-black text-white text-xs rounded z-10 whitespace-nowrap">
+                            {rate}% Pickup ({count} calls)
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </>
               ))}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
+
+
 
       {/* Recent Calls */}
       <Card>

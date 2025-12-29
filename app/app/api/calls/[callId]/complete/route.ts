@@ -1,6 +1,168 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+/**
+ * Clean and validate transcript before saving
+ * Removes noise, normalizes text, and calculates quality metrics
+ */
+function cleanTranscript(transcriptArray: Array<{
+    speaker: string
+    text: string
+    timestamp?: string
+    confidence?: number
+}>): {
+    transcript: Array<any>
+    quality: number
+    avgConfidence: number
+} {
+    if (!Array.isArray(transcriptArray)) {
+        return { transcript: [], quality: 0, avgConfidence: 0 }
+    }
+
+    let totalConfidence = 0
+    let confidenceCount = 0
+
+    const cleanedTranscript = transcriptArray
+        .filter(entry => {
+            // Remove empty entries
+            if (!entry.text || entry.text.trim().length === 0) return false
+            // Remove very short noise (single characters)
+            if (entry.text.trim().length < 2) return false
+            return true
+        })
+        .map(entry => {
+            // Track confidence
+            if (entry.confidence) {
+                totalConfidence += entry.confidence
+                confidenceCount++
+            }
+
+            let cleanedText = entry.text.trim()
+
+            // Remove repetitive filler words
+            cleanedText = cleanedText.replace(/\b(um|uh|like|you know)\s+\1+\b/gi, '$1')
+
+            // Remove multiple spaces
+            cleanedText = cleanedText.replace(/\s{2,}/g, ' ')
+
+            // Ensure proper capitalization
+            cleanedText = cleanedText.charAt(0).toUpperCase() + cleanedText.slice(1)
+
+            return {
+                ...entry,
+                text: cleanedText
+            }
+        })
+
+    const avgConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : 0
+    const quality = cleanedTranscript.length >= 3 ? avgConfidence : avgConfidence * 0.5
+
+    return {
+        transcript: cleanedTranscript,
+        quality: Math.round(quality * 100) / 100,
+        avgConfidence: Math.round(avgConfidence * 100) / 100
+    }
+}
+
+/**
+ * Replace variables in email template
+ */
+function replaceVariables(template: string, data: Record<string, string>) {
+    let result = template
+    for (const [key, value] of Object.entries(data)) {
+        const regex = new RegExp(`{{${key}}}`, 'g')
+        result = result.replace(regex, value || '')
+    }
+    return result
+}
+
+/**
+ * Find matching template and send email
+ */
+async function sendPostCallEmail(
+    companyId: string,
+    leadId: string,
+    callId: string,
+    analysis: any,
+    lead: any,
+    user: any
+) {
+    try {
+        // Determine trigger type based on analysis
+        let triggerType = 'post_call_low'
+        if (analysis.scheduledDemo) triggerType = 'demo_reminder' // Prioritize demo
+        else if (analysis.interestLevel === 'high') triggerType = 'post_call_high'
+        else if (analysis.interestLevel === 'medium') triggerType = 'post_call_medium'
+        else if (analysis.interestLevel === 'not_interested') triggerType = 'post_call_not_interested'
+
+        // Find active template
+        const template = await prisma.emailTemplate.findFirst({
+            where: {
+                companyId,
+                triggerType,
+                isActive: true
+            },
+            orderBy: { createdAt: 'desc' } // Get most recent
+        })
+
+        if (!template) {
+            console.log(`[Email Auto-Send] No template found for trigger: ${triggerType}`)
+            return false
+        }
+
+        // Prepare variables
+        const variables = {
+            firstName: lead.firstName,
+            lastName: lead.lastName,
+            email: lead.email || '',
+            company: lead.company || '',
+            notes: analysis.aiSummary || '',
+            nextSteps: analysis.nextSteps || '',
+            myFirstName: user.firstName,
+            myLastName: user.lastName,
+            myEmail: user.email
+        }
+
+        // Replace variables
+        const subject = replaceVariables(template.subject, variables)
+        const body = replaceVariables(template.body, variables)
+
+        // Send email
+        const { sendEmail } = await import('@/lib/email')
+        if (lead.email) {
+            const result = await sendEmail({
+                to: lead.email,
+                subject,
+                html: body
+            })
+
+            // Log email
+            await prisma.emailLog.create({
+                data: {
+                    companyId,
+                    leadId,
+                    callId,
+                    templateId: template.id,
+                    subject,
+                    body,
+                    status: result.success ? 'sent' : 'failed',
+                    errorMessage: result.error,
+                    sentAt: result.success ? new Date() : null
+                }
+            })
+
+            console.log(`[Email Auto-Send] Email sent to ${lead.email} using template ${template.name}`)
+            return true
+        }
+
+        return false
+
+    } catch (error) {
+        console.error('[Email Auto-Send] Error:', error)
+        return false
+    }
+}
+
 // POST /api/calls/[callId]/complete
 // Called automatically by backend when call ends to save transcript and summary
 export async function POST(
@@ -17,7 +179,12 @@ export async function POST(
         const body = await request.json()
         const { transcript, summary, duration, status, voicePersona, disconnectReason } = body
 
-        console.log(`[Call Complete API] Saving call ${callId} - transcript entries: ${transcript?.length || 0}`)
+        console.log(`[Call Complete API] Processing call ${callId} - raw transcript entries: ${transcript?.length || 0}`)
+
+        // Clean and validate transcript before saving
+        const { transcript: cleanedTranscript, quality, avgConfidence } = cleanTranscript(transcript)
+
+        console.log(`[Call Complete API] Cleaned transcript: ${cleanedTranscript.length} entries, quality: ${quality}, avg confidence: ${avgConfidence}`)
 
         // Find the call
         const existingCall = await prisma.call.findUnique({
@@ -30,11 +197,11 @@ export async function POST(
             return NextResponse.json({ error: 'Call not found' }, { status: 404 })
         }
 
-        // Update the call with transcript and summary
+        // Update the call with cleaned transcript and summary
         const updatedCall = await prisma.call.update({
             where: { id: callId },
             data: {
-                transcript: transcript || [],
+                transcript: cleanedTranscript,
                 aiSummary: summary || null,
                 duration: duration || 0,
                 status: status || 'completed',
@@ -42,7 +209,7 @@ export async function POST(
             }
         })
 
-        console.log(`[Call Complete API] ✅ Call ${callId} updated with ${transcript?.length || 0} transcript entries`)
+        console.log(`[Call Complete API] ✅ Call ${callId} updated with ${cleanedTranscript.length} cleaned transcript entries`)
 
         // Auto-trigger analysis if we have a transcript
         if (transcript && transcript.length > 2 && existingCall.lead) {
@@ -115,6 +282,22 @@ export async function POST(
                     if (analysis.nextSteps) {
                         console.log(`[Call Complete API] 📋 Next steps: ${analysis.nextSteps}`)
                     }
+
+                    // Attempt to send auto-follow-up email
+                    if (existingCall.companyId && existingCall.lead.email) {
+                        // Fetch user to get sender details
+                        const user = await prisma.user.findUnique({ where: { id: existingCall.userId } });
+                        if (user) {
+                            await sendPostCallEmail(
+                                existingCall.companyId,
+                                existingCall.lead.id,
+                                existingCall.id,
+                                analysis,
+                                existingCall.lead,
+                                user
+                            )
+                        }
+                    }
                 }
             } catch (analysisErr) {
                 console.error(`[Call Complete API] AI analysis failed:`, analysisErr)
@@ -125,7 +308,9 @@ export async function POST(
         return NextResponse.json({
             success: true,
             callId,
-            transcriptEntries: transcript?.length || 0,
+            transcriptEntries: cleanedTranscript.length,
+            transcriptQuality: quality,
+            avgConfidence,
             hasSummary: !!summary
         })
 

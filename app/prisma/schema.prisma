@@ -30,6 +30,9 @@ model Company {
   knowledgeSources    KnowledgeSource[]
   invites             CompanyInvite[]
   settings            CompanySettings?
+  emailTemplates      EmailTemplate[]
+  emailLogs           EmailLog[]
+  voicemailMessages   VoicemailMessage[]
 
   @@index([slug])
 }
@@ -163,6 +166,7 @@ model Lead {
   updatedAt        DateTime  @updatedAt
   
   calls            Call[]
+  emailLogs        EmailLog[]
   companyRelation  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -222,6 +226,9 @@ model Call {
   emailCaptured    String?
   nextSteps        String?
   scheduledDemo    DateTime?
+  // AMD (Voicemail Detection)
+  amdResult        String?   // "human", "machine_start", "machine_end_beep", "fax", "unknown"
+  voicemailDropped Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   
@@ -304,4 +311,70 @@ model KnowledgeSource {
   @@index([isShared])
   @@index([category])
   @@index([status])
+}
+
+// ==================== EMAIL AUTOMATION ====================
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  subject     String
+  body        String   // HTML with {{variables}} for personalization
+  triggerType String   // "post_call_high", "post_call_medium", "post_call_low", "demo_reminder", "follow_up"
+  delayMinutes Int     @default(0)  // Delay before sending (0 = immediate)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emails      EmailLog[]
+
+  @@index([companyId, triggerType])
+  @@index([companyId, isActive])
+}
+
+model EmailLog {
+  id          String    @id @default(uuid())
+  companyId   String
+  leadId      String
+  callId      String?   // Link to call that triggered this email
+  templateId  String?
+  subject     String
+  body        String?   // Rendered HTML
+  status      String    @default("pending")  // "pending", "sent", "delivered", "opened", "clicked", "bounced", "failed"
+  sendgridId  String?   // SendGrid message ID for tracking
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
+  errorMessage String?
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  template    EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([leadId])
+  @@index([sendgridId])
+  @@index([createdAt])
+}
+
+// ==================== VOICEMAIL ====================
+
+model VoicemailMessage {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  audioUrl  String   // URL to uploaded audio file
+  duration  Int?     // Duration in seconds
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, isActive])
 }

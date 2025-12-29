@@ -162,13 +162,17 @@ export function attachMediaStreamServer(httpServer) {
                     return;
                   }
 
-                  // Add to transcript with timestamp
+                  // Add to transcript with timestamp and speaker info
                   const timestamp = new Date().toISOString();
+                  // Use diarization speaker if available, otherwise default to "prospect"
+                  const speaker = result.speaker !== null ? `speaker_${result.speaker}` : "prospect";
                   updateCallTranscript(callSid, {
-                    speaker: "prospect",
+                    speaker: speaker,
                     text: currentTranscript,
                     timestamp,
-                    confidence: result.confidence
+                    confidence: result.confidence,
+                    startTime: result.startTime,
+                    endTime: result.endTime
                   });
 
                   // Get AI reply

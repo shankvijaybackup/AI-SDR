@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe, Building2, Crown, Loader2 } from 'lucide-react'
+import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe, Building2, Crown, Loader2, Volume2 } from 'lucide-react'
 
 interface TeamUser {
   id: string
@@ -39,7 +39,23 @@ interface UserProfile {
   isEmailVerified: boolean
 }
 
+
+// Voicemail interface
+interface VoicemailMessage {
+  id: string
+  name: string
+  audioUrl: string
+  isDefault: boolean
+  isActive: boolean
+  createdAt: string
+}
+
 export default function SettingsPage() {
+  // Voicemail state
+  const [voicemailMessages, setVoicemailMessages] = useState<VoicemailMessage[]>([])
+  const [voicemailForm, setVoicemailForm] = useState({ name: '', audioUrl: '', isDefault: false })
+  const [savingVoicemail, setSavingVoicemail] = useState(false)
+
   const [linkedinCookie, setLinkedinCookie] = useState('')
   const [hasLinkedIn, setHasLinkedIn] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -94,6 +110,7 @@ export default function SettingsPage() {
     fetchProfile()
     fetchPhoneNumbers()
     fetchOrganization()
+    fetchVoicemailMessages()
   }, [])
 
   const fetchPhoneNumbers = async () => {
@@ -357,6 +374,68 @@ export default function SettingsPage() {
     }
   }
 
+  const fetchVoicemailMessages = async () => {
+    try {
+      const response = await fetch('/api/voicemail-messages')
+      if (response.ok) {
+        const data = await response.json()
+        setVoicemailMessages(data.messages)
+      }
+    } catch (error) {
+      console.error('Failed to fetch voicemail messages:', error)
+    }
+  }
+
+  const handleSaveVoicemail = async () => {
+    if (!voicemailForm.name || !voicemailForm.audioUrl) {
+      setMessage({ type: 'error', text: 'Name and Audio URL are required' })
+      return
+    }
+    setSavingVoicemail(true)
+    try {
+      const response = await fetch('/api/voicemail-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(voicemailForm),
+      })
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Voicemail message saved!' })
+        setVoicemailForm({ name: '', audioUrl: '', isDefault: false })
+        fetchVoicemailMessages()
+      } else {
+        setMessage({ type: 'error', text: 'Failed to save message' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'An error occurred' })
+    } finally {
+      setSavingVoicemail(false)
+    }
+  }
+
+  const handleDeleteVoicemail = async (id: string) => {
+    try {
+      await fetch(`/api/voicemail-messages?id=${id}`, { method: 'DELETE' })
+      fetchVoicemailMessages()
+      setMessage({ type: 'success', text: 'Message deleted' })
+    } catch (error) {
+      console.error(error)
+      setMessage({ type: 'error', text: 'Failed to delete' })
+    }
+  }
+
+  const handleToggleVoicemailDefault = async (id: string) => {
+    try {
+      await fetch('/api/voicemail-messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, isDefault: true })
+      })
+      fetchVoicemailMessages()
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     setMessage({ type: 'success', text: 'Link copied to clipboard!' })
@@ -377,6 +456,84 @@ export default function SettingsPage() {
           {message.text}
         </div>
       )}
+
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <Volume2 className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <CardTitle>Voicemail Messages</CardTitle>
+          </div>
+          <CardDescription>
+            Manage pre-recorded voicemail messages. The default message will be left when an answering machine is detected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add New Message */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+            <div className="space-y-2">
+              <Label>Message Name</Label>
+              <Input
+                placeholder="Main Sales Voicemail"
+                value={voicemailForm.name}
+                onChange={(e) => setVoicemailForm({ ...voicemailForm, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Audio URL (Link to MP3/WAV)</Label>
+              <Input
+                placeholder="https://example.com/voicemail.mp3"
+                value={voicemailForm.audioUrl}
+                onChange={(e) => setVoicemailForm({ ...voicemailForm, audioUrl: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center space-x-2 pb-2">
+              <input
+                type="checkbox"
+                id="vm-default"
+                checked={voicemailForm.isDefault}
+                onChange={(e) => setVoicemailForm({ ...voicemailForm, isDefault: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <Label htmlFor="vm-default" className="cursor-pointer">Set as Default</Label>
+            </div>
+            <Button onClick={handleSaveVoicemail} disabled={savingVoicemail}>
+              {savingVoicemail ? 'Saving...' : 'Add Message'}
+            </Button>
+          </div>
+
+          {/* List Messages */}
+          <div className="space-y-2">
+            {voicemailMessages.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No voicemail messages added yet.</p>
+            ) : (
+              voicemailMessages.map((vm) => (
+                <div key={vm.id} className="flex items-center justify-between p-3 border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-800">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <p className="font-medium">{vm.name}</p>
+                      {vm.isDefault && <Badge variant="secondary" className="bg-green-100 text-green-700">Default</Badge>}
+                    </div>
+                    <a href={vm.audioUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline truncate max-w-[200px] block">
+                      {vm.audioUrl}
+                    </a>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {!vm.isDefault && (
+                      <Button variant="ghost" size="sm" onClick={() => handleToggleVoicemailDefault(vm.id)}>
+                        Set Default
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteVoicemail(vm.id)} className="text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Organization Settings - Admin Only */}
       {isAdmin && (
