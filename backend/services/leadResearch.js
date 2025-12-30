@@ -3,15 +3,18 @@
  * 
  * Automatically researches leads before calls by:
  * 1. Searching knowledge base for relevant content
- * 2. Finding industry-specific talking points
- * 3. Identifying relevant case studies
- * 4. Building comprehensive lead context
+ * 2. Researching the prospect's company (what they do, pain points)
+ * 3. Finding industry-specific talking points
+ * 4. Identifying relevant case studies
+ * 5. Building comprehensive lead context with sales approach
  */
 
+import { researchProspectCompany, formatProspectResearch } from './companyResearch.js';
+
 /**
- * Research a lead and build context from knowledge base
+ * Research a lead and build context from knowledge base + prospect company
  */
-export async function researchLead(lead) {
+export async function researchLead(lead, sellerCompanyDescription = '') {
     console.log(`[Lead Research] Starting research for ${lead.name} at ${lead.company}`)
 
     const context = {
@@ -23,6 +26,8 @@ export async function researchLead(lead) {
             email: lead.email
         },
         relevantKnowledge: [],
+        prospectCompanyResearch: null, // NEW: Research about the prospect's company
+        prospectContext: '', // NEW: Formatted context for AI
         talkingPoints: [],
         caseStudies: [],
         objectionResponses: [],
@@ -30,24 +35,41 @@ export async function researchLead(lead) {
     }
 
     try {
-        // 1. Search knowledge base for relevant content
-        const knowledgeMatches = await searchKnowledgeBase(lead)
+        // 1. Search knowledge base for relevant content (parallel with prospect research)
+        const [knowledgeMatches, prospectResearch] = await Promise.all([
+            searchKnowledgeBase(lead),
+            // Research the prospect's company if we have their company name
+            lead.company && lead.company !== 'Unknown'
+                ? researchProspectCompany(lead.company, sellerCompanyDescription, lead.role)
+                : Promise.resolve(null)
+        ]);
+
         context.relevantKnowledge = knowledgeMatches
 
-        // 2. Extract talking points from knowledge
-        context.talkingPoints = extractTalkingPoints(knowledgeMatches, lead)
+        // Store prospect company research
+        if (prospectResearch) {
+            context.prospectCompanyResearch = prospectResearch;
+            context.prospectContext = formatProspectResearch(prospectResearch);
+            console.log(`[Lead Research] Researched prospect company: ${prospectResearch.companyName} - ${prospectResearch.industry}`);
+        }
+
+        // 2. Extract talking points from knowledge + prospect research
+        context.talkingPoints = extractTalkingPoints(knowledgeMatches, lead, prospectResearch)
 
         // 3. Find relevant case studies
         context.caseStudies = findCaseStudies(knowledgeMatches, lead.industry)
 
-        // 4. Prepare objection responses
-        context.objectionResponses = findObjectionHandling(knowledgeMatches)
+        // 4. Prepare objection responses (enhanced with prospect research)
+        context.objectionResponses = findObjectionHandling(knowledgeMatches, prospectResearch)
 
         // 5. Generate personalized opening script
         context.personalizedScript = await generatePersonalizedScript(lead, context)
 
         console.log(`[Lead Research] Found ${context.relevantKnowledge.length} relevant knowledge sources`)
         console.log(`[Lead Research] Generated ${context.talkingPoints.length} talking points`)
+        if (context.prospectCompanyResearch) {
+            console.log(`[Lead Research] Prospect pain points: ${context.prospectCompanyResearch.potentialPainPoints?.length || 0}`)
+        }
 
         return context
     } catch (error) {
