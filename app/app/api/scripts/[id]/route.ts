@@ -105,21 +105,32 @@ export async function DELETE(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Use deleteMany to properly support OR clause (same fix as knowledge sources)
-    // Scripts can be shared (isShared: true) OR owned by user (userId: currentUser.userId)
-    const deleteResult = await prisma.script.deleteMany({
-      where: {
-        id: id,
-        OR: [
-          { isShared: true },
-          { userId: currentUser.userId },
-        ],
-      },
+    // First, find the script to check permissions
+    const script = await prisma.script.findUnique({
+      where: { id: id },
     })
 
-    if (deleteResult.count === 0) {
-      return NextResponse.json({ error: 'Script not found or no permission' }, { status: 404 })
+    if (!script) {
+      return NextResponse.json({ error: 'Script not found' }, { status: 404 })
     }
+
+    // Check if user can delete this script:
+    // 1. Script is shared (isShared: true) - anyone can delete
+    // 2. Script belongs to the user (userId matches)
+    // 3. Script belongs to user's company (companyId matches)
+    const canDelete =
+      script.isShared ||
+      script.userId === currentUser.userId ||
+      (script.companyId && script.companyId === currentUser.companyId)
+
+    if (!canDelete) {
+      return NextResponse.json({ error: 'No permission to delete this script' }, { status: 403 })
+    }
+
+    // Delete the script
+    await prisma.script.delete({
+      where: { id: id },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
