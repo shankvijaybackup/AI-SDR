@@ -746,60 +746,65 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     addTranscript(callSid, { speaker: "agent", text: reply });
 
-    // Play AI reply with TTS (ElevenLabs with Polly fallback)\n    // Pass region and voice ID for proper regional voice\n    try {\n      const audioUrl = await synthesizeTTS(reply, callSid, call.voicePersona, call.leadRegion, call.voiceId);\n      console.log(`[AI Reply] Playing: ${audioUrl}`);\n      twiml.play(audioUrl);
+    // Play AI reply with TTS (ElevenLabs with Polly fallback)
+    // Pass region and voice ID for proper regional voice
+    try {
+      const audioUrl = await synthesizeTTS(reply, callSid, call.voicePersona, call.leadRegion, call.voiceId);
+      console.log(`[AI Reply] Playing: ${audioUrl}`);
+      twiml.play(audioUrl);
+    } catch (err) {
+      console.error("[AI Reply] TTS failed, using Polly:", err.message);
+      twiml.say({ voice: "Polly.Joanna" }, reply);
+    }
+
+    // Check if this is a closing statement (thanks, goodbye, talk soon, etc.)
+    // Be careful not to match "chat" or "good time to chat"
+    const isClosing = /\b(thanks for your time|talk to you soon|have a great day|have a good day|have a wonderful day|looking forward to our call|appreciate your interest|goodbye|bye now|take care|speak soon|catch you later)\b/i.test(reply);
+
+    // Also check if conversation has gone on too long (10+ exchanges)
+    const conversationLength = call.transcript.length;
+    const shouldEnd = isClosing || conversationLength > 20;
+
+    if (shouldEnd) {
+      // End the call gracefully after closing statement
+      console.log(`[Call End] Closing detected (isClosing: ${isClosing}, length: ${conversationLength}), ending call gracefully`);
+      twiml.pause({ length: 2 });
+      twiml.hangup();
+    } else {
+      // Continue conversation
+      twiml.pause({ length: 0.3 });
+
+      // Gather next response with Enhanced Speech Model
+      twiml.gather({
+        input: "speech",
+        action: "/api/twilio/handle-speech",
+        method: "POST",
+        timeout: 10,
+        speechTimeout: "auto",
+        speechModel: "phone_call",
+        enhanced: true,
+        profanityFilter: false,
+        language: "en-US"
+      });
+
+      // Loop to avoid TwiML ending the call on repeated silence
+      twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
+    }
+
+    res.type("text/xml");
+    res.send(twiml.toString());
   } catch (err) {
-    console.error("[AI Reply] TTS failed, using Polly:", err.message);
-    twiml.say({ voice: "Polly.Joanna" }, reply);
-  }
+    console.error("[Error] handle-speech failed:", err.message);
+    console.error("[Error] Stack:", err.stack);
 
-  // Check if this is a closing statement (thanks, goodbye, talk soon, etc.)
-  // Be careful not to match "chat" or "good time to chat"
-  const isClosing = /\b(thanks for your time|talk to you soon|have a great day|have a good day|have a wonderful day|looking forward to our call|appreciate your interest|goodbye|bye now|take care|speak soon|catch you later)\b/i.test(reply);
-
-  // Also check if conversation has gone on too long (10+ exchanges)
-  const conversationLength = call.transcript.length;
-  const shouldEnd = isClosing || conversationLength > 20;
-
-  if (shouldEnd) {
-    // End the call gracefully after closing statement
-    console.log(`[Call End] Closing detected (isClosing: ${isClosing}, length: ${conversationLength}), ending call gracefully`);
-    twiml.pause({ length: 2 });
+    // More graceful error message
+    twiml.say("I apologize, I'm having a technical issue on my end. I'll follow up with you via email shortly. Thanks for your time!");
+    twiml.pause({ length: 1 });
     twiml.hangup();
-  } else {
-    // Continue conversation
-    twiml.pause({ length: 0.3 });
 
-    // Gather next response with Enhanced Speech Model
-    twiml.gather({
-      input: "speech",
-      action: "/api/twilio/handle-speech",
-      method: "POST",
-      timeout: 10,
-      speechTimeout: "auto",
-      speechModel: "phone_call",
-      enhanced: true,
-      profanityFilter: false,
-      language: "en-US"
-    });
-
-    // Loop to avoid TwiML ending the call on repeated silence
-    twiml.redirect({ method: "POST" }, "/api/twilio/handle-speech");
+    res.type("text/xml");
+    res.send(twiml.toString());
   }
-
-  res.type("text/xml");
-  res.send(twiml.toString());
-} catch (err) {
-  console.error("[Error] handle-speech failed:", err.message);
-  console.error("[Error] Stack:", err.stack);
-
-  // More graceful error message
-  twiml.say("I apologize, I'm having a technical issue on my end. I'll follow up with you via email shortly. Thanks for your time!");
-  twiml.pause({ length: 1 });
-  twiml.hangup();
-
-  res.type("text/xml");
-  res.send(twiml.toString());
-}
 });
 
 // ---------- Twilio Status Callback ----------

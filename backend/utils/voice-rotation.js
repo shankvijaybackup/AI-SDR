@@ -22,15 +22,17 @@ const REGIONAL_VOICE_POOLS = {
     { name: 'Brandon', id: process.env.ELEVEN_VOICE_BRANDON, gender: 'male' },
     { name: 'Jane', id: process.env.ELEVEN_VOICE_JANE, gender: 'female' },
   ],
-  // INDIA: Use dedicated Indian English accent voices from ElevenLabs
-  // These are voices with authentic Indian accents for India region calls
+  // INDIA: Real Indian English accent voices from ElevenLabs shared library
+  // Fetched via ElevenLabs API - guaranteed authentic Indian accents
   INDIA: [
-    // Indian English female voices
-    { name: 'Priya', id: process.env.ELEVEN_VOICE_INDIA_FEMALE || 'pFZP5JQG7iQjIQuC4Bku', gender: 'female' }, // Lily - has Indian accent
-    { name: 'Ananya', id: process.env.ELEVEN_VOICE_INDIA_FEMALE_2 || 'jsCqWAovK2LkecY7zXl4', gender: 'female' }, // Freya - warm, clear
-    // Indian English male voices  
-    { name: 'Raj', id: process.env.ELEVEN_VOICE_INDIA_MALE || 'TX3LPaxmHKxFdv7VOQHJ', gender: 'male' }, // Liam - clear pronunciation
-    { name: 'Vikram', id: process.env.ELEVEN_VOICE_INDIA_MALE_2 || 'iP95p4xoKVk53GoZ742B', gender: 'male' }, // Chris - professional
+    // Indian English female voices - from ElevenLabs shared library
+    { name: 'Roohi', id: 'lx9HCNXE1EkLR0EPKlLY', gender: 'female' }, // Natural Customer Care voice
+    { name: 'Payal', id: 'zEoa2AiakhTnKPSlAhoX', gender: 'female' }, // Articulate, Clear and Natural
+    { name: 'Tina', id: 'KrfvGW2D1x6nS5QnRj2q', gender: 'female' }, // Calm, Confident and Clear
+    // Indian English male voices - from ElevenLabs shared library
+    { name: 'Aashish', id: 'RpiHVNPKGBg7UmgmrKrN', gender: 'male' }, // Natural Indian male
+    { name: 'Sridhar', id: '4djJiaeiIiFtglUCWGdA', gender: 'male' }, // Calm, Natural & Professional
+    { name: 'Rahul', id: 'swh0hLPsEaD50F02tIJJ', gender: 'male' }, // Expressive and Clear
   ],
 };
 
