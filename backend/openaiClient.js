@@ -173,6 +173,25 @@ Headquarters: San Francisco, California (with offices in Bangalore, India).`;
   // For HR scripts, don't include IT-focused product details
   const productDetails = (isDefaultScript && !isHRScript) ? `
 
+**COMPANY BACKGROUND (Use to build trust and credibility):**
+- **Founded**: 2022 by enterprise SaaS veterans with deep ITSM expertise
+- **Founders**:
+  * **Vijay Rayapati** (CEO) - Former SVP at Freshworks, scaled Freshservice to $100M+ ARR. 20+ years enterprise SaaS experience.
+  * **Kiran Darisi** (CTO) - Former Engineering Director at Freshworks, built core ITSM platform. Expert in AI/ML systems.
+  * **Parsuram Vijayasankar** (CPO) - Former Head of Product at Freshworks, led ITSM product strategy. Built products used by 50,000+ companies.
+- **Total Funding**: Raised **$40 million** across multiple rounds:
+  * **Seed Round (2022)**: $11M led by Z47 (formerly Matrix Partners India) and Blume Ventures
+  * **Strategic Round (Sept 2024)**: $3M+ from 40+ global CIOs, CTOs, and industry veterans
+  * **Series A (Jan 2025)**: $25M led by **Khosla Ventures** and Z47, with Battery Ventures, Blume Ventures, Peak XV Partners
+  * **Strategic (Sept 2025)**: **Okta Ventures** investment
+- **Key Investors**: Khosla Ventures, Z47 (Matrix Partners India), Battery Ventures, Peak XV Partners, Blume Ventures, Storm Ventures, Neon Fund, Okta Ventures, 40+ Fortune 500 CIOs/CTOs
+- **Headquarters**: San Francisco, California (with R&D office in Bangalore, India)
+- **Mission**: "Make work easier for employees with AI-first service management"
+- **Why Founded**: The founders saw that legacy ITSM tools (ServiceNow, Jira) weren't built for the AI era. They created Atomicwork to be AI-native from day one.
+
+**IF PROSPECT ASKS "Who are you?" or "Tell me about your company":**
+Say something like: "We're Atomicwork - founded by the team that built Freshservice at Freshworks. Our founders - Vijay, Kiran, and Parsuram - scaled Freshservice to over $100 million. They saw that legacy ITSM tools weren't built for AI, so they started Atomicwork to be AI-native from the ground up. We raised $11 million from Matrix Partners and Blume Ventures."
+
 **Core Value Propositions:**
 - **Universal AI Agent (Atom)**: Meets employees in Slack/Teams with voice, chat, and screen-sharing support. Zero-touch resolutions for IT, HR, Finance requests.
 - **Identity & Access Management (IGA)**: Automate access provisioning, deprovisioning, and governance. Saves 1500+ IT hours/year on manual access requests.
@@ -623,9 +642,9 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
       /what do you (do|offer|sell)/i.test(latestUserText)
     );
 
-    // If user asked about the company, ALWAYS explain
+    // If user asked about the company, ALWAYS explain with credibility
     if (userAskedAboutCompany) {
-      return `Atomicwork is an AI-powered ITSM platform. We help IT teams automate support and reduce ticket volume by 40-60%. Would you like to see a quick demo?`;
+      return `Atomicwork is an AI-powered ITSM platform. We've raised $40 million from Khosla Ventures, Okta Ventures, and others. Our founders built Freshservice at Freshworks. We help IT teams automate support and cut ticket volume by 40-60%. Worth a quick demo?`;
     }
 
     // Context-aware ITSM fallbacks based on phase

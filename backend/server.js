@@ -763,7 +763,9 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     // Also check if conversation has gone on too long (10+ exchanges)
     const conversationLength = call.transcript.length;
-    const shouldEnd = isClosing || conversationLength > 40; // Increased from 20 to allow longer conversations
+    // NEVER end call based on length - only end when prospect says goodbye
+    // User requirement: System should not cut the call, only prospect can end it
+    const shouldEnd = isClosing; // Removed length limit - calls continue until prospect ends
 
     if (shouldEnd) {
       // End the call gracefully after closing statement
