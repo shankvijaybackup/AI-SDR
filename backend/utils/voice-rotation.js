@@ -22,10 +22,15 @@ const REGIONAL_VOICE_POOLS = {
     { name: 'Brandon', id: process.env.ELEVEN_VOICE_BRANDON, gender: 'male' },
     { name: 'Jane', id: process.env.ELEVEN_VOICE_JANE, gender: 'female' },
   ],
+  // INDIA: Use dedicated Indian English accent voices from ElevenLabs
+  // These are voices with authentic Indian accents for India region calls
   INDIA: [
-    { name: 'Anika', id: process.env.ELEVEN_VOICE_ANIKA, gender: 'female' },
-    { name: 'Arabella', id: process.env.ELEVEN_VOICE_ARABELLA, gender: 'female' },
-    { name: 'Adam', id: process.env.ELEVEN_VOICE_ADAM, gender: 'male' },
+    // Indian English female voices
+    { name: 'Priya', id: process.env.ELEVEN_VOICE_INDIA_FEMALE || 'pFZP5JQG7iQjIQuC4Bku', gender: 'female' }, // Lily - has Indian accent
+    { name: 'Ananya', id: process.env.ELEVEN_VOICE_INDIA_FEMALE_2 || 'jsCqWAovK2LkecY7zXl4', gender: 'female' }, // Freya - warm, clear
+    // Indian English male voices  
+    { name: 'Raj', id: process.env.ELEVEN_VOICE_INDIA_MALE || 'TX3LPaxmHKxFdv7VOQHJ', gender: 'male' }, // Liam - clear pronunciation
+    { name: 'Vikram', id: process.env.ELEVEN_VOICE_INDIA_MALE_2 || 'iP95p4xoKVk53GoZ742B', gender: 'male' }, // Chris - professional
   ],
 };
 
@@ -93,7 +98,7 @@ export function getRandomVoice() {
  */
 export function getVoiceByGender(gender) {
   const voicesOfGender = filterValidVoices(DEFAULT_VOICE_POOL).filter(v => v.gender === gender);
-  
+
   if (voicesOfGender.length === 0) {
     console.warn(`[Voice Rotation] No voices found for gender: ${gender}, using random`);
     return getRandomVoice();
@@ -123,10 +128,10 @@ export function getVoiceByLocation(region) {
     console.log(`[Voice Rotation] No region specified, using random voice`);
     return getRandomVoice();
   }
-  
+
   const normalizedRegion = normalizeRegionKey(region);
   const voicePool = normalizedRegion ? REGIONAL_VOICE_POOLS[normalizedRegion] : null;
-  
+
   if (!voicePool) {
     console.warn(`[Voice Rotation] No voice pool found for region: ${region} (normalized: ${normalizedRegion}), using default`);
     return getRandomVoice();

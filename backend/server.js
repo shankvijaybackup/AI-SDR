@@ -260,8 +260,24 @@ export async function synthesizeWithChatterboxTTS(text, callSid) {
 // Set USE_DEEPGRAM=true in env to enable Deepgram (requires DEEPGRAM_API_KEY)
 const USE_DEEPGRAM = process.env.USE_DEEPGRAM === 'true' && process.env.DEEPGRAM_API_KEY;
 
+// Check if region requires ElevenLabs (regions where accent matters)
+function requiresElevenLabs(region) {
+  if (!region) return false;
+  const r = String(region).toLowerCase().trim();
+  // India, UK, Australia, ANZ - use ElevenLabs for proper accents
+  // Deepgram only has American English voices
+  return ['india', 'in', 'uk', 'australia', 'au', 'anz', 'nz'].some(x => r.includes(x));
+}
+
 export async function synthesizeTTS(text, callSid, voicePersona = null, region = null) {
-  // Try Deepgram first if enabled (fastest: ~100-200ms)
+  // For regions requiring specific accents, skip Deepgram and use ElevenLabs directly
+  // This ensures India gets Indian English voices, UK gets UK voices, etc.
+  if (requiresElevenLabs(region)) {
+    console.log(`[TTS] Region ${region} requires ElevenLabs for proper accent`);
+    return await synthesizeWithElevenLabs(text, callSid);
+  }
+
+  // Try Deepgram first if enabled (fastest: ~100-200ms) - only for US/default
   if (USE_DEEPGRAM) {
     try {
       return await synthesizeWithDeepgram(text, callSid, voicePersona, region);
