@@ -273,29 +273,45 @@ function matchThemesToPainPoints(sellerThemes, leadPainPoints) {
     }
 
     const matches = []
-    const themesLower = sellerThemes.map(t => t.toLowerCase())
-    const painPointsLower = leadPainPoints.map(p => p.toLowerCase())
 
-    for (const theme of sellerThemes) {
-        const themeLower = theme.toLowerCase()
+    // Normalize themes and pain points
+    const themes = sellerThemes.map(t => ({
+        original: t,
+        normalized: t.toLowerCase()
+    }))
 
+    // Common stop words to ignore in matching
+    const stopWords = new Set(['the', 'and', 'or', 'to', 'for', 'with', 'a', 'an', 'in', 'of', 'on', 'at', 'by'])
+
+    for (const theme of themes) {
         for (const painPoint of leadPainPoints) {
             const painLower = painPoint.toLowerCase()
 
-            // Check for keyword overlap
-            const themeWords = themeLower.split(/\s+/)
-            const painWords = painLower.split(/\s+/)
+            // 1. Direct inclusion check (High confidence)
+            if (painLower.includes(theme.normalized) || theme.normalized.includes(painLower)) {
+                matches.push({
+                    theme: theme.original,
+                    painPoint: painPoint,
+                    relevance: `Directly addresses "${theme.original}"`,
+                    score: 10
+                })
+                continue
+            }
 
-            const overlap = themeWords.filter(tw =>
+            // 2. Keyword overlap check (Medium confidence)
+            const themeWords = theme.normalized.split(/[\s-]+/).filter(w => w.length > 3 && !stopWords.has(w))
+            const painWords = painLower.split(/[\s-]+/).filter(w => w.length > 3 && !stopWords.has(w))
+
+            const matchedKeywords = themeWords.filter(tw =>
                 painWords.some(pw => pw.includes(tw) || tw.includes(pw))
             )
 
-            if (overlap.length > 0) {
+            if (matchedKeywords.length > 0) {
                 matches.push({
-                    theme: theme,
+                    theme: theme.original,
                     painPoint: painPoint,
-                    relevance: `${theme} helps with: ${painPoint}`,
-                    score: overlap.length
+                    relevance: `Related to ${matchedKeywords.join(', ')}`,
+                    score: matchedKeywords.length * 2
                 })
             }
         }
@@ -306,8 +322,9 @@ function matchThemesToPainPoints(sellerThemes, leadPainPoints) {
     return matches
         .sort((a, b) => b.score - a.score)
         .filter(m => {
-            if (seen.has(m.theme)) return false
-            seen.add(m.theme)
+            const key = `${m.theme}-${m.painPoint}`
+            if (seen.has(key)) return false
+            seen.add(key)
             return true
         })
         .slice(0, 5)
@@ -323,11 +340,24 @@ async function generatePersonalizedScript(lead, context) {
     // Standard greeting
     parts.push(`Hi ${lead.name}, this is {{repName}} from {{companyName}}.`)
 
-    // Add context-specific hook
-    if (context.caseStudies.length > 0) {
+    // 1. Try to use a Theme Match (Highest Priority)
+    if (context.themeMatches && context.themeMatches.length > 0) {
+        const bestMatch = context.themeMatches[0]
+        parts.push(`I'm reaching out because I see a lot of ${context.lead.role}s struggling with ${bestMatch.painPoint.toLowerCase()}, and our ${bestMatch.theme.toLowerCase()} approach specifically solves this.`)
+    }
+    // 2. Use Role Intelligence
+    else if (context.roleIntelligence?.challenges?.length > 0) {
+        // Use a random challenge to keep it fresh
+        const challenge = context.roleIntelligence.challenges[0]
+        parts.push(`I'm reaching out because many ${context.lead.role}s are focused on ${challenge.toLowerCase()} right now.`)
+    }
+    // 3. Use Case Study
+    else if (context.caseStudies.length > 0) {
         const caseStudy = context.caseStudies[0]
         parts.push(`I wanted to reach out because we recently helped ${caseStudy.industry} companies like yours ${caseStudy.summary?.substring(0, 80) || 'achieve great results'}.`)
-    } else if (context.talkingPoints.length > 0) {
+    }
+    // 4. Use Talking Points
+    else if (context.talkingPoints.length > 0) {
         const point = context.talkingPoints[0]
         parts.push(`I wanted to share how we're helping ${lead.industry || 'companies like yours'} ${point.substring(0, 80)}.`)
     } else {
@@ -350,51 +380,75 @@ export function buildContextualSystemPrompt({
     openingScript,
     objectionResponses
 }) {
+    // Extract key context items
+    const {
+        lead,
+        roleContext,
+        roleIntelligence,
+        themeMatches,
+        prospectCompanyResearch,
+        prospectContext
+    } = leadContext
+
     const prompt = `
 You are an AI sales representative with deep knowledge about your company and the prospect.
 
-PROSPECT CONTEXT:
-- Name: ${leadContext.lead.name}
-- Company: ${leadContext.lead.company}
-- Industry: ${leadContext.lead.industry}
-- Role: ${leadContext.lead.role}
-- Email: ${leadContext.lead.email || 'Unknown'}
+=== PROSPECT INTELLIGENCE ===
+NAME: ${lead.name}
+ROLE: ${lead.role}
+COMPANY: ${lead.company}
+INDUSTRY: ${lead.industry}
+${lead.email ? `EMAIL: ${lead.email}` : ''}
 
-RELEVANT KNOWLEDGE:
+${prospectContext ? `
+=== COMPANY RESEARCH ===
+${prospectContext}
+` : ''}
+
+${roleContext ? `
+=== ROLE INSIGHTS (What matters to a ${lead.role}) ===
+${roleContext}
+` : ''}
+
+${themeMatches && themeMatches.length > 0 ? `
+=== KEY VALUE MATCHES (Connecting our solution to their needs) ===
+${themeMatches.map(m => `- They likely struggle with: "${m.painPoint}"
+  -> Our Solution Connection: "${m.theme}" (${m.relevance})`).join('\n')}
+` : ''}
+
+=== RELEVANT KNOWLEDGE BASE ===
 ${relevantKnowledge.slice(0, 5).map((k, i) => `
 ${i + 1}. ${k.title}
    ${k.summary || k.description || ''}
 `).join('\n')}
 
-KEY TALKING POINTS:
+=== TALKING POINTS ===
 ${leadContext.talkingPoints.slice(0, 5).map((p, i) => `${i + 1}. ${p}`).join('\n')}
 
 ${leadContext.caseStudies.length > 0 ? `
-RELEVANT CASE STUDIES:
+=== RELEVANT CASE STUDIES ===
 ${leadContext.caseStudies.map((cs, i) => `${i + 1}. ${cs.title}: ${cs.summary}`).join('\n')}
 ` : ''}
 
-${objectionResponses.length > 0 ? `
-OBJECTION HANDLING:
+=== OBJECTION HANDLING ===
 ${objectionResponses.map((obj, i) => `
 Q: ${obj.objection}
-A: ${obj.response}
+A: ${obj.response || "Address this using the role insights above."}
 `).join('\n')}
-` : ''}
 
-OPENING SCRIPT:
+=== STARTING SCRIPT ===
 ${openingScript}
 
-GUIDELINES:
+=== GUIDELINES ===
 1. Be natural and conversational - you're a knowledgeable sales rep, not a robot
-2. Reference the relevant knowledge above when appropriate
-3. Mention case studies if they fit the conversation naturally
-4. Listen actively and respond to the prospect's specific concerns
-5. Keep responses under 50 words for natural pacing
-6. Guide towards booking a meeting, but don't be pushy
-7. If they show interest, verify their email: ${leadContext.lead.email || 'ask for it'}
-8. Use their name (${leadContext.lead.name}) occasionally but not excessively
-9. Adapt your approach based on their industry (${leadContext.lead.industry})
+2. USE THE INTELLIGENCE: Address the specific challenges found in the "ROLE INSIGHTS" and "KEY VALUE MATCHES" sections.
+3. If they mention one of the challenges in "KEY VALUE MATCHES", pivot immediately to how our "${themeMatches?.[0]?.theme || 'solution'}" helps.
+4. Mention case studies if they fit the conversation naturally
+5. Listen actively and respond to the prospect's specific concerns
+6. Keep responses under 50 words for natural pacing
+7. Guide towards booking a meeting, but don't be pushy
+8. If they show interest, verify their email: ${lead.email || 'ask for it'}
+9. Adapt your approach based on their industry (${lead.industry})
 10. Be ready to handle objections using the responses above
 
 Remember: You have deep knowledge about this prospect and relevant solutions. Use it naturally!

@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import { PrismaClient } from '@prisma/client';
 import { getVoiceByLocation } from '../utils/voice-rotation.js';
 import { researchCompany, formatCompanyKnowledge } from '../services/companyResearch.js';
 
@@ -6,6 +7,8 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const publicBaseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:4000'; // Default to localhost for local dev
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+const prisma = new PrismaClient();
 
 // Fallback phone numbers from env (used if DB lookup fails)
 const FALLBACK_PHONES = {
@@ -71,7 +74,7 @@ async function getPhoneNumberForRegion(region, userId) {
 
 async function initiateCall(req, res) {
   try {
-    const { callId, phoneNumber, script, leadName, leadEmail, leadCompany, region, leadId, industry, role } = req.body;
+    const { callId, phoneNumber, script, leadName, leadEmail, leadCompany, region, leadId, industry, role, userId } = req.body;
 
     if (!callId || !phoneNumber || !script) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -99,8 +102,50 @@ async function initiateCall(req, res) {
 
       console.log(`[Knowledge Research] Researching lead: ${leadName} at ${leadCompany}`);
 
-      // Research lead and get context
-      leadContext = await researchLead(lead);
+      // Fetch seller themes from persona in DB
+      let sellerThemes = [];
+      let sellerDescription = '';
+
+      if (userId) {
+        try {
+          // Look for persona type knowledge source
+          const persona = await prisma.knowledgeSource.findFirst({
+            where: { userId: userId, type: 'persona' }
+          });
+
+          if (persona) {
+            try {
+              // Try to parse content if it's JSON
+              let data;
+              try {
+                data = JSON.parse(persona.content);
+              } catch (e) {
+                // Content might be plain text, use summary if available
+                data = { description: persona.content };
+              }
+
+              if (data.product?.themes) {
+                sellerThemes = data.product.themes;
+              }
+              if (data.product?.use_cases) {
+                sellerThemes.push(...data.product.use_cases);
+              }
+              if (data.description) {
+                sellerDescription = data.description;
+              }
+
+              console.log(`[Knowledge Research] Found ${sellerThemes.length} seller themes from persona`);
+            } catch (parseError) {
+              console.warn('Error parsing persona content:', parseError);
+            }
+          }
+        } catch (dbError) {
+          console.warn('Database error fetching persona:', dbError.message);
+        }
+      }
+
+      // Research lead and get context - PASS SELLER THEMES
+      leadContext = await researchLead(lead, sellerDescription, sellerThemes);
 
       // Use personalized script if generated
       if (leadContext.personalizedScript) {
@@ -124,7 +169,6 @@ async function initiateCall(req, res) {
     const voiceId = selectedVoice.id;
 
     // Select phone number based on lead's region (from DB or env fallback)
-    const userId = req.body.userId || null;
     const fromNumber = await getPhoneNumberForRegion(region, userId);
 
     console.log(`[Initiate Call] Starting call to ${phoneNumber} for ${leadName}`);
