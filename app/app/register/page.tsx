@@ -110,15 +110,19 @@ export default function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="company">Company (Optional)</Label>
+              <Label htmlFor="company">Company Name</Label>
               <Input
                 id="company"
                 name="company"
-                placeholder="Atomicwork"
+                placeholder="Your Company Name"
                 value={formData.company}
                 onChange={handleChange}
+                required
                 disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">
+                This will be your company workspace
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
