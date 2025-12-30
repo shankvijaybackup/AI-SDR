@@ -337,15 +337,32 @@ app.get("/api/calls/:callSid", (req, res) => {
   res.json({ call });
 });
 
-// ---------- Twilio Voice webhook: Enhanced Speech Model ----------
-
-// Media Stream voice webhook (optimized latency)
-app.post("/api/twilio/voice-media-stream", voiceMediaStreamWebhook);
-
-// Realtime API voice webhook (experimental - not working yet)
-app.post("/api/twilio/voice-realtime", voiceRealtimeWebhook);
-
 // Traditional voice webhook (working but slower)
+app.get("/api/twilio/voice", async (req, res) => {
+  console.log("➡️  GET /api/twilio/voice hit for testing. Query:", req.query);
+
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  // Simple test response
+  const { script, voicePersona } = req.query;
+  const greeting = script ? script.replace(/\{\{repName\}\}/g, voicePersona || 'Arabella') : `Hello, this is ${voicePersona || 'Arabella'} from Keka HR.`;
+  
+  try {
+    const audioUrl = await synthesizeTTS(greeting, 'test-call-sid');
+    console.log(`[Test Greeting] Playing: ${audioUrl}`);
+    twiml.play(audioUrl);
+  } catch (err) {
+    console.error("[Test Greeting] TTS failed:", err.message);
+    twiml.say({ voice: "Polly.Joanna" }, greeting);
+  }
+
+  twiml.pause({ length: 0.5 });
+  twiml.hangup();
+
+  res.type("text/xml");
+  res.send(twiml.toString());
+});
+
 app.post("/api/twilio/voice", async (req, res) => {
   console.log(
     "➡️  /api/twilio/voice hit. CallSid:",
@@ -365,7 +382,8 @@ app.post("/api/twilio/voice", async (req, res) => {
 
   // Extract first line/sentence from script as opening greeting
   // Use voicePersona name instead of hardcoded "Alex"
-  let openingScript = `Hi, this is ${voicePersona} from Atomicwork. How are you doing today?`;
+  let companyName = req.query.companyName ? decodeURIComponent(req.query.companyName) : (activeCall && activeCall.companyName ? activeCall.companyName : 'Keka');
+  let openingScript = `Hi, this is ${voicePersona} from ${companyName}. How are you doing today?`;
   if (customScript) {
     // Replace {{repName}} placeholder with actual voice persona name
     const processedScript = customScript.replace(/\{\{repName\}\}/gi, voicePersona);
@@ -388,7 +406,7 @@ app.post("/api/twilio/voice", async (req, res) => {
   initCall(callSid, {
     script: (activeCall && activeCall.script) ? activeCall.script : (customScript || "Default sales script"),
     leadName: (activeCall && activeCall.leadName) ? activeCall.leadName : (req.query.leadName || "there"),
-    companyName: "",
+    companyName: (activeCall && activeCall.companyName) ? activeCall.companyName : "Keka",
     userId: (activeCall && activeCall.userId) ? activeCall.userId : null,
     voicePersona: voicePersona // Store voice persona name in call state
   });

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe, Building2, Crown, Loader2, Volume2 } from 'lucide-react'
+import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe, Building2, Crown, Loader2, Volume2, Search, ShoppingCart, DollarSign } from 'lucide-react'
 
 interface TeamUser {
   id: string
@@ -73,10 +73,18 @@ export default function SettingsPage() {
   const [inviteResult, setInviteResult] = useState<{ url: string; email: string } | null>(null)
 
   // Regional phone numbers state
-  interface PhoneNumber { id: string; region: string; phoneNumber: string; isDefault: boolean }
+  interface PhoneNumber { id: string; region: string; phoneNumber: string; isDefault: boolean; provider?: string; monthlyCost?: number }
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([])
   const [phoneForm, setPhoneForm] = useState({ region: '', phoneNumber: '', isDefault: false })
   const [savingPhone, setSavingPhone] = useState(false)
+
+  // Number browsing state
+  const [showBrowseDialog, setShowBrowseDialog] = useState(false)
+  const [searchCountry, setSearchCountry] = useState('US')
+  const [searchAreaCode, setSearchAreaCode] = useState('')
+  const [availableNumbers, setAvailableNumbers] = useState<any[]>([])
+  const [searchingNumbers, setSearchingNumbers] = useState(false)
+  const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null)
 
   // Organization state
   interface Organization {
@@ -179,6 +187,79 @@ export default function SettingsPage() {
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to delete' })
+    }
+  }
+
+  const handleSearchNumbers = async () => {
+    setSearchingNumbers(true)
+    try {
+      const params = new URLSearchParams({
+        country: searchCountry,
+        ...(searchAreaCode && { areaCode: searchAreaCode }),
+        limit: '20',
+      })
+      const response = await fetch(`/api/twilio/numbers/search?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableNumbers(data.numbers)
+      } else {
+        const error = await response.json()
+        setMessage({ type: 'error', text: error.error || 'Failed to search numbers' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to search numbers' })
+    } finally {
+      setSearchingNumbers(false)
+    }
+  }
+
+  const handlePurchaseNumber = async (phoneNumber: string) => {
+    if (!confirm(`Purchase ${phoneNumber}? This will cost approximately $1-2/month.`)) {
+      return
+    }
+
+    setPurchasingNumber(phoneNumber)
+    try {
+      const response = await fetch('/api/twilio/numbers/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber, region: searchCountry }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage({ type: 'success', text: data.message })
+        setShowBrowseDialog(false)
+        setAvailableNumbers([])
+        fetchPhoneNumbers()
+      } else {
+        const error = await response.json()
+        setMessage({ type: 'error', text: error.error || 'Failed to purchase number' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to purchase number' })
+    } finally {
+      setPurchasingNumber(null)
+    }
+  }
+
+  const handleReleaseNumber = async (id: string, phoneNumber: string) => {
+    if (!confirm(`Release ${phoneNumber}? This will permanently remove it from your account.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/twilio/numbers/release?id=${id}`, { method: 'DELETE' })
+      if (response.ok) {
+        const data = await response.json()
+        setMessage({ type: 'success', text: data.message })
+        fetchPhoneNumbers()
+      } else {
+        const error = await response.json()
+        setMessage({ type: 'error', text: error.error || 'Failed to release number' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to release number' })
     }
   }
 
@@ -917,9 +998,15 @@ export default function SettingsPage() {
       {/* Regional Phone Numbers */}
       <Card>
         <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-            <CardTitle>Regional Phone Numbers</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <CardTitle>Regional Phone Numbers</CardTitle>
+            </div>
+            <Button onClick={() => setShowBrowseDialog(true)} variant="outline" size="sm">
+              <Search className="w-4 h-4 mr-2" />
+              Browse & Buy Numbers
+            </Button>
           </div>
           <CardDescription>
             Configure Twilio phone numbers for different regions. Calls will use the matching regional number.
@@ -934,56 +1021,169 @@ export default function SettingsPage() {
                   <div className="flex items-center space-x-3">
                     <Phone className="w-4 h-4 text-slate-500" />
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-white">{phone.region}</p>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-slate-900 dark:text-white">{phone.region}</p>
+                        {phone.isDefault && <Badge variant="secondary">Default</Badge>}
+                        {phone.provider && <Badge variant="outline" className="text-xs">{phone.provider}</Badge>}
+                      </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400">{phone.phoneNumber}</p>
+                      {phone.monthlyCost && (
+                        <p className="text-xs text-slate-400">
+                          <DollarSign className="w-3 h-3 inline" />
+                          ${phone.monthlyCost.toFixed(2)}/month
+                        </p>
+                      )}
                     </div>
-                    {phone.isDefault && <Badge variant="secondary">Default</Badge>}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => handleDeletePhoneNumber(phone.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    {phone.provider === 'twilio' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-orange-600 hover:text-orange-700"
+                        onClick={() => handleReleaseNumber(phone.id, phone.phoneNumber)}
+                        title="Release from Twilio"
+                      >
+                        Release
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => handleDeletePhoneNumber(phone.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Add new number */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="phone-region">Region</Label>
-              <Input
-                id="phone-region"
-                placeholder="ANZ, US, UK, India..."
-                value={phoneForm.region}
-                onChange={(e) => setPhoneForm({ ...phoneForm, region: e.target.value })}
-              />
+          {/* Add new number manually */}
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium mb-3">Or add existing number manually:</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="phone-region">Region</Label>
+                <Input
+                  id="phone-region"
+                  placeholder="ANZ, US, UK, India..."
+                  value={phoneForm.region}
+                  onChange={(e) => setPhoneForm({ ...phoneForm, region: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="phone-number">Phone Number</Label>
+                <Input
+                  id="phone-number"
+                  placeholder="+14155551234"
+                  value={phoneForm.phoneNumber}
+                  onChange={(e) => setPhoneForm({ ...phoneForm, phoneNumber: e.target.value })}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleSavePhoneNumber} disabled={savingPhone}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  {savingPhone ? 'Saving...' : 'Add'}
+                </Button>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="phone-number">Phone Number</Label>
-              <Input
-                id="phone-number"
-                placeholder="+14155551234"
-                value={phoneForm.phoneNumber}
-                onChange={(e) => setPhoneForm({ ...phoneForm, phoneNumber: e.target.value })}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleSavePhoneNumber} disabled={savingPhone}>
-                <Plus className="w-4 h-4 mr-1" />
-                {savingPhone ? 'Saving...' : 'Add'}
-              </Button>
-            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              Phone must be E.164 format (+country code + number).
+            </p>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Tip: Use region names like "ANZ", "US", "UK", "India", "EU". Phone must be E.164 format (+country code + number).
-          </p>
         </CardContent>
       </Card>
+
+      {/* Browse Numbers Dialog */}
+      <Dialog open={showBrowseDialog} onOpenChange={setShowBrowseDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Browse Available Phone Numbers</DialogTitle>
+            <DialogDescription>
+              Search and purchase Twilio phone numbers for your campaigns
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Search Filters */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <select
+                  value={searchCountry}
+                  onChange={(e) => setSearchCountry(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2"
+                >
+                  <option value="US">United States</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="AU">Australia</option>
+                  <option value="CA">Canada</option>
+                  <option value="DE">Germany</option>
+                  <option value="FR">France</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Area Code (Optional)</Label>
+                <Input
+                  placeholder="415"
+                  value={searchAreaCode}
+                  onChange={(e) => setSearchAreaCode(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleSearchNumbers} disabled={searchingNumbers} className="w-full">
+                  {searchingNumbers ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Searching...</>
+                  ) : (
+                    <><Search className="w-4 h-4 mr-2" /> Search</>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Results */}
+            {availableNumbers.length > 0 && (
+              <div className="border rounded-lg max-h-96 overflow-y-auto">
+                <div className="divide-y">
+                  {availableNumbers.map((number, idx) => (
+                    <div key={idx} className="p-3 flex items-center justify-between hover:bg-slate-50">
+                      <div>
+                        <p className="font-medium">{number.phoneNumber}</p>
+                        <p className="text-sm text-slate-500">
+                          {number.locality}, {number.region}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          ~${number.estimatedMonthlyCost.toFixed(2)}/month
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handlePurchaseNumber(number.phoneNumber)}
+                        disabled={purchasingNumber === number.phoneNumber}
+                      >
+                        {purchasingNumber === number.phoneNumber ? (
+                          <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Purchasing...</>
+                        ) : (
+                          <><ShoppingCart className="w-4 h-4 mr-1" /> Purchase</>
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {availableNumbers.length === 0 && !searchingNumbers && (
+              <div className="text-center py-8 text-slate-500">
+                <Search className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Search for available numbers to get started</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div >
   )
 }

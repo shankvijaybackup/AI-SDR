@@ -145,6 +145,18 @@ function buildSystemPrompt(phase, customScript = null, voicePersona = 'Arabella'
   const isDefaultScript = !customScript;
   const company = companyName || 'Atomicwork';
 
+  // Detect if this is an HR-focused script (not IT)
+  const isHRScript = customScript && (
+    customScript.toLowerCase().includes('hr') ||
+    customScript.toLowerCase().includes('human resources') ||
+    customScript.toLowerCase().includes('employee') ||
+    customScript.toLowerCase().includes('recruitment') ||
+    customScript.toLowerCase().includes('payroll') ||
+    customScript.toLowerCase().includes('benefits') ||
+    customScript.toLowerCase().includes('onboarding') ||
+    customScript.toLowerCase().includes('keka')
+  );
+
   const basePersona = customScript
     ? `You are a friendly, emotionally intelligent SDR making an outbound sales call for ${company}.
 
@@ -157,8 +169,9 @@ Use this script as your guide, but adapt naturally to the conversation. Don't re
 Atomicwork is an **AI-native service management platform** with a Universal AI Agent.
 Headquarters: San Francisco, California (with offices in Bangalore, India).`;
 
-  // Only include Atomicwork-specific details if using default persona AND no custom script
-  const productDetails = isDefaultScript ? `
+  // Only include product details if using default script AND no custom script
+  // For HR scripts, don't include IT-focused product details
+  const productDetails = (isDefaultScript && !isHRScript) ? `
 
 **Core Value Propositions:**
 - **Universal AI Agent (Atom)**: Meets employees in Slack/Teams with voice, chat, and screen-sharing support. Zero-touch resolutions for IT, HR, Finance requests.
@@ -183,8 +196,14 @@ Headquarters: San Francisco, California (with offices in Bangalore, India).`;
 - **Cross-System Orchestration**: One request can trigger actions across multiple systems (Okta, ServiceNow, Slack, email) without manual handoffs.
 - **Learning & Adaptation**: Gets smarter over time by learning from resolutions, user preferences, and organizational patterns.` : '';
 
+  // For HR scripts, add HR-specific context
+  const hrContext = isHRScript ? `
+
+**HR-FOCUSED CONTEXT:**
+You are calling about HR solutions, not IT services. Focus on HR challenges like employee onboarding, payroll processing, benefits administration, recruitment, compliance, and employee experience. Avoid talking about IT tickets, service desks, or technical infrastructure unless the prospect brings it up. Use HR terminology and pain points from your script.` : '';
+
   return `
-${basePersona}${productDetails}
+${basePersona}${productDetails}${hrContext}
 
 High-level rules:
 - **CRITICAL FOR VOICE**: Keep responses under 25 words. This is a phone call, not email.
@@ -300,7 +319,7 @@ No bullet points. No meta talk. Just what a human would say.`;
 /**
  * Light post-processing to clean up the model reply.
  */
-function sanitizeReply(raw, phase) {
+function sanitizeReply(raw, phase, isHRScript = false) {
   let reply = String(raw || "").trim();
   if (!reply) {
     return "Thanks for sharing that. I'd love to understand how your current IT setup feels day to day.";
@@ -352,7 +371,8 @@ function sanitizeReply(raw, phase) {
 
   // Final fallback if we've stripped too much
   if (!reply) {
-    reply =
+    reply = isHRScript ?
+      "Thanks for sharing that. I'd love to understand how your current HR processes are working." :
       "Thanks for sharing that. I'd love to understand how your current IT setup feels day to day.";
   }
 
@@ -370,7 +390,8 @@ export async function getAiSdrReply({
   userId,
   leadEmail,
   leadRegion,
-  voicePersona = 'Arabella'
+  voicePersona = 'Arabella',
+  companyName = 'our company'
 }) {
   const startTime = Date.now();
   const phase = inferPhase({ transcript, latestUserText });
@@ -386,7 +407,7 @@ export async function getAiSdrReply({
     if (cachedResponse) {
       const elapsed = Date.now() - startTime;
       console.log(`[AI] CACHE HIT in ${elapsed}ms: "${cachedResponse.substring(0, 50)}..."`);
-      return sanitizeReply(cachedResponse, phase);
+      return sanitizeReply(cachedResponse, phase, isHRScript);
     }
   }
 
@@ -407,7 +428,7 @@ export async function getAiSdrReply({
       if (groqReply && groqReply.length > 5) {
         const elapsed = Date.now() - startTime;
         console.log(`[AI] GROQ SUCCESS in ${elapsed}ms`);
-        return sanitizeReply(groqReply, phase);
+        return sanitizeReply(groqReply, phase, isHRScript);
       }
     } catch (err) {
       console.warn('[AI] Groq failed, falling back to OpenAI:', err.message);
@@ -463,7 +484,19 @@ export async function getAiSdrReply({
   }
 
   // Pass custom script to system prompt builder
-  const system = buildSystemPrompt(phase, script);
+  const system = buildSystemPrompt(phase, script, voicePersona, companyName);
+
+  // Detect if this is an HR-focused script (not IT)
+  const isHRScript = script && (
+    script.toLowerCase().includes('hr') ||
+    script.toLowerCase().includes('human resources') ||
+    script.toLowerCase().includes('employee') ||
+    script.toLowerCase().includes('recruitment') ||
+    script.toLowerCase().includes('payroll') ||
+    script.toLowerCase().includes('benefits') ||
+    script.toLowerCase().includes('onboarding') ||
+    script.toLowerCase().includes('keka')
+  );
 
   const transcriptSummary = (transcript || [])
     .map((t) => `${t.speaker === "agent" ? "Alex" : "Prospect"}: ${t.text}`)
@@ -534,7 +567,7 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
         .join(" ");
     }
 
-    const safe = sanitizeReply(raw, phase);
+    const safe = sanitizeReply(raw, phase, isHRScript);
     console.log("[AI] Reply:", raw);
     console.log("[AI] Sanitized reply:", safe);
 
@@ -547,7 +580,12 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
     clearTimeout(timeoutId);
     console.error('[AI] Error or timeout:', err.message);
     // Return a safe fallback response
-    const fallbacks = [
+    const fallbacks = isHRScript ? [
+      "I hear you. Can you tell me more about your HR processes?",
+      "That's interesting. What's been your experience with HR management?",
+      "Got it. How's that been working for your team?",
+      "I understand. What would make HR easier for you?"
+    ] : [
       "I hear you. Can you tell me more about that?",
       "That's interesting. What's been your experience?",
       "Got it. How's that been working for you?",

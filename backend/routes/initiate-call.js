@@ -3,7 +3,7 @@ import { getVoiceByLocation } from '../utils/voice-rotation.js';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const publicBaseUrl = process.env.PUBLIC_BASE_URL;
+const publicBaseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:4000'; // Default to localhost for local dev
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Fallback phone numbers from env (used if DB lookup fails)
@@ -126,7 +126,7 @@ async function initiateCall(req, res) {
 
     // Initiate Twilio call using traditional voice (WORKING - Media Stream has issues)
     const call = await client.calls.create({
-      url: `${publicBaseUrl}/api/twilio/voice?callId=${callId}&voicePersona=${voicePersona}&script=${encodeURIComponent(script)}`,
+      url: `${publicBaseUrl}/api/twilio/voice?callId=${callId}&voicePersona=${voicePersona}&companyName=${encodeURIComponent(leadCompany || 'our company')}`,
       to: phoneNumber,
       from: fromNumber, // Use region-specific phone number
       statusCallback: `${publicBaseUrl}/api/twilio/status?callId=${callId}`,

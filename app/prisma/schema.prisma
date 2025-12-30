@@ -131,6 +131,13 @@ model RegionalPhoneNumber {
   region      String   // e.g., "ANZ", "US", "UK", "India", "EU"
   phoneNumber String   // e.g., "+61341574513"
   isDefault   Boolean  @default(false)
+  
+  // Twilio integration fields
+  provider    String   @default("twilio")  // twilio, exotel, manual
+  twilioSid   String?  // Twilio phone number SID
+  capabilities Json?   // { voice: true, sms: true, mms: false }
+  monthlyCost Float?   // Monthly cost in USD
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -140,6 +147,7 @@ model RegionalPhoneNumber {
   @@unique([companyId, region])
   @@index([companyId])
   @@index([userId])
+  @@index([provider])
 }
 
 // ==================== LEADS ====================
