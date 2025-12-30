@@ -71,23 +71,51 @@ export async function DELETE(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const ids = searchParams.get('ids')
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    // Support both single and bulk deletion
+    if (!id && !ids) {
+      return NextResponse.json({ error: 'ID or IDs are required' }, { status: 400 })
     }
 
-    // Multi-tenancy: Can delete if shared or owned by user
-    await prisma.knowledgeSource.delete({
-      where: {
-        id,
-        OR: [
-          { isShared: true },  // Can delete shared knowledge
-          { userId: currentUser.userId },  // Can delete own knowledge
-        ],
-      },
-    })
+    if (ids) {
+      // Bulk deletion
+      const idArray = ids.split(',').map(i => i.trim()).filter(Boolean)
 
-    return NextResponse.json({ success: true })
+      if (idArray.length === 0) {
+        return NextResponse.json({ error: 'No valid IDs provided' }, { status: 400 })
+      }
+
+      // Delete multiple knowledge sources
+      const result = await prisma.knowledgeSource.deleteMany({
+        where: {
+          id: { in: idArray },
+          OR: [
+            { isShared: true },
+            { userId: currentUser.userId },
+          ],
+        },
+      })
+
+      return NextResponse.json({
+        success: true,
+        count: result.count,
+        message: `Deleted ${result.count} knowledge source(s)`
+      })
+    } else {
+      // Single deletion
+      await prisma.knowledgeSource.delete({
+        where: {
+          id: id!,
+          OR: [
+            { isShared: true },
+            { userId: currentUser.userId },
+          ],
+        },
+      })
+
+      return NextResponse.json({ success: true, count: 1 })
+    }
   } catch (error) {
     console.error('Delete knowledge source error:', error)
     return NextResponse.json(

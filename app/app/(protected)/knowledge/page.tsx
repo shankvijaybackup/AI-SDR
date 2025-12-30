@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle, Bot, Globe, Sparkles } from 'lucide-react'
+import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle, Bot, Globe, Sparkles, Edit, Check } from 'lucide-react'
 
 interface KnowledgeSource {
   id: string
@@ -28,6 +28,17 @@ export default function KnowledgePage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Edit state
+  const [editingSource, setEditingSource] = useState<KnowledgeSource | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editCategory, setEditCategory] = useState('')
+  const [editTags, setEditTags] = useState('')
 
   // Persona Gen State
   const [showPersonaDialog, setShowPersonaDialog] = useState(false)
@@ -244,6 +255,87 @@ export default function KnowledgePage() {
       }
     } catch (error) {
       console.error('Delete error:', error)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} knowledge source(s)?`)) {
+      return
+    }
+
+    try {
+      const ids = Array.from(selectedIds).join(',')
+      const response = await fetch(`/api/knowledge?ids=${ids}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert(data.message || `Deleted ${data.count} knowledge source(s)`)
+        setSelectedIds(new Set())
+        fetchKnowledgeSources()
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error)
+      alert('Failed to delete knowledge sources')
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === knowledgeSources.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(knowledgeSources.map(s => s.id)))
+    }
+  }
+
+  const handleSelectOne = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
+  const handleEdit = (source: KnowledgeSource) => {
+    setEditingSource(source)
+    setEditTitle(source.title)
+    setEditDescription(source.description || '')
+    setEditCategory(source.category || 'product')
+    setEditTags(source.tags.join(', '))
+    setShowEditDialog(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingSource) return
+
+    try {
+      const response = await fetch(`/api/knowledge/${editingSource.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription,
+          category: editCategory,
+          tags: editTags,
+        }),
+      })
+
+      if (response.ok) {
+        alert('Knowledge source updated successfully!')
+        setShowEditDialog(false)
+        setEditingSource(null)
+        fetchKnowledgeSources()
+      } else {
+        alert('Failed to update knowledge source')
+      }
+    } catch (error) {
+      console.error('Edit error:', error)
+      alert('Failed to update knowledge source')
     }
   }
 
@@ -600,11 +692,102 @@ export default function KnowledgePage() {
         </Card>
       )}
 
+      {/* Edit Dialog */}
+      {showEditDialog && editingSource && (
+        <Card className="border-2 border-blue-500">
+          <CardHeader>
+            <CardTitle>Edit Knowledge Source</CardTitle>
+            <CardDescription>Update the details of this knowledge source</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editTitle">Title *</Label>
+              <Input
+                id="editTitle"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editDescription">Description</Label>
+              <Textarea
+                id="editDescription"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editCategory">Category</Label>
+              <select
+                id="editCategory"
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                className="w-full border rounded-md px-3 py-2"
+              >
+                <option value="product">Product</option>
+                <option value="sales">Sales</option>
+                <option value="technical">Technical</option>
+                <option value="customer_story">Customer Story</option>
+                <option value="objection_handling">Objection Handling</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editTags">Tags (comma-separated)</Label>
+              <Input
+                id="editTags"
+                value={editTags}
+                onChange={(e) => setEditTags(e.target.value)}
+              />
+            </div>
+            <div className="flex space-x-3">
+              <Button onClick={handleSaveEdit}>
+                <Check className="w-4 h-4 mr-2" />
+                Save Changes
+              </Button>
+              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Knowledge Sources List */}
       <Card>
         <CardHeader>
-          <CardTitle>Your Knowledge Sources</CardTitle>
-          <CardDescription>{knowledgeSources.length} sources uploaded</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Your Knowledge Sources</CardTitle>
+              <CardDescription>{knowledgeSources.length} sources uploaded</CardDescription>
+            </div>
+            {knowledgeSources.length > 0 && (
+              <div className="flex items-center space-x-3">
+                {selectedIds.size > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-slate-600">
+                      {selectedIds.size} selected
+                    </span>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleBulkDelete}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Selected
+                    </Button>
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                >
+                  {selectedIds.size === knowledgeSources.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -627,9 +810,19 @@ export default function KnowledgePage() {
               {knowledgeSources.map((source) => (
                 <div
                   key={source.id}
-                  className="border rounded-lg p-4 flex items-start justify-between hover:bg-slate-50"
+                  className={`border rounded-lg p-4 flex items-start justify-between hover:bg-slate-50 transition-colors ${selectedIds.has(source.id) ? 'bg-blue-50 border-blue-300' : ''
+                    }`}
                 >
                   <div className="flex items-start space-x-3 flex-1">
+                    {/* Selection Checkbox */}
+                    <div className="pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(source.id)}
+                        onChange={() => handleSelectOne(source.id)}
+                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                      />
+                    </div>
                     <div className="p-2 bg-slate-100 rounded">
                       {getTypeIcon(source.type)}
                     </div>
@@ -666,14 +859,25 @@ export default function KnowledgePage() {
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(source.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {/* Action Buttons */}
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(source)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(source.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
