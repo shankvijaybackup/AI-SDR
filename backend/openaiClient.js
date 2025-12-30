@@ -381,6 +381,7 @@ function sanitizeReply(raw, phase, isHRScript = false) {
 
 /**
  * Main brain: decide what Alex should say next.
+ * NOW WITH PHASE 2: Knowledge-based context injection
  */
 export async function getAiSdrReply({
   script,
@@ -391,11 +392,37 @@ export async function getAiSdrReply({
   leadEmail,
   leadRegion,
   voicePersona = 'Arabella',
-  companyName = 'our company'
+  companyName = 'our company',
+  // ========== PHASE 2: Knowledge context parameters ==========
+  leadContext = null,
+  relevantKnowledge = [],
+  industry = null,
+  role = null
+  // ========== END PHASE 2 ==========
 }) {
   const startTime = Date.now();
   const phase = inferPhase({ transcript, latestUserText });
   console.log(`[AI] Phase: ${phase}`);
+
+  // ========== PHASE 2: Use contextual system prompt if knowledge available ==========
+  let systemPrompt = null;
+  if (leadContext && relevantKnowledge.length > 0) {
+    try {
+      const { buildContextualSystemPrompt } = await import('../services/leadResearch.js');
+      systemPrompt = buildContextualSystemPrompt({
+        basePersona: script,
+        leadContext,
+        relevantKnowledge,
+        openingScript: script,
+        objectionResponses: leadContext.objectionResponses || []
+      });
+      console.log(`[Knowledge AI] Using contextual system prompt with ${relevantKnowledge.length} knowledge sources`);
+    } catch (err) {
+      console.error('[Knowledge AI] Error building contextual prompt:', err);
+      // Fall back to standard prompt
+    }
+  }
+  // ========== END PHASE 2 ==========
 
   // ===== STEP 1: Try cached response (0ms latency) =====
   if (USE_CACHE) {
@@ -484,7 +511,8 @@ export async function getAiSdrReply({
   }
 
   // Pass custom script to system prompt builder
-  const system = buildSystemPrompt(phase, script, voicePersona, companyName);
+  // Use knowledge-based prompt if available, otherwise standard prompt
+  const system = systemPrompt || buildSystemPrompt(phase, script, voicePersona, companyName);
 
   // Detect if this is an HR-focused script (not IT)
   const isHRScript = script && (

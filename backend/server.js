@@ -691,6 +691,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
     }
 
     // Get AI reply with timeout protection (handled inside getAiSdrReply)
+    // ========== PHASE 2: Pass knowledge context to AI ==========
     const reply = await getAiSdrReply({
       script: call.script,
       transcript: call.transcript,
@@ -700,8 +701,14 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       leadEmail: call.leadEmail,
       leadRegion: call.leadRegion,
       voicePersona: call.voicePersona,
-      companyName: call.companyName
+      companyName: call.companyName,
+      // Pass knowledge context if available
+      leadContext: call.leadContext || null,
+      relevantKnowledge: call.relevantKnowledge || [],
+      industry: call.industry || null,
+      role: call.role || null
     });
+    // ========== END PHASE 2 ==========
 
     addTranscript(callSid, { speaker: "agent", text: reply });
 

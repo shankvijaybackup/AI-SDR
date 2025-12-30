@@ -70,11 +70,52 @@ async function getPhoneNumberForRegion(region, userId) {
 
 async function initiateCall(req, res) {
   try {
-    const { callId, phoneNumber, script, leadName, leadEmail, leadCompany, region } = req.body;
+    const { callId, phoneNumber, script, leadName, leadEmail, leadCompany, region, leadId, industry, role } = req.body;
 
     if (!callId || !phoneNumber || !script) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+
+    // ========== PHASE 2: KNOWLEDGE-BASED LEAD RESEARCH ==========
+    let leadContext = null;
+    let personalizedScript = script;
+    let relevantKnowledge = [];
+
+    try {
+      // Import lead research service
+      const { researchLead, buildContextualSystemPrompt } = await import('../services/leadResearch.js');
+
+      // Build lead object for research
+      const lead = {
+        id: leadId,
+        name: leadName,
+        email: leadEmail,
+        company: leadCompany || 'Unknown Company',
+        industry: industry || region || 'Unknown',
+        role: role || 'Unknown',
+        phone: phoneNumber
+      };
+
+      console.log(`[Knowledge Research] Researching lead: ${leadName} at ${leadCompany}`);
+
+      // Research lead and get context
+      leadContext = await researchLead(lead);
+
+      // Use personalized script if generated
+      if (leadContext.personalizedScript) {
+        personalizedScript = leadContext.personalizedScript;
+        console.log(`[Knowledge Research] Using personalized script: ${personalizedScript.substring(0, 80)}...`);
+      }
+
+      relevantKnowledge = leadContext.relevantKnowledge || [];
+      console.log(`[Knowledge Research] Found ${relevantKnowledge.length} relevant knowledge sources`);
+      console.log(`[Knowledge Research] Generated ${leadContext.talkingPoints?.length || 0} talking points`);
+
+    } catch (researchError) {
+      console.error('[Knowledge Research] Error during lead research:', researchError);
+      // Continue with call even if research fails
+    }
+    // ========== END PHASE 2 ==========
 
     // Select voice based on lead's region
     const selectedVoice = getVoiceByLocation(region);
@@ -89,13 +130,13 @@ async function initiateCall(req, res) {
     console.log(`[Initiate Call] Region: ${region || 'Not specified'}`);
     console.log(`[Initiate Call] From: ${fromNumber}`);
     console.log(`[Initiate Call] Voice: ${voicePersona} (${selectedVoice.gender}), ID: ${voiceId}`);
-    console.log(`[Initiate Call] Script: ${script.substring(0, 50)}...`);
+    console.log(`[Initiate Call] Script: ${personalizedScript.substring(0, 50)}...`);
 
     // Use company name from request or extract from script as fallback
     let companyName = leadCompany || 'Atomicwork'; // Use provided company or default
     if (!leadCompany) {
       // Fallback to extracting from script if not provided
-      const companyMatch = script.match(/(?:from|at)\s+([A-Z][A-Za-z0-9\s&]+?)(?:\.|,|\s+is|\s+Is|\n)/);
+      const companyMatch = personalizedScript.match(/(?:from|at)\s+([A-Z][A-Za-z0-9\s&]+?)(?:\.|,|\s+is|\s+Is|\n)/);
       if (companyMatch && companyMatch[1]) {
         companyName = companyMatch[1].trim();
         console.log(`[Initiate Call] Extracted company name from script: ${companyName}`);
@@ -104,11 +145,11 @@ async function initiateCall(req, res) {
       console.log(`[Initiate Call] Using provided company name: ${companyName}`);
     }
 
-    // Store call metadata with events tracking
+    // Store call metadata with events tracking AND knowledge context
     activeCalls.set(callId, {
       callId,
       phoneNumber,
-      script,
+      script: personalizedScript, // Use personalized script
       companyName, // Store extracted company
       voicePersona,
       voiceId, // Store the actual ElevenLabs voice ID
@@ -118,6 +159,12 @@ async function initiateCall(req, res) {
       startTime: new Date(),
       transcript: [],
       userId: req.body.userId || null,
+      // ========== PHASE 2: Store knowledge context ==========
+      leadContext: leadContext, // Full lead research context
+      relevantKnowledge: relevantKnowledge, // Quick access to knowledge
+      industry: industry || region || 'Unknown',
+      role: role || 'Unknown',
+      // ========== END PHASE 2 ==========
       // Track call events for UI display
       callEvents: [
         { event: 'initiated', timestamp: new Date().toISOString(), details: `Calling ${phoneNumber}` }
