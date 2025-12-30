@@ -162,19 +162,20 @@ function truncateForTTS(text, maxLength = 200) {
   return truncated + '...';
 }
 
-export async function synthesizeWithElevenLabs(text, callSid) {
-  if (!ELEVEN_API_KEY || !ELEVEN_VOICE_ID_MALE || !ELEVEN_VOICE_ID_FEMALE || !PUBLIC_BASE_URL) {
+export async function synthesizeWithElevenLabs(text, callSid, voiceId = null) {
+  if (!ELEVEN_API_KEY || !PUBLIC_BASE_URL) {
     throw new Error("Missing ElevenLabs env vars or PUBLIC_BASE_URL.");
   }
 
   // Truncate long text to prevent slow TTS
   const truncatedText = truncateForTTS(text, 150); // Reduced from 180 for faster TTS
 
-  const voiceId = getVoiceIdForCall(callSid);
-  const voiceType = voiceId === ELEVEN_VOICE_ID_FEMALE ? "Female" : "Male";
-  console.log(`[ElevenLabs] Synthesizing (${voiceType}) for ${callSid}:`, truncatedText.substring(0, 50) + '...');
+  // Use provided voiceId, or fall back to call mapping, or default
+  const finalVoiceId = voiceId || getVoiceIdForCall(callSid) || ELEVEN_VOICE_ID_FEMALE;
+  const voiceType = finalVoiceId === ELEVEN_VOICE_ID_FEMALE ? "Female" : (finalVoiceId === ELEVEN_VOICE_ID_MALE ? "Male" : "Regional");
+  console.log(`[ElevenLabs] Synthesizing (${voiceType}) with voice ${finalVoiceId.substring(0, 8)}... for ${callSid}:`, truncatedText.substring(0, 50) + '...');
 
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${finalVoiceId}`;
 
   // Add timeout to prevent hanging
   const controller = new AbortController();
@@ -269,12 +270,14 @@ function requiresElevenLabs(region) {
   return ['india', 'in', 'uk', 'australia', 'au', 'anz', 'nz'].some(x => r.includes(x));
 }
 
-export async function synthesizeTTS(text, callSid, voicePersona = null, region = null) {
+export async function synthesizeTTS(text, callSid, voicePersona = null, region = null, voiceId = null) {
   // For regions requiring specific accents, skip Deepgram and use ElevenLabs directly
   // This ensures India gets Indian English voices, UK gets UK voices, etc.
   if (requiresElevenLabs(region)) {
     console.log(`[TTS] Region ${region} requires ElevenLabs for proper accent`);
-    return await synthesizeWithElevenLabs(text, callSid);
+    // Get voice ID from call state if not provided
+    const callVoiceId = voiceId || getVoiceIdForCall(callSid);
+    return await synthesizeWithElevenLabs(text, callSid, callVoiceId);
   }
 
   // Try Deepgram first if enabled (fastest: ~100-200ms) - only for US/default
@@ -458,10 +461,11 @@ app.post("/api/twilio/voice", async (req, res) => {
   console.log(`[Script] Using opening: ${openingScript.substring(0, 80)}...`);
 
   // Play greeting with TTS (ElevenLabs with Polly fallback)
-  // Pass region for voice optimization (India gets clearer voices)
+  // Pass region and voice ID for proper regional voice
   const leadRegion = activeCall ? activeCall.region : null;
+  const voiceIdFromCall = activeCall ? activeCall.voiceId : null;
   try {
-    const audioUrl = await synthesizeTTS(openingScript, callSid, voicePersona, leadRegion);
+    const audioUrl = await synthesizeTTS(openingScript, callSid, voicePersona, leadRegion, voiceIdFromCall);
     console.log(`[Greeting] Playing: ${audioUrl}`);
     twiml.play(audioUrl);
   } catch (err) {
