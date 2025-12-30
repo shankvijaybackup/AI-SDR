@@ -103,8 +103,8 @@ export async function DELETE(request: NextRequest) {
         message: `Deleted ${result.count} knowledge source(s)`
       })
     } else {
-      // Single deletion
-      await prisma.knowledgeSource.delete({
+      // Single deletion - use deleteMany since delete() doesn't support OR
+      const result = await prisma.knowledgeSource.deleteMany({
         where: {
           id: id!,
           OR: [
@@ -113,6 +113,10 @@ export async function DELETE(request: NextRequest) {
           ],
         },
       })
+
+      if (result.count === 0) {
+        return NextResponse.json({ error: 'Knowledge source not found or no permission' }, { status: 404 })
+      }
 
       return NextResponse.json({ success: true, count: 1 })
     }
