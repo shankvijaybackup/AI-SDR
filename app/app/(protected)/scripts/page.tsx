@@ -522,8 +522,10 @@ export default function ScriptsPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteScript(script.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
                     >
-                      <Trash2 className="w-4 h-4 text-red-500" />
+                      <Trash2 className="w-4 h-4" />
+                      <span className="sr-only">Delete</span>
                     </Button>
                   </div>
                 </div>
