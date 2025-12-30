@@ -200,3 +200,48 @@ export async function PATCH(
         )
     }
 }
+
+// DELETE /api/calls/bulk/[campaignId] - Delete a campaign
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ campaignId: string }> }
+) {
+    try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) {
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+        }
+
+        const { campaignId } = await params
+
+        const campaign = await prisma.bulkCallCampaign.findFirst({
+            where: {
+                id: campaignId,
+                userId: currentUser.userId,
+            },
+        })
+
+        if (!campaign) {
+            return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+        }
+
+        // Disconnect any calls linked to this campaign (set campaignId to null)
+        await prisma.call.updateMany({
+            where: { campaignId: campaignId },
+            data: { campaignId: null },
+        })
+
+        // Delete the campaign
+        await prisma.bulkCallCampaign.delete({
+            where: { id: campaignId },
+        })
+
+        return NextResponse.json({ success: true, message: 'Campaign deleted successfully' })
+    } catch (error) {
+        console.error('Delete campaign error:', error)
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        )
+    }
+}

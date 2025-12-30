@@ -18,7 +18,8 @@ import {
     Loader2,
     ChevronDown,
     ChevronUp,
-    BarChart3
+    BarChart3,
+    Trash2
 } from 'lucide-react'
 
 interface Lead {
@@ -232,6 +233,27 @@ export default function BulkCallingPage() {
         }
     }
 
+    const handleDeleteCampaign = async (campaignId: string, e: React.MouseEvent) => {
+        e.stopPropagation() // Prevent opening campaign details
+        if (!confirm('Are you sure you want to delete this campaign? This cannot be undone.')) {
+            return
+        }
+        try {
+            const response = await fetch(`/api/calls/bulk/${campaignId}`, {
+                method: 'DELETE',
+            })
+            if (response.ok) {
+                fetchCampaigns()
+            } else {
+                const error = await response.json()
+                alert(error.error || 'Failed to delete campaign')
+            }
+        } catch (error) {
+            console.error('Failed to delete campaign:', error)
+            alert('Failed to delete campaign')
+        }
+    }
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'running': return 'text-green-600 bg-green-100'
@@ -373,8 +395,8 @@ export default function BulkCallingPage() {
                                             <div className="flex items-center space-x-4">
                                                 {call.interestLevel && (
                                                     <span className={`px-2 py-1 rounded text-xs font-medium ${call.interestLevel === 'high' ? 'bg-green-100 text-green-700' :
-                                                            call.interestLevel === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                                                'bg-slate-100 text-slate-700'
+                                                        call.interestLevel === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                                            'bg-slate-100 text-slate-700'
                                                         }`}>
                                                         {call.interestLevel} interest
                                                     </span>
@@ -477,6 +499,14 @@ export default function BulkCallingPage() {
                                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(campaign.status)}`}>
                                                 {campaign.status.toUpperCase()}
                                             </span>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => handleDeleteCampaign(campaign.id, e)}
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -526,8 +556,8 @@ export default function BulkCallingPage() {
                                         key={script.id}
                                         onClick={() => setSelectedScript(script)}
                                         className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedScript?.id === script.id
-                                                ? 'border-blue-600 bg-blue-50'
-                                                : 'hover:border-slate-300'
+                                            ? 'border-blue-600 bg-blue-50'
+                                            : 'hover:border-slate-300'
                                             }`}
                                     >
                                         <p className="font-medium text-sm">{script.name}</p>
@@ -608,8 +638,8 @@ export default function BulkCallingPage() {
                                         key={lead.id}
                                         onClick={() => handleLeadToggle(lead.id)}
                                         className={`p-3 border rounded-lg cursor-pointer transition-colors flex items-center ${selectedLeads.has(lead.id)
-                                                ? 'border-blue-600 bg-blue-50'
-                                                : 'hover:border-slate-300'
+                                            ? 'border-blue-600 bg-blue-50'
+                                            : 'hover:border-slate-300'
                                             }`}
                                     >
                                         <div className={`w-5 h-5 rounded border mr-3 flex items-center justify-center ${selectedLeads.has(lead.id) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'
