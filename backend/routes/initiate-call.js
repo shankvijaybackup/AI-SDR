@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { getVoiceByLocation } from '../utils/voice-rotation.js';
+import { researchCompany, formatCompanyKnowledge } from '../services/companyResearch.js';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
