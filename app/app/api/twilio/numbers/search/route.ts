@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
         // Search for available phone numbers
         const numbers = await client.availablePhoneNumbers(country).local.list({
-            areaCode,
+            areaCode: areaCode ? parseInt(areaCode) : undefined,
             contains,
             limit,
             voiceEnabled: true,
