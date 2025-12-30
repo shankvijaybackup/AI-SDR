@@ -73,7 +73,7 @@ export default function SettingsPage() {
   const [inviteResult, setInviteResult] = useState<{ url: string; email: string } | null>(null)
 
   // Regional phone numbers state
-  interface PhoneNumber { id: string; region: string; phoneNumber: string; isDefault: boolean; provider?: string; monthlyCost?: number }
+  interface PhoneNumber { id: string; region: string; phoneNumber: string; isDefault: boolean; provider?: string; monthlyCost?: number; twilioSid?: string }
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([])
   const [phoneForm, setPhoneForm] = useState({ region: '', phoneNumber: '', isDefault: false })
   const [savingPhone, setSavingPhone] = useState(false)
