@@ -763,7 +763,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     // Also check if conversation has gone on too long (10+ exchanges)
     const conversationLength = call.transcript.length;
-    const shouldEnd = isClosing || conversationLength > 20;
+    const shouldEnd = isClosing || conversationLength > 40; // Increased from 20 to allow longer conversations
 
     if (shouldEnd) {
       // End the call gracefully after closing statement

@@ -573,7 +573,7 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
 
   // Use faster model with tight timeout for voice calls
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout - use fallback if slow
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout - increased for complex questions
 
   try {
     const response = await client.chat.completions.create({
@@ -614,18 +614,37 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
   } catch (err) {
     clearTimeout(timeoutId);
     console.error('[AI] Error or timeout:', err.message);
-    // Return a safe fallback response
-    const fallbacks = isHRScript ? [
+
+    // Check if user was asking about the company - extract from transcript
+    const userAskedAboutCompany = latestUserText && (
+      /what is (atomicwork|atom|your company)/i.test(latestUserText) ||
+      /who (are you|is atomicwork)/i.test(latestUserText) ||
+      /tell me about (atomicwork|your company|you)/i.test(latestUserText) ||
+      /what do you (do|offer|sell)/i.test(latestUserText)
+    );
+
+    // If user asked about the company, ALWAYS explain
+    if (userAskedAboutCompany) {
+      return `Atomicwork is an AI-powered ITSM platform. We help IT teams automate support and reduce ticket volume by 40-60%. Would you like to see a quick demo?`;
+    }
+
+    // Context-aware ITSM fallbacks based on phase
+    const itsmFallbacks = [
+      "Quick question - what ITSM tool are you guys using right now?",
+      "I'm curious, how is your IT team handling employee requests today?",
+      "Here's the thing - we help IT teams cut repetitive work. What's taking most of your team's time?",
+      "Totally get it. Are your IT folks dealing with a lot of password resets and access requests?",
+      "That makes sense. Is your team exploring AI for IT automation?"
+    ];
+
+    const hrFallbacks = [
       "I hear you. Can you tell me more about your HR processes?",
       "That's interesting. What's been your experience with HR management?",
       "Got it. How's that been working for your team?",
       "I understand. What would make HR easier for you?"
-    ] : [
-      "I hear you. Can you tell me more about that?",
-      "That's interesting. What's been your experience?",
-      "Got it. How's that been working for you?",
-      "I understand. What would make it better?"
     ];
+
+    const fallbacks = isHRScript ? hrFallbacks : itsmFallbacks;
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
   }
 }
