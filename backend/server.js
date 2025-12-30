@@ -388,13 +388,25 @@ app.post("/api/twilio/voice", async (req, res) => {
   // Bridge metadata from the initiation request into call state (lead email, userId, region)
   const activeCall = callId ? getActiveCall(callId) : null;
 
+  // Get company name from activeCall (set during initiation from lead data)
+  // Priority: activeCall.companyName > query param > lead company > default
+  let companyName = 'Atomicwork'; // Default fallback
+  if (activeCall && activeCall.companyName) {
+    companyName = activeCall.companyName;
+  } else if (req.query.companyName) {
+    companyName = decodeURIComponent(req.query.companyName);
+  } else if (activeCall && activeCall.leadCompany) {
+    companyName = activeCall.leadCompany;
+  }
+
   // Extract first line/sentence from script as opening greeting
   // Use voicePersona name instead of hardcoded "Alex"
-  let companyName = req.query.companyName ? decodeURIComponent(req.query.companyName) : (activeCall && activeCall.companyName ? activeCall.companyName : 'Keka');
   let openingScript = `Hi, this is ${voicePersona} from ${companyName}. How are you doing today?`;
   if (customScript) {
-    // Replace {{repName}} placeholder with actual voice persona name
-    const processedScript = customScript.replace(/\{\{repName\}\}/gi, voicePersona);
+    // Replace BOTH placeholders with actual values
+    let processedScript = customScript
+      .replace(/\{\{repName\}\}/gi, voicePersona)
+      .replace(/\{\{companyName\}\}/gi, companyName);
 
     // Take the first TWO sentences to ensure we get the "How are you?" part
     // Split on sentence boundaries but keep delimiters

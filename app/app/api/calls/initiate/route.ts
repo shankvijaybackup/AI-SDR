@@ -144,10 +144,13 @@ Remember to:
           callId: call.id,
           phoneNumber: lead.phone,
           script: personalizedScript,
-          // voicePersona removed - backend auto-selects
           leadName: `${lead.firstName} ${lead.lastName}`,
           leadEmail: lead.email,
+          leadCompany: lead.company || 'Atomicwork', // CRITICAL: Pass company to backend
           region: lead.region, // Pass the lead's region for voice selection
+          industry: lead.region || 'Unknown', // For knowledge matching
+          role: lead.jobTitle || 'Unknown', // For knowledge matching
+          userId: currentUser.userId, // For knowledge search
         }),
       })
 
