@@ -198,7 +198,8 @@ export default function SettingsPage() {
         ...(searchAreaCode && { areaCode: searchAreaCode }),
         limit: '20',
       })
-      const response = await fetch(`/api/twilio/numbers/search?${params}`)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
+      const response = await fetch(`${backendUrl}/api/twilio-numbers/search?${params}`)
       if (response.ok) {
         const data = await response.json()
         setAvailableNumbers(data.numbers)
@@ -220,7 +221,8 @@ export default function SettingsPage() {
 
     setPurchasingNumber(phoneNumber)
     try {
-      const response = await fetch('/api/twilio/numbers/purchase', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
+      const response = await fetch(`${backendUrl}/api/twilio-numbers/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber, region: searchCountry }),
@@ -249,7 +251,13 @@ export default function SettingsPage() {
     }
 
     try {
-      const response = await fetch(`/api/twilio/numbers/release?id=${id}`, { method: 'DELETE' })
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
+      const number = phoneNumbers.find(n => n.id === id)
+      if (!number?.twilioSid) {
+        setMessage({ type: 'error', text: 'Cannot release: missing Twilio SID' })
+        return
+      }
+      const response = await fetch(`${backendUrl}/api/twilio-numbers/release?twilioSid=${number.twilioSid}`, { method: 'DELETE' })
       if (response.ok) {
         const data = await response.json()
         setMessage({ type: 'success', text: data.message })

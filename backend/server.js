@@ -106,6 +106,8 @@ app.use("/tts", express.static(TTS_DIR));
 
 // Import Persona Service
 import { generateCompanyPersona } from "./services/personaService.js";
+// Import Twilio Number Management
+import { searchAvailableNumbers, purchaseNumber, releaseNumber } from "./routes/twilio-numbers.js";
 
 // ---------- PERSONA GENERATION ROUTE ----------
 app.post("/api/knowledge/persona", async (req, res) => {
@@ -128,6 +130,12 @@ app.post("/api/knowledge/persona", async (req, res) => {
     res.status(500).json({ error: "Failed to generate persona", details: err.message });
   }
 });
+
+// ---------- TWILIO NUMBER MANAGEMENT ROUTES ----------
+app.get("/api/twilio-numbers/search", searchAvailableNumbers);
+app.post("/api/twilio-numbers/purchase", purchaseNumber);
+app.delete("/api/twilio-numbers/release", releaseNumber);
+
 
 // ---------- ElevenLabs TTS Helper ----------
 
@@ -342,11 +350,11 @@ app.get("/api/twilio/voice", async (req, res) => {
   console.log("➡️  GET /api/twilio/voice hit for testing. Query:", req.query);
 
   const twiml = new twilio.twiml.VoiceResponse();
-  
+
   // Simple test response
   const { script, voicePersona } = req.query;
   const greeting = script ? script.replace(/\{\{repName\}\}/g, voicePersona || 'Arabella') : `Hello, this is ${voicePersona || 'Arabella'} from Keka HR.`;
-  
+
   try {
     const audioUrl = await synthesizeTTS(greeting, 'test-call-sid');
     console.log(`[Test Greeting] Playing: ${audioUrl}`);
