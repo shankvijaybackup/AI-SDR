@@ -260,11 +260,11 @@ export async function synthesizeWithChatterboxTTS(text, callSid) {
 // Set USE_DEEPGRAM=true in env to enable Deepgram (requires DEEPGRAM_API_KEY)
 const USE_DEEPGRAM = process.env.USE_DEEPGRAM === 'true' && process.env.DEEPGRAM_API_KEY;
 
-export async function synthesizeTTS(text, callSid, voicePersona = null) {
+export async function synthesizeTTS(text, callSid, voicePersona = null, region = null) {
   // Try Deepgram first if enabled (fastest: ~100-200ms)
   if (USE_DEEPGRAM) {
     try {
-      return await synthesizeWithDeepgram(text, callSid, voicePersona);
+      return await synthesizeWithDeepgram(text, callSid, voicePersona, region);
     } catch (err) {
       console.warn('[TTS] Deepgram failed, falling back to ElevenLabs:', err.message);
     }
@@ -430,8 +430,10 @@ app.post("/api/twilio/voice", async (req, res) => {
   console.log(`[Script] Using opening: ${openingScript.substring(0, 80)}...`);
 
   // Play greeting with TTS (ElevenLabs with Polly fallback)
+  // Pass region for voice optimization (India gets clearer voices)
+  const leadRegion = activeCall ? activeCall.region : null;
   try {
-    const audioUrl = await synthesizeTTS(openingScript, callSid);
+    const audioUrl = await synthesizeTTS(openingScript, callSid, voicePersona, leadRegion);
     console.log(`[Greeting] Playing: ${audioUrl}`);
     twiml.play(audioUrl);
   } catch (err) {
@@ -713,8 +715,9 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
     addTranscript(callSid, { speaker: "agent", text: reply });
 
     // Play AI reply with TTS (ElevenLabs with Polly fallback)
+    // Pass region for voice optimization
     try {
-      const audioUrl = await synthesizeTTS(reply, callSid);
+      const audioUrl = await synthesizeTTS(reply, callSid, call.voicePersona, call.leadRegion);
       console.log(`[AI Reply] Playing: ${audioUrl}`);
       twiml.play(audioUrl);
     } catch (err) {

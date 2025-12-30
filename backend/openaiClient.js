@@ -424,6 +424,18 @@ export async function getAiSdrReply({
   }
   // ========== END PHASE 2 ==========
 
+  // Detect if this is an HR-focused script (not IT) - MUST BE DEFINED BEFORE CACHE CHECK
+  const isHRScript = script && (
+    script.toLowerCase().includes('hr') ||
+    script.toLowerCase().includes('human resources') ||
+    script.toLowerCase().includes('employee') ||
+    script.toLowerCase().includes('recruitment') ||
+    script.toLowerCase().includes('payroll') ||
+    script.toLowerCase().includes('benefits') ||
+    script.toLowerCase().includes('onboarding') ||
+    script.toLowerCase().includes('keka')
+  );
+
   // ===== STEP 1: Try cached response (0ms latency) =====
   if (USE_CACHE) {
     const cachedResponse = getCachedResponse(latestUserText, phase, {
@@ -514,17 +526,7 @@ export async function getAiSdrReply({
   // Use knowledge-based prompt if available, otherwise standard prompt
   const system = systemPrompt || buildSystemPrompt(phase, script, voicePersona, companyName);
 
-  // Detect if this is an HR-focused script (not IT)
-  const isHRScript = script && (
-    script.toLowerCase().includes('hr') ||
-    script.toLowerCase().includes('human resources') ||
-    script.toLowerCase().includes('employee') ||
-    script.toLowerCase().includes('recruitment') ||
-    script.toLowerCase().includes('payroll') ||
-    script.toLowerCase().includes('benefits') ||
-    script.toLowerCase().includes('onboarding') ||
-    script.toLowerCase().includes('keka')
-  );
+  // isHRScript is already defined above before cache check
 
   const transcriptSummary = (transcript || [])
     .map((t) => `${t.speaker === "agent" ? "Alex" : "Prospect"}: ${t.text}`)

@@ -30,16 +30,34 @@ const DEFAULT_VOICE = VOICES.asteria;
 
 /**
  * Map ElevenLabs voice names to Deepgram equivalents
+ * Note: Deepgram only has English voices. For Indian market,
+ * we use voices with clearer, more neutral pronunciation.
  */
-function mapVoiceToDeepgram(voicePersona) {
-    const mappings = {
+function mapVoiceToDeepgram(voicePersona, region = null) {
+    // For India region, use voices with clearer pronunciation
+    // (Deepgram doesn't have Indian English voices, but some are more neutral)
+    const indiaVoices = {
+        'Arabella': VOICES.stella,   // Stella has clearer pronunciation
+        'Anika': VOICES.luna,        // Luna is gentler, clearer
+        'Jane': VOICES.athena,       // Athena is confident, clear
+        'Brandon': VOICES.arcas,     // Arcas is friendly, clear
+        'Adam': VOICES.angus,        // Angus is warm, neutral
+    };
+
+    const defaultMappings = {
         'Arabella': VOICES.asteria,
         'Anika': VOICES.stella,
         'Jane': VOICES.luna,
         'Brandon': VOICES.orion,
         'Adam': VOICES.arcas,
     };
-    return mappings[voicePersona] || DEFAULT_VOICE;
+
+    // Use India-optimized voices for India region
+    if (region && /^(india|in|ind)$/i.test(String(region).trim())) {
+        return indiaVoices[voicePersona] || VOICES.luna;
+    }
+
+    return defaultMappings[voicePersona] || DEFAULT_VOICE;
 }
 
 /**
@@ -49,15 +67,16 @@ function mapVoiceToDeepgram(voicePersona) {
  * @param {string} text - Text to synthesize
  * @param {string} callSid - Call identifier for logging
  * @param {string} voicePersona - Voice persona name (maps to Deepgram voice)
+ * @param {string} region - Lead region (used for voice accent optimization)
  * @returns {Promise<string>} - URL of the generated audio file
  */
-export async function synthesizeWithDeepgram(text, callSid, voicePersona = null) {
+export async function synthesizeWithDeepgram(text, callSid, voicePersona = null, region = null) {
     if (!DEEPGRAM_API_KEY) {
         throw new Error('DEEPGRAM_API_KEY not configured');
     }
 
     const startTime = Date.now();
-    const voice = voicePersona ? mapVoiceToDeepgram(voicePersona) : DEFAULT_VOICE;
+    const voice = voicePersona ? mapVoiceToDeepgram(voicePersona, region) : DEFAULT_VOICE;
 
     // Truncate to keep responses snappy (max 200 chars)
     const truncatedText = text.length > 200 ? text.substring(0, 200) : text;
