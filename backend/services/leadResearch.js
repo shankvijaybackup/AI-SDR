@@ -4,17 +4,19 @@
  * Automatically researches leads before calls by:
  * 1. Searching knowledge base for relevant content
  * 2. Researching the prospect's company (what they do, pain points)
- * 3. Finding industry-specific talking points
- * 4. Identifying relevant case studies
- * 5. Building comprehensive lead context with sales approach
+ * 3. Researching the lead's ROLE (what challenges they face)
+ * 4. Finding industry-specific talking points
+ * 5. Identifying relevant case studies
+ * 6. Building comprehensive lead context with sales approach
  */
 
 import { researchProspectCompany, formatProspectResearch } from './companyResearch.js';
+import { researchRoleChallenges, formatRoleIntelligence } from './roleIntelligence.js';
 
 /**
- * Research a lead and build context from knowledge base + prospect company
+ * Research a lead and build context from knowledge base + prospect company + role intelligence
  */
-export async function researchLead(lead, sellerCompanyDescription = '') {
+export async function researchLead(lead, sellerCompanyDescription = '', sellerThemes = []) {
     console.log(`[Lead Research] Starting research for ${lead.name} at ${lead.company}`)
 
     const context = {
@@ -22,12 +24,15 @@ export async function researchLead(lead, sellerCompanyDescription = '') {
             name: lead.name,
             company: lead.company,
             industry: lead.industry || 'Unknown',
-            role: lead.role || 'Unknown',
+            role: lead.role || lead.jobTitle || 'Unknown',
             email: lead.email
         },
         relevantKnowledge: [],
-        prospectCompanyResearch: null, // NEW: Research about the prospect's company
-        prospectContext: '', // NEW: Formatted context for AI
+        prospectCompanyResearch: null,
+        prospectContext: '',
+        roleIntelligence: null,  // NEW: Role-specific challenges and outreach angles
+        roleContext: '',          // NEW: Formatted role intelligence for AI
+        themeMatches: [],         // NEW: Matched seller themes to lead pain points
         talkingPoints: [],
         caseStudies: [],
         objectionResponses: [],
@@ -35,12 +40,16 @@ export async function researchLead(lead, sellerCompanyDescription = '') {
     }
 
     try {
-        // 1. Search knowledge base for relevant content (parallel with prospect research)
-        const [knowledgeMatches, prospectResearch] = await Promise.all([
+        // 1. Research knowledge base, prospect company, AND role challenges in PARALLEL
+        const [knowledgeMatches, prospectResearch, roleIntel] = await Promise.all([
             searchKnowledgeBase(lead),
             // Research the prospect's company if we have their company name
             lead.company && lead.company !== 'Unknown'
-                ? researchProspectCompany(lead.company, sellerCompanyDescription, lead.role)
+                ? researchProspectCompany(lead.company, sellerCompanyDescription, lead.role || lead.jobTitle)
+                : Promise.resolve(null),
+            // Research role-specific challenges
+            (lead.role || lead.jobTitle)
+                ? researchRoleChallenges(lead.role || lead.jobTitle, lead.industry)
                 : Promise.resolve(null)
         ]);
 
@@ -53,23 +62,39 @@ export async function researchLead(lead, sellerCompanyDescription = '') {
             console.log(`[Lead Research] Researched prospect company: ${prospectResearch.companyName} - ${prospectResearch.industry}`);
         }
 
-        // 2. Extract talking points from knowledge + prospect research
-        context.talkingPoints = extractTalkingPoints(knowledgeMatches, lead, prospectResearch)
+        // Store role intelligence
+        if (roleIntel) {
+            context.roleIntelligence = roleIntel;
+            context.roleContext = formatRoleIntelligence(roleIntel);
+            console.log(`[Lead Research] Role intelligence: ${roleIntel.challenges?.length || 0} challenges, ${roleIntel.kpis?.length || 0} KPIs`);
+        }
 
-        // 3. Find relevant case studies
+        // 2. Match seller themes to lead pain points
+        if (sellerThemes.length > 0 && (prospectResearch || roleIntel)) {
+            context.themeMatches = matchThemesToPainPoints(
+                sellerThemes,
+                [
+                    ...(prospectResearch?.potentialPainPoints || []),
+                    ...(roleIntel?.challenges || [])
+                ]
+            );
+            console.log(`[Lead Research] Theme matches: ${context.themeMatches.length}`);
+        }
+
+        // 3. Extract talking points from knowledge + prospect research + role intel
+        context.talkingPoints = extractTalkingPoints(knowledgeMatches, lead, prospectResearch, roleIntel)
+
+        // 4. Find relevant case studies
         context.caseStudies = findCaseStudies(knowledgeMatches, lead.industry)
 
-        // 4. Prepare objection responses (enhanced with prospect research)
-        context.objectionResponses = findObjectionHandling(knowledgeMatches, prospectResearch)
+        // 5. Prepare objection responses (enhanced with prospect research + role objections)
+        context.objectionResponses = findObjectionHandling(knowledgeMatches, prospectResearch, roleIntel)
 
-        // 5. Generate personalized opening script
+        // 6. Generate personalized opening script
         context.personalizedScript = await generatePersonalizedScript(lead, context)
 
         console.log(`[Lead Research] Found ${context.relevantKnowledge.length} relevant knowledge sources`)
         console.log(`[Lead Research] Generated ${context.talkingPoints.length} talking points`)
-        if (context.prospectCompanyResearch) {
-            console.log(`[Lead Research] Prospect pain points: ${context.prospectCompanyResearch.potentialPainPoints?.length || 0}`)
-        }
 
         return context
     } catch (error) {
@@ -157,10 +182,20 @@ function rankByRelevance(sources, lead) {
 }
 
 /**
- * Extract key talking points from knowledge sources
+ * Extract key talking points from knowledge sources + role intelligence
  */
-function extractTalkingPoints(knowledgeSources, lead) {
+function extractTalkingPoints(knowledgeSources, lead, prospectResearch, roleIntel) {
     const points = []
+
+    // Add role-specific discovery questions first (most valuable)
+    if (roleIntel?.discoveryQuestions) {
+        points.push(...roleIntel.discoveryQuestions.slice(0, 2))
+    }
+
+    // Add prospect-specific talking points
+    if (prospectResearch?.talkingPoints) {
+        points.push(...prospectResearch.talkingPoints.slice(0, 2))
+    }
 
     for (const source of knowledgeSources.slice(0, 5)) { // Top 5 sources
         // Extract from summary if available
@@ -176,7 +211,7 @@ function extractTalkingPoints(knowledgeSources, lead) {
     }
 
     // Deduplicate and limit
-    return [...new Set(points)].slice(0, 8)
+    return [...new Set(points)].slice(0, 10)
 }
 
 /**
@@ -199,16 +234,83 @@ function findCaseStudies(knowledgeSources, industry) {
 }
 
 /**
- * Find objection handling responses
+ * Find objection handling responses - includes role-specific objections
  */
-function findObjectionHandling(knowledgeSources) {
-    return knowledgeSources
+function findObjectionHandling(knowledgeSources, prospectResearch, roleIntel) {
+    const objections = []
+
+    // From knowledge base
+    const kbObjections = knowledgeSources
         .filter(s => s.category === 'objection_handling')
-        .slice(0, 5)
+        .slice(0, 3)
         .map(s => ({
             objection: s.title,
-            response: s.summary || s.description
+            response: s.summary || s.description,
+            source: 'knowledge_base'
         }))
+    objections.push(...kbObjections)
+
+    // From role intelligence (common objections for this role)
+    if (roleIntel?.commonObjections) {
+        const roleObjections = roleIntel.commonObjections.slice(0, 3).map(obj => ({
+            objection: obj,
+            response: null, // No pre-built response, AI will handle
+            source: 'role_intelligence'
+        }))
+        objections.push(...roleObjections)
+    }
+
+    return objections.slice(0, 6)
+}
+
+/**
+ * Match seller themes to lead pain points
+ * Returns array of theme matches with relevance scores
+ */
+function matchThemesToPainPoints(sellerThemes, leadPainPoints) {
+    if (!sellerThemes?.length || !leadPainPoints?.length) {
+        return []
+    }
+
+    const matches = []
+    const themesLower = sellerThemes.map(t => t.toLowerCase())
+    const painPointsLower = leadPainPoints.map(p => p.toLowerCase())
+
+    for (const theme of sellerThemes) {
+        const themeLower = theme.toLowerCase()
+
+        for (const painPoint of leadPainPoints) {
+            const painLower = painPoint.toLowerCase()
+
+            // Check for keyword overlap
+            const themeWords = themeLower.split(/\s+/)
+            const painWords = painLower.split(/\s+/)
+
+            const overlap = themeWords.filter(tw =>
+                painWords.some(pw => pw.includes(tw) || tw.includes(pw))
+            )
+
+            if (overlap.length > 0) {
+                matches.push({
+                    theme: theme,
+                    painPoint: painPoint,
+                    relevance: `${theme} helps with: ${painPoint}`,
+                    score: overlap.length
+                })
+            }
+        }
+    }
+
+    // Sort by score and deduplicate by theme
+    const seen = new Set()
+    return matches
+        .sort((a, b) => b.score - a.score)
+        .filter(m => {
+            if (seen.has(m.theme)) return false
+            seen.add(m.theme)
+            return true
+        })
+        .slice(0, 5)
 }
 
 /**

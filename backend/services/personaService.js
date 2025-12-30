@@ -174,7 +174,11 @@ Synthesize ALL sources above into a comprehensive JSON research report with this
     "core_offering": "Main product in 1-2 sentences",
     "key_features": ["Feature 1", "Feature 2", "..."],
     "integrations": ["Slack", "Teams", "etc."],
-    "differentiators": ["What makes them unique vs competitors"]
+    "differentiators": ["What makes them unique vs competitors"],
+    "themes": ["Theme1", "Theme2", "...up to 10 key product themes/keywords"],
+    "use_cases": [
+      { "title": "Use case name", "description": "What problem it solves", "target_role": "Who benefits most" }
+    ]
   },
   "market_position": {
     "perception": "How the market sees them",
@@ -186,7 +190,13 @@ Synthesize ALL sources above into a comprehensive JSON research report with this
     "company_size": "e.g., 500-10,000 employees",
     "industries": ["Tech", "Healthcare", "etc."],
     "buyer_personas": [
-      { "title": "CIO", "pain_points": ["..."], "goals": ["..."] }
+      { 
+        "title": "CIO", 
+        "pain_points": ["Pain 1", "Pain 2"], 
+        "goals": ["Goal 1", "Goal 2"],
+        "challenges": ["What this role struggles with today"],
+        "outreach_angles": ["Best way to approach this persona", "What resonates with them"]
+      }
     ],
     "ideal_customer_description": "1-2 sentence summary of perfect fit customer",
     "disqualifiers": "Who should NOT buy this"
@@ -195,6 +205,13 @@ Synthesize ALL sources above into a comprehensive JSON research report with this
     "tone": "Professional, Innovative, etc.",
     "key_messages": ["Message 1", "Message 2"],
     "communication_style": "How they talk to customers"
+  },
+  "themes_summary": {
+    "primary_themes": ["Top 5 themes/keywords that define this company"],
+    "keywords": ["10-15 searchable keywords for matching"],
+    "value_propositions": ["3-5 core value props"],
+    "target_industries": ["Industries they serve"],
+    "problems_solved": ["Top 3-5 problems this company solves"]
   }
 }
 

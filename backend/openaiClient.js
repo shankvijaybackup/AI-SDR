@@ -579,6 +579,25 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
     userContent += `\n\n[ANZ LOCAL CONTEXT]\nThis lead is in ANZ (Australia/New Zealand).\nIn consultative or pitch, weave in ONE quick mention of the Sydney AI Summit / the State of AI report to make it locally relevant. Do not repeat it more than once.`;
   }
 
+  // Add ROLE INTELLIGENCE if available (from lead enrichment)
+  if (leadContext?.roleContext) {
+    userContent += `\n\n[ROLE INTELLIGENCE]\n${leadContext.roleContext}\n\nUse this context to ask better discovery questions and handle objections. Reference their specific challenges when relevant.`;
+  }
+
+  // Add THEME MATCHES if available (matched seller themes to prospect pain points)
+  if (leadContext?.themeMatches?.length > 0) {
+    const matchesText = leadContext.themeMatches
+      .slice(0, 3)
+      .map(m => `- ${m.theme} → ${m.painPoint}`)
+      .join('\n');
+    userContent += `\n\n[THEME MATCHES - How We Help]\n${matchesText}\n\nUse these matches to make your pitch relevant to their specific situation.`;
+  }
+
+  // Add PROSPECT COMPANY CONTEXT if available
+  if (leadContext?.prospectContext) {
+    userContent += `\n\n[PROSPECT COMPANY]\n${leadContext.prospectContext}`;
+  }
+
   // Add RAG context if available
   if (objectionResponse) {
     userContent += `\n\n[OBJECTION HANDLING GUIDE]\nThe prospect raised: "${objectionResponse.objection}"\nSuggested response: ${objectionResponse.response}\nFollow-up: ${objectionResponse.followUp}\n\nUse this as a guide, but make it conversational and natural. Add empathy and understanding.`;
