@@ -127,6 +127,23 @@ export async function DELETE(
       return NextResponse.json({ error: 'No permission to delete this script' }, { status: 403 })
     }
 
+    // Check if there are any campaigns using this script (campaigns REQUIRE a script)
+    const linkedCampaigns = await prisma.bulkCallCampaign.count({
+      where: { scriptId: id },
+    })
+
+    if (linkedCampaigns > 0) {
+      return NextResponse.json({
+        error: `Cannot delete: ${linkedCampaigns} campaign(s) are using this script. Delete the campaigns first.`
+      }, { status: 400 })
+    }
+
+    // Disconnect any calls linked to this script (set scriptId to null)
+    await prisma.call.updateMany({
+      where: { scriptId: id },
+      data: { scriptId: null },
+    })
+
     // Delete the script
     await prisma.script.delete({
       where: { id: id },
