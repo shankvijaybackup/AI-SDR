@@ -16,7 +16,7 @@ import { researchRoleChallenges, formatRoleIntelligence } from './roleIntelligen
 /**
  * Research a lead and build context from knowledge base + prospect company + role intelligence
  */
-export async function researchLead(lead, sellerCompanyDescription = '', sellerThemes = []) {
+export async function researchLead(lead, sellerCompanyDescription = '', sellerThemes = [], prisma = null) {
     console.log(`[Lead Research] Starting research for ${lead.name} at ${lead.company}`)
 
     const context = {
@@ -42,7 +42,7 @@ export async function researchLead(lead, sellerCompanyDescription = '', sellerTh
     try {
         // 1. Research knowledge base, prospect company, AND role challenges in PARALLEL
         const [knowledgeMatches, prospectResearch, roleIntel] = await Promise.all([
-            searchKnowledgeBase(lead),
+            searchKnowledgeBase(lead, prisma),
             // Research the prospect's company if we have their company name
             lead.company && lead.company !== 'Unknown'
                 ? researchProspectCompany(lead.company, sellerCompanyDescription, lead.role || lead.jobTitle)
@@ -107,30 +107,59 @@ export async function researchLead(lead, sellerCompanyDescription = '', sellerTh
 /**
  * Search knowledge base for content relevant to this lead
  */
-async function searchKnowledgeBase(lead) {
-    // This will integrate with the existing knowledge base API
+async function searchKnowledgeBase(lead, prisma) {
+    // Fallback URL only if prisma not used (legacy support)
     const backendUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:4000'
+    const matches = []
 
     try {
-        // Search by company name, industry, and role
-        const searchTerms = [
-            lead.company,
-            lead.industry,
-            lead.role,
-            // Add common variations
-            lead.industry ? `${lead.industry} industry` : null,
-            lead.role ? `${lead.role} challenges` : null
-        ].filter(Boolean)
+        if (prisma) {
+            // Use direct DB access - FAST & ROBUST
+            const userId = lead.userId;
 
-        const matches = []
+            // Construct where clause: User's files OR Shared files
+            const where = {
+                isActive: true,
+                OR: [
+                    { isShared: true },
+                    ...(userId ? [{ userId: userId }] : [])
+                ]
+            };
 
-        // Call frontend knowledge API to search
-        // Note: This assumes knowledge base has embeddings and search capability
-        for (const term of searchTerms) {
-            const response = await fetch(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/api/knowledge?search=${encodeURIComponent(term)}`)
-            if (response.ok) {
-                const data = await response.json()
-                matches.push(...data.knowledgeSources)
+            const sources = await prisma.knowledgeSource.findMany({
+                where,
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    summary: true,
+                    category: true,
+                    tags: true,
+                    type: true
+                }
+            });
+
+            matches.push(...sources);
+        } else {
+            // Legacy HTTP fetch (Fragile on Cloud)
+            const searchTerms = [
+                lead.company,
+                lead.industry,
+                lead.role
+            ].filter(Boolean)
+
+            console.warn('[Knowledge Search] Warning: Using HTTP fetch instead of direct DB access. Pass prisma instance for better performance.');
+
+            for (const term of searchTerms) {
+                try {
+                    const response = await fetch(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/api/knowledge?search=${encodeURIComponent(term)}`)
+                    if (response.ok) {
+                        const data = await response.json()
+                        matches.push(...data.knowledgeSources)
+                    }
+                } catch (fetchErr) {
+                    console.error('[Knowledge Search] HTTP Fetch failed:', fetchErr.message);
+                }
             }
         }
 
@@ -149,6 +178,7 @@ async function searchKnowledgeBase(lead) {
 function deduplicateKnowledge(sources) {
     const seen = new Set()
     return sources.filter(source => {
+        if (!source || !source.id) return false
         if (seen.has(source.id)) return false
         seen.add(source.id)
         return true
@@ -168,6 +198,14 @@ function rankByRelevance(sources, lead) {
             if (lead.company && text.includes(lead.company.toLowerCase())) score += 10
             if (lead.industry && text.includes(lead.industry.toLowerCase())) score += 8
             if (lead.role && text.includes(lead.role.toLowerCase())) score += 5
+
+            // Keyword matches from lead fields
+            if (lead.role) {
+                const roleParts = lead.role.toLowerCase().split(' ');
+                roleParts.forEach(part => {
+                    if (part.length > 3 && text.includes(part)) score += 2;
+                });
+            }
 
             // Boost certain categories
             if (source.category === 'customer_story') score += 7

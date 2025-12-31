@@ -22,20 +22,43 @@ const client = twilio(accountSid, authToken);
 // Store active calls
 const activeCalls = new Map();
 
-// Get phone number from database via API
+// Get phone number from database via Prisma (Direct DB Access)
 async function getPhoneNumberFromDB(userId, region) {
   try {
-    const url = `${frontendUrl}/api/settings/phone-numbers/lookup?userId=${userId}&region=${encodeURIComponent(region || '')}`;
-    const response = await fetch(url, { timeout: 3000 });
-    if (response.ok) {
-      const data = await response.json();
-      if (data.phoneNumber) {
-        console.log(`[Phone] DB lookup: ${data.phoneNumber} for region ${data.region}`);
-        return data.phoneNumber;
+    const normalizedRegion = region ? region.toUpperCase().trim() : null;
+
+    // Direct match
+    if (normalizedRegion) {
+      const phone = await prisma.regionalPhoneNumber.findFirst({
+        where: { userId, region: normalizedRegion }
+      });
+      if (phone) {
+        console.log(`[Phone] DB lookup: ${phone.phoneNumber} for region ${phone.region}`);
+        return phone.phoneNumber;
       }
     }
+
+    // Pattern match (if direct failed)
+    // Fetch all numbers for user to filter in memory (efficient for small lists)
+    const allNumbers = await prisma.regionalPhoneNumber.findMany({
+      where: { userId }
+    });
+
+    if (region && allNumbers.length > 0) {
+      const regionLower = region.toLowerCase();
+      const match = allNumbers.find(p => {
+        const r = p.region.toLowerCase();
+        return regionLower.includes(r) || r.includes(regionLower);
+      });
+      if (match) {
+        console.log(`[Phone] DB fuzzy match via Prisma: ${match.phoneNumber} for region ${match.region}`);
+        return match.phoneNumber;
+      }
+    }
+
+    return null;
   } catch (err) {
-    console.log(`[Phone] DB lookup failed, using fallback:`, err.message);
+    console.log(`[Phone] Prisma DB lookup failed:`, err.message);
   }
   return null;
 }
@@ -92,6 +115,7 @@ async function initiateCall(req, res) {
       // Build lead object for research
       const lead = {
         id: leadId,
+        userId: userId, // Pass userId for DB Lookups
         name: leadName,
         email: leadEmail,
         company: leadCompany || 'Unknown Company',
@@ -144,8 +168,8 @@ async function initiateCall(req, res) {
         }
       }
 
-      // Research lead and get context - PASS SELLER THEMES
-      leadContext = await researchLead(lead, sellerDescription, sellerThemes);
+      // Research lead and get context - PASS SELLER THEMES AND PRISMA
+      leadContext = await researchLead(lead, sellerDescription, sellerThemes, prisma);
 
       // Use personalized script if generated
       if (leadContext.personalizedScript) {
@@ -169,6 +193,7 @@ async function initiateCall(req, res) {
     const voiceId = selectedVoice.id;
 
     // Select phone number based on lead's region (from DB or env fallback)
+    // removed duplicate userId declaration
     const fromNumber = await getPhoneNumberForRegion(region, userId);
 
     console.log(`[Initiate Call] Starting call to ${phoneNumber} for ${leadName}`);
