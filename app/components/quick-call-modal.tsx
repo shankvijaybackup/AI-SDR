@@ -137,6 +137,10 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
                         clearInterval(pollInterval)
                         setCallStatus('ended')
                         setLogs(prev => [...prev, `[Call End] ${callData.disconnectReason || callData.status}`])
+                        // Ensure we capture final transcript
+                        if (callData.transcript && callData.transcript.length > 0) {
+                            setTranscript(callData.transcript)
+                        }
                     } else if (callData.status === 'in-progress' || callData.status === 'answered') {
                         setCallStatus('in-progress')
                     }
@@ -147,7 +151,15 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
         }, 2000)
     }
 
-    const handleEndCall = () => {
+    const handleEndCall = async () => {
+        // Send request to end call if in progress
+        if (currentCallId) {
+            try {
+                // Optional: We could have an endpoint to trigger hangup, but for now we rely on user manually hanging up or UI state
+            } catch (e) {
+                console.error("Error ending call", e)
+            }
+        }
         setCallStatus('ended')
         if (onCallComplete) onCallComplete()
     }
@@ -213,22 +225,43 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
                     </div>
                 )}
 
-                {/* Live Transcript (during call) */}
-                {(callStatus === 'ringing' || callStatus === 'in-progress') && (
-                    <Card>
+                {/* Transcript (Live or Completed) */}
+                {(callStatus === 'ringing' || callStatus === 'in-progress' || callStatus === 'ended') && (
+                    <Card className="mt-4">
                         <CardContent className="p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Mic className="w-4 h-4 text-red-500 animate-pulse" />
-                                <span className="text-sm font-medium">Live Transcript</span>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    {callStatus === 'ended' ? (
+                                        <div className="w-2 h-2 rounded-full bg-slate-400" />
+                                    ) : (
+                                        <Mic className="w-4 h-4 text-red-500 animate-pulse" />
+                                    )}
+                                    <span className="text-sm font-medium">
+                                        {callStatus === 'ended' ? 'Call Transcript' : 'Live Transcript'}
+                                    </span>
+                                </div>
+                                {callStatus === 'ended' && transcript.length > 0 && (
+                                    <span className="text-xs text-slate-500">{transcript.length} turns</span>
+                                )}
                             </div>
-                            <div className="max-h-32 overflow-y-auto text-sm space-y-1">
+                            <div className="max-h-80 overflow-y-auto text-sm space-y-3 bg-slate-50 p-3 rounded-lg border">
                                 {transcript.length === 0 ? (
-                                    <p className="text-slate-400 italic">Waiting for conversation...</p>
+                                    <div className="text-center py-4 text-slate-400 italic">
+                                        {callStatus === 'ended' ? 'No transcript available.' : 'Connecting...'}
+                                    </div>
                                 ) : (
                                     transcript.map((entry, i) => (
-                                        <p key={i} className={entry.speaker === 'agent' ? 'text-blue-600' : 'text-slate-700'}>
-                                            <strong>{entry.speaker === 'agent' ? 'AI:' : 'Lead:'}</strong> {entry.text}
-                                        </p>
+                                        <div key={i} className={`flex flex-col ${entry.speaker === 'agent' ? 'items-end' : 'items-start'}`}>
+                                            <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm ${entry.speaker === 'agent'
+                                                    ? 'bg-blue-600 text-white rounded-tr-none'
+                                                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
+                                                }`}>
+                                                <p>{entry.text}</p>
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 mt-1 px-1">
+                                                {entry.speaker === 'agent' ? 'AI Assistant' : lead.firstName}
+                                            </span>
+                                        </div>
                                     ))
                                 )}
                             </div>

@@ -151,6 +151,7 @@ Remember to:
           industry: lead.region || 'Unknown', // For knowledge matching
           role: lead.jobTitle || 'Unknown', // For knowledge matching
           userId: currentUser.userId, // For knowledge search
+          linkedinData: lead.linkedinData, // PASS RICH INTELLIGENCE TO BACKEND
         }),
       })
 

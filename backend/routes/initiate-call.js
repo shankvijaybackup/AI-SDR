@@ -103,7 +103,7 @@ async function getPhoneNumberForRegion(region, userId) {
 
 async function initiateCall(req, res) {
   try {
-    const { callId, phoneNumber, script, leadName, leadEmail, leadCompany, region, leadId, industry, role, userId } = req.body;
+    const { callId, phoneNumber, script, leadName, leadEmail, leadCompany, region, leadId, industry, role, userId, linkedinData } = req.body;
 
     if (!callId || !phoneNumber || !script) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -127,7 +127,8 @@ async function initiateCall(req, res) {
         company: leadCompany || 'Unknown Company',
         industry: industry || region || 'Unknown',
         role: role || 'Unknown',
-        phone: phoneNumber
+        phone: phoneNumber,
+        linkedinData: linkedinData // Pass enriched data to research
       };
 
       console.log(`[Knowledge Research] Researching lead: ${leadName} at ${leadCompany}`);

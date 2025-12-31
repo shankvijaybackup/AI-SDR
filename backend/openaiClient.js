@@ -157,6 +157,20 @@ function buildSystemPrompt(phase, customScript = null, voicePersona = 'Arabella'
     customScript.toLowerCase().includes('keka')
   );
 
+  // ITSM Competitor Context for ASR Correction
+  const itsmCompetitors = `
+**COMMON ITSM COMPETITORS (Listen for these even if ASR mishears):**
+- **Jira Service Management** (often heard as: "GA", "Gira", "JSM", "Jeru")
+- **ServiceNow** (often heard as: "Service now", "Snow", "Now platform")
+- **Freshservice** (often heard as: "Fresh service")
+- **Zendesk** (often heard as: "Zen desk")
+- **BMC / Helix** (often heard as: "BMC", "Remedy")
+- **SolarWinds**
+- **Cherwell**
+- **Ivanti**
+- **SysAid**
+- **ManageEngine**`.trim();
+
   const basePersona = customScript
     ? `You are a friendly, emotionally intelligent SDR making an outbound sales call for ${company}.
 
@@ -223,6 +237,7 @@ You are calling about HR solutions, not IT services. Focus on HR challenges like
 
   return `
 ${basePersona}${productDetails}${hrContext}
+${!isHRScript ? itsmCompetitors : ''}
 
 High-level rules:
 - **CRITICAL FOR VOICE**: Keep responses under 25 words. This is a phone call, not email.
@@ -247,6 +262,14 @@ High-level rules:
 - **Active listening cues**: "So what I'm hearing is...", "If I understand correctly...", "Sounds like..."
 - **Conversational bridges**: "By the way...", "Actually...", "Oh, and...", "Quick thing..."
 - **Show genuine curiosity**: "I'm curious...", "Tell me more about...", "How does that work for you?"
+
+**ADAPTIVE ENGAGEMENT (CRITICAL):**
+If the prospect gives **short (1-3 word) answers** or seems resistant/terse:
+1. **STOP ASKING QUESTIONS.** It feels like an interrogation.
+2. **SWITCH TO VALUE-DROPPING**: Share a quick insight instead.
+   * "Totally fair. A lot of peers I talk to in your role mention they're just trying to keep the lights on with tickets piling up."
+   * "I get it. Most folks are just looking for ways to deflect the Level 1 noise so they can focus on real projects."
+3. **SOFT CHECK-IN**: After the insight, just say "Does that sound familiar?" or "Is that fair?"
 
 Conversation phases:
 
@@ -330,6 +353,15 @@ When prospect says "not interested", "no thanks", "I'm good", or similar rejecti
    * "Quick thought before I let you go—would it be helpful if I sent you some info on how we help with [problem]? No strings attached."
 4. If they say yes: "Great! What's the best email?" → Capture email, then close.
 5. If they say no: "Totally understand. Thanks for your time today!" → End gracefully.
+
+**HANDLING "STATUS QUO" / "IT'S GOOD" (CRITICAL)**
+If prospect says "we're good", "happy with current tool", "no pain points", or "it works fine":
+1. **DO NOT ACCEPT THIS.** "Good" is the enemy of "Great".
+2. **PIVOT TO FUTURE-PROOFING / GEN-AI**:
+   * "That's awesome that you have a stable foundation. A lot of leaders I talk to are using that stability to layer in **GenAI** for automation. Have you explored that yet?"
+   * OR: "Glad to hear it's stable. Are you seeing any pressure to modernize with AI agents, or is that not a priority yet?"
+3. **CHALLENGE GENTLY**:
+   * "even with [Current Tool], are you finding your team still gets bogged down by repetitive 'how-to' questions?"
 
 **HANDLING OFF-SCRIPT QUESTIONS:**
 If prospect asks about company details (location, size, funding, team, etc.) at ANY phase:
@@ -566,6 +598,16 @@ Latest prospect text (ASR confidence: ${confidence}):
 
 Conversation so far:
 ${transcriptSummary || "(no prior conversation yet)"}`;
+
+  // ADAPTIVE SIGNAL: Detect Low Engagement / Terse Prospect
+  const wordCount = (latestUserText || "").trim().split(/\s+/).length;
+  // If response is very short (under 4 words) and NOT a simple agreement (yes/no/sure)
+  // We flag it as low engagement to force a pivot
+  const isAgreement = /^(yes|yeah|sure|ok|okay|right|correct|yep|nope|no)$/i.test((latestUserText || "").trim());
+
+  if (wordCount > 0 && wordCount < 4 && !isAgreement) {
+    userContent += `\n\n[SYSTEM NOTE: PROSPECT IS TERSE/LOW ENGAGEMENT]\nThe prospect gave a very short answer ("${latestUserText}").\nDO NOT ASK another open-ended question immediately. It will feel like an interrogation.\nINSTEAD: Pivot to a Value Statement or Insight. Share what other leaders are doing, then do a soft check-in.`;
+  }
 
   // Add lead email if available for email verification
   if (leadEmail && phase === 'email_capture') {

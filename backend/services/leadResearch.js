@@ -96,6 +96,12 @@ export async function researchLead(lead, sellerCompanyDescription = '', sellerTh
         console.log(`[Lead Research] Found ${context.relevantKnowledge.length} relevant knowledge sources`)
         console.log(`[Lead Research] Generated ${context.talkingPoints.length} talking points`)
 
+        // 7. Inject Strategic Intelligence (LinkedIn Enhanced)
+        if (lead.linkedinData?.persona) {
+            console.log('[Lead Research] Injecting Strategic Intelligence from LinkedIn Persona');
+            context.strategicIntelligence = lead.linkedinData.persona;
+        }
+
         return context
     } catch (error) {
         console.error('[Lead Research] Error:', error)
@@ -425,7 +431,8 @@ export function buildContextualSystemPrompt({
         roleIntelligence,
         themeMatches,
         prospectCompanyResearch,
-        prospectContext
+        prospectContext,
+        strategicIntelligence // NEW: Strategic Intelligence from LinkedIn
     } = leadContext
 
     const prompt = `
@@ -437,6 +444,26 @@ ROLE: ${lead.role}
 COMPANY: ${lead.company}
 INDUSTRY: ${lead.industry}
 ${lead.email ? `EMAIL: ${lead.email}` : ''}
+
+${strategicIntelligence ? `
+=== EXECUTIVE BRIEF (STRATEGIC INTELLIGENCE) ===
+PERSONALITY: ${strategicIntelligence.discProfile} - ${strategicIntelligence.discDescription}
+COMMUNICATION STYLE: ${strategicIntelligence.communicationStyle}
+
+> SNAPSHOT: ${strategicIntelligence.executiveSnapshot?.roleAndFocus || 'N/A'}
+> CORE STRENGTHS: ${strategicIntelligence.executiveSnapshot?.coreStrengths?.join(', ') || 'N/A'}
+> LEADERSHIP READ: ${strategicIntelligence.executiveSnapshot?.personaRead || 'N/A'}
+
+=== STRATEGIC PREP ===
+HOOK: ${strategicIntelligence.strategicPrep?.connectionAngle || 'N/A'}
+COMMON GROUND: ${strategicIntelligence.strategicPrep?.commonGround || 'N/A'}
+SMART QUESTIONS:
+${strategicIntelligence.strategicPrep?.smartQuestions?.map(q => `- ${q}`).join('\n') || 'N/A'}
+
+=== INTERNAL COACHING (HOW TO WIN) ===
+DO: ${strategicIntelligence.internalCoaching?.howToWin?.join(' | ') || 'N/A'}
+DON'T: ${strategicIntelligence.internalCoaching?.pitfallsAvoid?.join(' | ') || 'N/A'}
+` : ''}
 
 ${prospectContext ? `
 === COMPANY RESEARCH ===
@@ -479,15 +506,17 @@ ${openingScript}
 
 === GUIDELINES ===
 1. Be natural and conversational - you're a knowledgeable sales rep, not a robot
-2. USE THE INTELLIGENCE: Address the specific challenges found in the "ROLE INSIGHTS" and "KEY VALUE MATCHES" sections.
-3. If they mention one of the challenges in "KEY VALUE MATCHES", pivot immediately to how our "${themeMatches?.[0]?.theme || 'solution'}" helps.
-4. Mention case studies if they fit the conversation naturally
-5. Listen actively and respond to the prospect's specific concerns
-6. Keep responses under 50 words for natural pacing
-7. Guide towards booking a meeting, but don't be pushy
-8. If they show interest, verify their email: ${lead.email || 'ask for it'}
-9. Adapt your approach based on their industry (${lead.industry})
-10. Be ready to handle objections using the responses above
+2. USE THE EXECUTIVE BRIEF: Adjust your tone to the "Communication Style" and use the "Smart Questions" to drive the conversation.
+3. If specific "Hook" or "Common Ground" is provided in the Executive Brief, try to weave it in early.
+4. USE THE INTELLIGENCE: Address the specific challenges found in the "ROLE INSIGHTS" and "KEY VALUE MATCHES" sections.
+5. If they mention one of the challenges in "KEY VALUE MATCHES", pivot immediately to how our "${themeMatches?.[0]?.theme || 'solution'}" helps.
+6. Mention case studies if they fit the conversation naturally
+7. Listen actively and respond to the prospect's specific concerns
+8. Keep responses under 50 words for natural pacing
+9. Guide towards booking a meeting, but don't be pushy
+10. If they show interest, verify their email: ${lead.email || 'ask for it'}
+11. Adapt your approach based on their industry (${lead.industry})
+12. Be ready to handle objections using the responses above
 
 Remember: You have deep knowledge about this prospect and relevant solutions. Use it naturally!
 `

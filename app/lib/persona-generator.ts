@@ -27,6 +27,7 @@ export interface LinkedInPost {
 }
 
 export interface PersonaProfile {
+    // Legacy fields (kept for compatibility)
     discProfile: DISCType
     discDescription: string
     communicationStyle: string
@@ -36,6 +37,31 @@ export interface PersonaProfile {
     approachRecommendation: string
     painPoints?: string[]
     motivators?: string[]
+
+    // NEW: Strategic Intelligence (v2)
+    executiveSnapshot?: {
+        roleAndFocus: string
+        coreStrengths: string[]
+        personaRead: string
+    }
+    signals?: {
+        contentAnalysis: string
+        commercialLens: string
+    }
+    strategicPrep?: {
+        connectionAngle: string
+        commonGround: string
+        smartQuestions: string[]
+        highValueTalkingPoints?: string[]
+    }
+    internalCoaching?: {
+        howToWin: string[]
+        pitfallsAvoid: string[]
+    }
+    exampleOutreach?: {
+        subject: string
+        body: string
+    }
 }
 
 export interface EnhancedLinkedInData {
@@ -195,78 +221,62 @@ Return JSON only, no markdown.`
  * Build prompt for AI persona analysis
  */
 function buildPersonaPrompt(profile: Partial<EnhancedLinkedInData>): string {
-    // Check if we have rich data or minimal data
-    const hasRichData = !!(profile.summary || profile.skills?.length || profile.recentPosts?.length || profile.experience?.length);
+    const context = `
+You are a **Senior Enterprise Sales Strategist** and **Organizational Psychologist**. 
+Your goal is to analyze a prospect's LinkedIn profile and generate a **Strategic Account Exec Brief**.
 
-    let context = '';
+**INPUT DATA:**
+Name: ${profile.firstName} ${profile.lastName}
+Headline: ${profile.headline || 'N/A'}
+Role: ${profile.jobTitle || 'N/A'} at ${profile.company || 'N/A'}
+Summary: ${profile.summary || 'N/A'}
+Recent Posts: ${profile.recentPosts?.map(p => p.text).join(' | ').substring(0, 1000) || 'None'}
+Experience: ${profile.experience?.map(e => `${e.title} at ${e.company} (${e.description?.substring(0, 100) || ''})`).join('; ') || 'N/A'}
+Skills: ${profile.skills?.join(', ') || 'N/A'}
 
-    if (hasRichData) {
-        context = `Analyze this LinkedIn profile and generate a sales persona:\n\n`;
-    } else {
-        // Minimal data fallback - be explicit about what we DON'T have
-        context = `Generate a sales persona for a B2B outreach call to this prospect. 
-        
-IMPORTANT: We only have basic information about this person (name, title, company). 
-Do NOT mention "LinkedIn" as a platform or topic in your analysis.
-Focus entirely on their ROLE, COMPANY, and INDUSTRY.
-Generate realistic, role-appropriate content based on what someone in their position typically cares about.
+**ANALYSIS INSTRUCTIONS:**
+1. **Executive Snapshot**: Decode their career arc. Are they a builder, a scaler, or a maintainer? What is their "Superpower"?
+2. **Psychology (DISC)**: Infer their personality. D (Dominant), I (Influencer), S (Steady), C (Conscientious).
+3. **Commercial Lens**: Look at their posts/experience. Do they care about ROI, Culture, Innovation, or Risk?
+4. **Strategic Prep**: Find a "Hook" - a shared narrative or specific angle to open a conversation.
+5. **Coaching**: Tell me (the seller) exactly how to win this person.
 
-Analyze this prospect:\n\n`;
-    }
-
-    if (profile.firstName || profile.lastName) {
-        context += `Name: ${profile.firstName} ${profile.lastName}\n`;
-    }
-    if (profile.headline) {
-        context += `Headline: ${profile.headline}\n`;
-    }
-    if (profile.jobTitle && profile.company) {
-        context += `Role: ${profile.jobTitle} at ${profile.company}\n`;
-    } else if (profile.jobTitle) {
-        context += `Role: ${profile.jobTitle}\n`;
-    } else if (profile.company) {
-        context += `Company: ${profile.company}\n`;
-    }
-    if (profile.summary) {
-        context += `Summary: ${profile.summary}\n`;
-    }
-    if (profile.skills?.length) {
-        context += `Skills: ${profile.skills.slice(0, 10).join(', ')}\n`;
-    }
-    if (profile.experience?.length) {
-        context += `Experience: ${profile.experience.slice(0, 3).map(e => `${e.title} at ${e.company}`).join('; ')}\n`;
-    }
-    if (profile.recentPosts?.length) {
-        context += `\nRecent Posts:\n`;
-        profile.recentPosts.slice(0, 3).forEach(post => {
-            context += `- ${post.text.substring(0, 200)}...\n`;
-        });
-    }
-
-    // Add industry context for minimal data scenarios
-    if (!hasRichData && profile.company) {
-        context += `\nNote: Base your analysis on what a ${profile.jobTitle || 'professional'} at a company like ${profile.company} would typically focus on.\n`;
-    }
-
-    context += `
-Return a JSON object with these fields:
+**OUTPUT FORMAT (JSON ONLY):**
 {
-  "discProfile": "D|I|S|C|DI|DC|IS|SC" (primary and secondary type),
-  "discDescription": "Brief description of their personality style based on their role",
-  "communicationStyle": "How they likely prefer to communicate",
-  "keyInterests": ["3-5 key professional interests relevant to their role"],
-  "focusAreas": ["3-5 areas they likely focus on in their current role"],
-  "talkingPoints": ["3-5 personalized conversation starters about their industry/role"],
-  "approachRecommendation": "How to approach this person in a B2B sales call",
-  "painPoints": ["2-3 likely pain points based on their role and company type"],
-  "motivators": ["2-3 things that likely motivate someone in their position"]
+  "discProfile": "D|I|S|C|DI|DC|IS|SC",
+  "discDescription": "2-3 words (e.g. Results-Oriented, Collaborative)",
+  "communicationStyle": "One sentence on how to speak to them.",
+  "executiveSnapshot": {
+    "roleAndFocus": "1 short sentence on what they actually DO.",
+    "coreStrengths": ["Strength 1", "Strength 2", "Strength 3"],
+    "personaRead": "2 sentences on their leadership style."
+  },
+  "signals": {
+    "contentAnalysis": "What are they posting about? (1 sentence)",
+    "commercialLens": "What triggers their buying decision? (e.g. 'Proof points', 'Innovation')"
+  },
+  "strategicPrep": {
+    "connectionAngle": "The best angle to approach them.",
+    "commonGround": "Shared reality or industry trend to clear the air.",
+    "smartQuestions": ["Question 1 (Provocative)", "Question 2 (Discovery)", "Question 3 (Vision)"],
+    "highValueTalkingPoints": ["Point 1", "Point 2", "Point 3"] 
+  },
+  "internalCoaching": {
+    "howToWin": ["Tactic 1", "Tactic 2"],
+    "pitfallsAvoid": ["Mistake 1", "Mistake 2"]
+  },
+  "exampleOutreach": {
+    "subject": "Short, punchy subject line",
+    "body": "A 400-char max outbound email based on the analysis."
+  },
+  "keyInterests": ["Interest 1", "Interest 2"],
+  "focusAreas": ["Focus 1", "Focus 2"],
+  "talkingPoints": ["Mapped from strategicPrep.highValueTalkingPoints"],
+  "approachRecommendation": "Mapped from communicationStyle",
+  "painPoints": ["Inferred Pain 1", "Inferred Pain 2"],
+  "motivators": ["Inferred Motivator 1", "Inferred Motivator 2"]
 }
-
-CRITICAL: 
-- Make talking points about THEIR INDUSTRY and ROLE, not about any social media platform
-- Focus on business challenges relevant to their job title
-- Pain points should relate to their actual work, not networking or content creation`
-
+`;
     return context;
 }
 

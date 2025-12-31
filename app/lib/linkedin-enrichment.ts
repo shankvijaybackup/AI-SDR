@@ -662,6 +662,34 @@ export function buildContextualScript(
   if (linkedinData.persona) {
     const persona = linkedinData.persona
 
+    // NEW: Strategic Intelligence
+    if (persona.executiveSnapshot) {
+      contextualScript += `\n\n=== EXECUTIVE SNAPSHOT ===`
+      contextualScript += `\nRole & Focus: ${persona.executiveSnapshot.roleAndFocus}`
+      contextualScript += `\nPersona Read: ${persona.executiveSnapshot.personaRead}`
+      contextualScript += `\nCore Strengths: ${persona.executiveSnapshot.coreStrengths.join(', ')}`
+    }
+
+    if (persona.signals) {
+      contextualScript += `\n\n=== BUYING SIGNALS ===`
+      contextualScript += `\nCommercial Lens: ${persona.signals.commercialLens}`
+      contextualScript += `\nContent Analysis: ${persona.signals.contentAnalysis}`
+    }
+
+    if (persona.strategicPrep) {
+      contextualScript += `\n\n=== STRATEGIC PREP ===`
+      contextualScript += `\nConnection Angle: ${persona.strategicPrep.connectionAngle}`
+      contextualScript += `\nCommon Ground: ${persona.strategicPrep.commonGround}`
+      contextualScript += `\nHigh-Value Talking Points:\n${persona.strategicPrep.highValueTalkingPoints?.map((p: string) => `- ${p}`).join('\n')}`
+      contextualScript += `\nSmart Questions:\n${persona.strategicPrep.smartQuestions?.map((q: string) => `- ${q}`).join('\n')}`
+    }
+
+    if (persona.internalCoaching) {
+      contextualScript += `\n\n=== INTERNAL COACHING ===`
+      contextualScript += `\nHow to Win: ${persona.internalCoaching.howToWin?.join(' | ')}`
+      contextualScript += `\nPitfalls to Avoid: ${persona.internalCoaching.pitfallsAvoid?.join(' | ')}`
+    }
+
     contextualScript += `\n\n=== COMMUNICATION GUIDANCE ===`
     contextualScript += `\nPersonality Type: ${persona.discProfile} - ${persona.discDescription}`
     contextualScript += `\nCommunication Style: ${persona.communicationStyle}`
