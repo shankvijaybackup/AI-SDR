@@ -832,7 +832,7 @@ app.post("/api/twilio/amd-status", async (req, res) => {
 
   // If voicemail/machine detected, hang up immediately
   if (AnsweredBy === 'machine_start' || AnsweredBy === 'machine_end_beep' ||
-    AnsweredBy === 'machine_end_silence' || AnsweredBy === 'machine_end_other' ||
+    AnsweredBy === 'machine_end_silence' ||
     AnsweredBy === 'fax') {
 
     console.log(`[AMD] Voicemail/machine detected for call ${callId}, hanging up`);

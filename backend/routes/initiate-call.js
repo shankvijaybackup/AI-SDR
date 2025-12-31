@@ -259,6 +259,9 @@ async function initiateCall(req, res) {
       machineDetection: 'DetectMessageEnd', // Detect voicemail/answering machines
       asyncAmd: true, // Don't block on AMD detection
       asyncAmdStatusCallback: `${BASE_URL}/api/twilio/amd-status?callId=${callId}`, // AMD callback
+      machineDetectionSpeechThreshold: 3000, // Increase to reduce false positives
+      machineDetectionSpeechEndThreshold: 3000, // Increase to reduce false positives
+      machineDetectionSilenceTimeout: 5000, // Wait longer for silence
       record: true,
       // Add international calling settings
       ...(region === 'in' && {
