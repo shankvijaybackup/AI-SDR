@@ -550,23 +550,30 @@ export default function BulkCallingPage() {
 
                         <div>
                             <Label>Script</Label>
-                            <div className="space-y-2 mt-2">
-                                {scripts.map((script) => (
-                                    <div
-                                        key={script.id}
-                                        onClick={() => setSelectedScript(script)}
-                                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedScript?.id === script.id
-                                            ? 'border-blue-600 bg-blue-50'
-                                            : 'hover:border-slate-300'
-                                            }`}
-                                    >
-                                        <p className="font-medium text-sm">{script.name}</p>
-                                        {script.isDefault && (
-                                            <span className="text-xs text-blue-600">Default</span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                            {scripts.length === 0 ? (
+                                <div className="mt-2 p-4 border border-dashed rounded-lg bg-slate-50 text-center">
+                                    <p className="text-sm text-slate-500">No scripts found.</p>
+                                    <p className="text-xs text-slate-400 mt-1">Please add a script in Settings or check connection.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 mt-2 max-h-40 overflow-y-auto">
+                                    {scripts.map((script) => (
+                                        <div
+                                            key={script.id}
+                                            onClick={() => setSelectedScript(script)}
+                                            className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedScript?.id === script.id
+                                                ? 'border-blue-600 bg-blue-50'
+                                                : 'hover:border-slate-300'
+                                                }`}
+                                        >
+                                            <p className="font-medium text-sm">{script.name}</p>
+                                            {script.isDefault && (
+                                                <span className="text-xs text-blue-600">Default</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div>

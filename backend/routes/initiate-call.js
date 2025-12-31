@@ -5,7 +5,13 @@ import { researchCompany, formatCompanyKnowledge } from '../services/companyRese
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const publicBaseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:4000'; // Default to localhost for local dev
+const publicBaseUrl = process.env.PUBLIC_BASE_URL;
+
+if (!publicBaseUrl) {
+  console.warn('[Config] WARNING: PUBLIC_BASE_URL is missing. Using localhost fallback. Voice callbacks will fail on Cloud/Render.');
+}
+
+const BASE_URL = publicBaseUrl || 'http://localhost:4000'; // Default to localhost for local dev
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 const prisma = new PrismaClient();
@@ -243,15 +249,15 @@ async function initiateCall(req, res) {
 
     // Initiate Twilio call using traditional voice (WORKING - Media Stream has issues)
     const call = await client.calls.create({
-      url: `${publicBaseUrl}/api/twilio/voice?callId=${callId}&voicePersona=${voicePersona}&companyName=${encodeURIComponent(leadCompany || 'our company')}`,
+      url: `${BASE_URL}/api/twilio/voice?callId=${callId}&voicePersona=${voicePersona}&companyName=${encodeURIComponent(leadCompany || 'our company')}`,
       to: phoneNumber,
       from: fromNumber, // Use region-specific phone number
-      statusCallback: `${publicBaseUrl}/api/twilio/status?callId=${callId}`,
+      statusCallback: `${BASE_URL}/api/twilio/status?callId=${callId}`,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'canceled', 'failed'],
       timeout: region === 'in' ? 45 : 30, // Longer timeout for international calls
       machineDetection: 'DetectMessageEnd', // Detect voicemail/answering machines
       asyncAmd: true, // Don't block on AMD detection
-      asyncAmdStatusCallback: `${publicBaseUrl}/api/twilio/amd-status?callId=${callId}`, // AMD callback
+      asyncAmdStatusCallback: `${BASE_URL}/api/twilio/amd-status?callId=${callId}`, // AMD callback
       record: true,
       // Add international calling settings
       ...(region === 'in' && {

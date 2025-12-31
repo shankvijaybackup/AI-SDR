@@ -186,23 +186,30 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
                 {callStatus === 'idle' && (
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Select Script</label>
-                        <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
-                            {scripts.map((script) => (
-                                <div
-                                    key={script.id}
-                                    onClick={() => setSelectedScript(script)}
-                                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedScript?.id === script.id
-                                        ? 'border-blue-500 bg-blue-50'
-                                        : 'border-slate-200 hover:border-slate-300'
-                                        }`}
-                                >
-                                    <span className="text-sm font-medium">{script.name}</span>
-                                    {script.isDefault && (
-                                        <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Default</span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                        {scripts.length === 0 ? (
+                            <div className="p-4 border border-dashed rounded-lg bg-slate-50 text-center">
+                                <p className="text-sm text-slate-500">No scripts found.</p>
+                                <p className="text-xs text-slate-400 mt-1">Check DB connection or add a script.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                                {scripts.map((script) => (
+                                    <div
+                                        key={script.id}
+                                        onClick={() => setSelectedScript(script)}
+                                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedScript?.id === script.id
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-slate-200 hover:border-slate-300'
+                                            }`}
+                                    >
+                                        <span className="text-sm font-medium">{script.name}</span>
+                                        {script.isDefault && (
+                                            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Default</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -210,6 +210,9 @@ async function initiateCallViaTwilio(params) {
     const selectedVoice = getVoiceByLocation(params.region);
 
     const publicBaseUrl = process.env.PUBLIC_BASE_URL;
+    if (!publicBaseUrl) {
+        throw new Error('Configuration Error: PUBLIC_BASE_URL is missing. Cannot initiate bulk call.');
+    }
 
     // Create Twilio call
     const twilio = (await import('twilio')).default;
