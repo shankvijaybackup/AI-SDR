@@ -60,7 +60,7 @@ async function testProfile(username: string) {
         } else {
             console.log(`   ❌ Primary Failed: ${response.status}`)
         }
-    } catch (e) {
+    } catch (e: any) {
         console.log(`   ❌ Primary Exception: ${e.message}`)
     }
 
@@ -99,7 +99,7 @@ async function testProfile(username: string) {
             }
         }
         console.log(`   ❌ Secondary Failed`)
-    } catch (e) {
+    } catch (e: any) {
         console.log(`   ❌ Secondary Exception: ${e.message}`)
     }
 
@@ -127,4 +127,7 @@ async function runBatch() {
     console.log('Results saved to scripts/batch-results.json')
 }
 
+
 runBatch()
+
+export { }

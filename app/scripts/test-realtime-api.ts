@@ -40,9 +40,11 @@ async function testRealTimeApi() {
             console.log('❌ Unexpected JSON structure:', JSON.stringify(json).substring(0, 200))
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.log('❌ Error:', error)
     }
 }
 
 testRealTimeApi()
+
+export { }

@@ -56,9 +56,11 @@ async function testScrapeNinja() {
             console.log('Graph Types:', graph.map((g: any) => g['@type']))
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.log('❌ Error:', error)
     }
 }
 
 testScrapeNinja()
+
+export { }
