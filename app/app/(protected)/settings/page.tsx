@@ -1263,7 +1263,7 @@ export default function SettingsPage() {
                           {number.locality}, {number.region}
                         </p>
                         <p className="text-xs text-slate-400">
-                          ~${number.estimatedMonthlyCost.toFixed(2)}/month
+                          ~${number.estimatedCost.toFixed(2)}/month
                         </p>
                       </div>
                       <Button
