@@ -70,8 +70,7 @@ router.get('/hubspot/callback', async (req, res) => {
 });
 
 // ... (existing imports)
-import { getLists, refreshAccessToken } from '../hubspotClient.js'; // Import refreshAccessToken here too just in case, or rely on service
-import { importFromList } from '../services/hubspotSync.js';
+
 
 // ... (existing routes)
 
