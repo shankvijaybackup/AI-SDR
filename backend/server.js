@@ -1,4 +1,8 @@
-import "dotenv/config";
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Explicitly load .env from app directory
+dotenv.config({ path: path.resolve(process.cwd(), 'app/.env') });
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";

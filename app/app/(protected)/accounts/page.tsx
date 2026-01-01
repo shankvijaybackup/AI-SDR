@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Search, Loader2, Building2, RefreshCw, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 
 interface Account {
     id: string
@@ -38,6 +40,13 @@ export default function AccountsPage() {
     const [page, setPage] = useState(1)
     const [syncing, setSyncing] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+    // HubSpot List Import State
+    const [importOpen, setImportOpen] = useState(false)
+    const [hubspotLists, setHubspotLists] = useState<{ id: string, name: string }[]>([])
+    const [selectedListId, setSelectedListId] = useState<string>('')
+    const [loadingLists, setLoadingLists] = useState(false)
+    const [isImporting, setIsImporting] = useState(false)
 
     const [companyId, setCompanyId] = useState<string | null>(null)
 
@@ -112,6 +121,57 @@ export default function AccountsPage() {
         }
     }
 
+    const handleOpenImport = async () => {
+        if (!companyId) return
+        setImportOpen(true)
+        setLoadingLists(true)
+        try {
+            // Fetch lists
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+            const res = await fetch(`${backendUrl}/api/integrations/hubspot/lists?companyId=${companyId}`)
+            if (res.ok) {
+                const data = await res.json()
+                setHubspotLists(data.lists)
+            } else {
+                if (res.status === 401) {
+                    setMessage({ type: 'error', text: 'HubSpot not connected. Please go to Settings.' })
+                    setImportOpen(false)
+                }
+            }
+        } catch (e) {
+            console.error(e)
+            setMessage({ type: 'error', text: 'Failed to load HubSpot lists' })
+        } finally {
+            setLoadingLists(false)
+        }
+    }
+
+    const handleImportList = async () => {
+        if (!companyId || !selectedListId) return
+        setIsImporting(true)
+        try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+            const res = await fetch(`${backendUrl}/api/integrations/hubspot/import-list`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyId, listId: selectedListId })
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setMessage({ type: 'success', text: `Imported ${data.imported} contacts from list.` })
+                setImportOpen(false)
+                fetchAccounts() // Refresh
+            } else {
+                const err = await res.json()
+                setMessage({ type: 'error', text: err.error || 'Import failed' })
+            }
+        } catch (e) {
+            setMessage({ type: 'error', text: 'Import failed' })
+        } finally {
+            setIsImporting(false)
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -120,15 +180,57 @@ export default function AccountsPage() {
                     <p className="text-slate-500 dark:text-slate-400">Target companies and enrichment status</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={handleOpenImport}>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Import List
+                    </Button>
                     <Button variant="outline" onClick={handleSync} disabled={syncing}>
                         <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                        Sync HubSpot
+                        Sync All
                     </Button>
                     <Link href="/settings">
                         <Button variant="outline">Settings</Button>
                     </Link>
                 </div>
             </div>
+
+            {/* Import Dialog */}
+            <Dialog open={importOpen} onOpenChange={setImportOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Import from HubSpot List</DialogTitle>
+                        <DialogDescription>Select a contact list to import specifically.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Select List</Label>
+                            <select
+                                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
+                                value={selectedListId}
+                                onChange={(e) => setSelectedListId(e.target.value)}
+                            >
+                                <option value="" disabled>Choose a list...</option>
+                                {loadingLists ? (
+                                    <option disabled>Loading lists...</option>
+                                ) : hubspotLists.length === 0 ? (
+                                    <option disabled>No lists found</option>
+                                ) : (
+                                    hubspotLists.map(list => (
+                                        <option key={list.id} value={list.id}>{list.name}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                        <Button onClick={handleImportList} disabled={!selectedListId || isImporting} className="w-full">
+                            {isImporting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...
+                                </>
+                            ) : 'Start Import'}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <div className="flex items-center gap-4">
                 <div className="relative flex-1 max-w-sm">

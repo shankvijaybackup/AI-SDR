@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { getCompanies, getContacts, refreshAccessToken } from '../hubspotClient.js';
+import { getCompanies, getContacts, refreshAccessToken, getContactsInList } from '../hubspotClient.js';
 import { enrichAccount } from './enrichment.js';
 
 const prisma = new PrismaClient();
@@ -166,6 +166,99 @@ export const syncHubSpotAccount = async (companyId) => {
     } catch (err) {
         console.error(`[HubSpot Sync] Error syncing contacts:`, err);
     }
+};
+
+// ... (existing code)
+
+export const importFromList = async (companyId, listId) => {
+    console.log(`[HubSpot Import] Starting import for list ${listId} (Company: ${companyId})`);
+
+    // 1. Get Token
+    const settings = await prisma.companySettings.findUnique({ where: { companyId } });
+    if (!settings?.hubspotAccessToken) throw new Error("HubSpot not connected");
+
+    let accessToken = settings.hubspotAccessToken;
+    // Refresh logic (simplified for brevity, usually should reuse common getToken function)
+    if (settings.hubspotExpiresAt && new Date() > new Date(settings.hubspotExpiresAt.getTime() - 300000)) {
+        const tokens = await refreshAccessToken(settings.hubspotRefreshToken);
+        accessToken = tokens.access_token;
+        // Update DB... (skipping for brevity, rely on main sync or extract token logic)
+        await prisma.companySettings.update({
+            where: { companyId },
+            data: { hubspotAccessToken: tokens.access_token, hubspotExpiresAt: new Date(Date.now() + tokens.expires_in * 1000) }
+        });
+    }
+
+    // 2. Fetch Contacts in List
+    // TODO: Pagination
+    const res = await getContactsInList(accessToken, listId, 100);
+    const contacts = res.results || [];
+
+    let importedCount = 0;
+
+    for (const c of contacts) {
+        const props = c.properties;
+        if (!props.email) continue;
+
+        // 3. Resolve Account (Company)
+        // Note: The Search API contact object has 'company' property but it might just be the name.
+        // To get the full Company object, we usually need to fetch associations. 
+        // For MVP, we'll try to match by Domain if available in email, or create a placeholder account.
+
+        let accountId;
+        const emailDomain = props.email.split('@')[1];
+
+        // Try to find Account by domain
+        let account = await prisma.account.findFirst({
+            where: {
+                companyId,
+                domain: { equals: emailDomain, mode: 'insensitive' }
+            }
+        });
+
+        if (!account && emailDomain) {
+            // Create Prospect Account
+            account = await prisma.account.create({
+                data: {
+                    companyId,
+                    name: props.company || emailDomain, // Fallback name
+                    domain: emailDomain,
+                    status: 'prospect'
+                }
+            });
+            // Trigger enrichment for this new account
+            enrichAccount(account.id).catch(console.error);
+        }
+
+        accountId = account?.id;
+
+        // 4. Upsert Lead
+        const leadData = {
+            userId: (await getAdminUserId(companyId)) || 'UNKNOWN',
+            hubspotId: c.id,
+            email: props.email,
+            firstName: props.firstname || '',
+            lastName: props.lastname || '',
+            jobTitle: props.jobtitle,
+            phone: props.phone || props.mobilephone,
+            linkedinUrl: props.linkedin_profile,
+            status: 'pending',
+            accountId: accountId
+        };
+
+        const existing = await prisma.lead.findFirst({
+            where: { companyId, OR: [{ hubspotId: c.id }, { email: props.email }] }
+        });
+
+        if (existing) {
+            await prisma.lead.update({ where: { id: existing.id }, data: leadData });
+        } else {
+            await prisma.lead.create({ data: { ...leadData, companyId } });
+        }
+        importedCount++;
+    }
+
+    return { imported: importedCount, total: contacts.length };
 };
 
 async function getAdminUserId(companyId) {

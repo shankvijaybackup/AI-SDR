@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { getAuthUrl, exchangeCodeForTokens } from '../hubspotClient.js';
+import { getAuthUrl, exchangeCodeForTokens, getLists, refreshAccessToken } from '../hubspotClient.js';
+import { importFromList } from '../services/hubspotSync.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -67,5 +68,56 @@ router.get('/hubspot/callback', async (req, res) => {
         res.redirect(`${frontendUrl}/settings?error=token_exchange_failed`);
     }
 });
+
+// ... (existing imports)
+import { getLists, refreshAccessToken } from '../hubspotClient.js'; // Import refreshAccessToken here too just in case, or rely on service
+import { importFromList } from '../services/hubspotSync.js';
+
+// ... (existing routes)
+
+// LISTS API: Fetch available Contact Lists
+router.get('/hubspot/lists', async (req, res) => {
+    const { companyId } = req.query;
+    if (!companyId) return res.status(400).send('Missing companyId');
+
+    try {
+        const settings = await prisma.companySettings.findUnique({ where: { companyId } });
+        if (!settings?.hubspotAccessToken) return res.status(401).send('Not connected');
+
+        let accessToken = settings.hubspotAccessToken;
+        // Basic Token Refresh Check (Should use shared middleware/service ideally)
+        if (settings.hubspotExpiresAt && new Date() > new Date(settings.hubspotExpiresAt.getTime() - 60000)) {
+            const tokens = await refreshAccessToken(settings.hubspotRefreshToken);
+            accessToken = tokens.access_token;
+            await prisma.companySettings.update({
+                where: { companyId },
+                data: { hubspotAccessToken: tokens.access_token, hubspotExpiresAt: new Date(Date.now() + tokens.expires_in * 1000) }
+            });
+        }
+
+        const listsRes = await getLists(accessToken);
+        res.json({ lists: listsRes.lists || [] });
+    } catch (err) {
+        console.error('Failed to fetch lists:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// IMPORT API: Trigger import from specific List
+router.post('/hubspot/import-list', async (req, res) => {
+    const { companyId, listId } = req.body;
+    if (!companyId || !listId) return res.status(400).send('Missing params');
+
+    try {
+        // Run import (async or await? For MVP await to show result, or async for background)
+        // Let's await for now to give immediate feedback on small lists
+        const result = await importFromList(companyId, listId);
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('Import failed:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 export default router;
