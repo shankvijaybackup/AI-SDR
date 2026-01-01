@@ -103,7 +103,13 @@ export function attachMediaStreamServer(httpServer) {
           // Play greeting first
           try {
             const openingScript = call.script || "Hi, this is Alex from Atomicwork. How are you doing today?";
-            const audioUrl = await synthesizeTTS(openingScript, callSid);
+            const audioUrl = await synthesizeTTS(
+              openingScript,
+              callSid,
+              call.voicePersona,
+              call.region,
+              call.voiceId
+            );
             console.log(`[Greeting] Synthesized: ${audioUrl}`);
 
             const mulawAudio = await convertMp3ToMulaw(audioUrl);
@@ -195,7 +201,15 @@ export function attachMediaStreamServer(httpServer) {
 
                   // Play AI reply
                   try {
-                    const audioUrl = await synthesizeTTS(reply, callSid);
+                    // Pass explicit voice params to ensure consistency/region-mapping
+                    const audioUrl = await synthesizeTTS(
+                      reply,
+                      callSid,
+                      call.voicePersona,
+                      call.region,
+                      call.voiceId
+                    );
+
                     console.log(`[AI Reply] Synthesized: ${audioUrl}`);
 
                     const mulawAudio = await convertMp3ToMulaw(audioUrl);

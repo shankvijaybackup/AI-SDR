@@ -1,0 +1,176 @@
+import { PrismaClient } from '@prisma/client';
+import { getCompanies, getContacts, refreshAccessToken } from '../hubspotClient.js';
+import { enrichAccount } from './enrichment.js';
+
+const prisma = new PrismaClient();
+
+export const syncHubSpotAccount = async (companyId) => {
+    console.log(`[HubSpot Sync] Starting sync for company ${companyId}`);
+
+    // 1. Get Company Settings & Token
+    const settings = await prisma.companySettings.findUnique({
+        where: { companyId }
+    });
+
+    if (!settings || !settings.hubspotConnected || !settings.hubspotRefreshToken) {
+        console.error(`[HubSpot Sync] HubSpot not connected for company ${companyId}`);
+        return;
+    }
+
+    let accessToken = settings.hubspotAccessToken;
+    let expiresAt = settings.hubspotExpiresAt;
+
+    // 2. Refresh Token if needed (buffer 5 mins)
+    if (!accessToken || !expiresAt || new Date() > new Date(expiresAt.getTime() - 5 * 60000)) {
+        console.log(`[HubSpot Sync] Refreshing token for company ${companyId}`);
+        try {
+            const tokens = await refreshAccessToken(settings.hubspotRefreshToken);
+            accessToken = tokens.access_token;
+            expiresAt = new Date(Date.now() + (tokens.expires_in * 1000));
+
+            await prisma.companySettings.update({
+                where: { companyId },
+                data: {
+                    hubspotAccessToken: accessToken,
+                    hubspotRefreshToken: tokens.refresh_token, // Update if rotated
+                    hubspotExpiresAt: expiresAt
+                }
+            });
+        } catch (err) {
+            console.error(`[HubSpot Sync] Token refresh failed:`, err);
+            return;
+        }
+    }
+
+    // 3. Sync Companies -> Accounts
+    try {
+        console.log(`[HubSpot Sync] Fetching companies...`);
+        // TODO: support pagination (just fetching first page for MVP)
+        const hubCompaniesRes = await getCompanies(accessToken, 100);
+        const hubCompanies = hubCompaniesRes.results || [];
+
+        for (const hc of hubCompanies) {
+            const props = hc.properties;
+            const domain = props.domain;
+            const hubspotId = hc.id;
+
+            if (!domain) continue;
+
+            let accountId;
+
+            const existingAccount = await prisma.account.findFirst({
+                where: {
+                    OR: [
+                        { hubspotId: hubspotId },
+                        { domain: domain, companyId: companyId }
+                    ]
+                }
+            });
+
+            if (existingAccount) {
+                await prisma.account.update({
+                    where: { id: existingAccount.id },
+                    data: {
+                        hubspotId: hubspotId,
+                        name: props.name || domain,
+                        industry: props.industry,
+                        employeeCount: props.numberofemployees ? parseInt(props.numberofemployees) : null,
+                        annualRevenue: props.annualrevenue,
+                        location: [props.city, props.state, props.country].filter(Boolean).join(', '),
+                        updatedAt: new Date()
+                    }
+                });
+                accountId = existingAccount.id;
+            } else {
+                const newAccount = await prisma.account.create({
+                    data: {
+                        companyId: companyId,
+                        hubspotId: hubspotId,
+                        name: props.name || domain,
+                        domain: domain,
+                        industry: props.industry,
+                        employeeCount: props.numberofemployees ? parseInt(props.numberofemployees) : null,
+                        annualRevenue: props.annualrevenue,
+                        location: [props.city, props.state, props.country].filter(Boolean).join(', '),
+                        status: "prospect"
+                    }
+                });
+                accountId = newAccount.id;
+            }
+
+            // Trigger Enrichment (Async - don't await blocking)
+            enrichAccount(accountId).catch(err => console.error(`[HubSpot Sync] Enrichment failed for ${accountId}`, err));
+        }
+        console.log(`[HubSpot Sync] Processed ${hubCompanies.length} companies.`);
+
+    } catch (err) {
+        console.error(`[HubSpot Sync] Error syncing companies:`, err);
+    }
+
+    // 4. Sync Contacts -> Leads
+    try {
+        console.log(`[HubSpot Sync] Fetching contacts...`);
+        const hubContactsRes = await getContacts(accessToken, 100);
+        const hubContacts = hubContactsRes.results || [];
+
+        for (const c of hubContacts) {
+            const props = c.properties;
+            const email = props.email;
+            const hubspotId = c.id;
+
+            if (!email || !props.firstname) continue;
+
+            // Upsert Lead
+            let existingLead = await prisma.lead.findFirst({
+                where: {
+                    companyId: companyId,
+                    OR: [
+                        { hubspotId: hubspotId },
+                        { email: email }
+                    ]
+                }
+            });
+
+            if (existingLead) {
+                await prisma.lead.update({
+                    where: { id: existingLead.id },
+                    data: {
+                        hubspotId: hubspotId,
+                        firstName: props.firstname,
+                        lastName: props.lastname || '',
+                        jobTitle: props.jobtitle,
+                        phone: props.phone || props.mobilephone || existingLead.phone,
+                        linkedinUrl: props.linkedin_profile || existingLead.linkedinUrl
+                    }
+                });
+            } else {
+                // Create new
+                await prisma.lead.create({
+                    data: {
+                        companyId: companyId,
+                        userId: (await getAdminUserId(companyId)) || 'UNKNOWN_USER',
+                        hubspotId: hubspotId,
+                        email: email,
+                        firstName: props.firstname,
+                        lastName: props.lastname || '',
+                        phone: props.phone || props.mobilephone || '',
+                        jobTitle: props.jobtitle,
+                        linkedinUrl: props.linkedin_profile,
+                        status: 'pending'
+                    }
+                });
+            }
+        }
+        console.log(`[HubSpot Sync] Processed ${hubContacts.length} contacts.`);
+
+    } catch (err) {
+        console.error(`[HubSpot Sync] Error syncing contacts:`, err);
+    }
+};
+
+async function getAdminUserId(companyId) {
+    const user = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' }
+    });
+    return user?.id;
+}

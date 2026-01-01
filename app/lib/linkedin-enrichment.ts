@@ -31,6 +31,17 @@ interface LinkedInProfile {
   source?: 'realtime' | 'scrapeninja' | 'basic'
 }
 
+export interface LinkedInCompany {
+  name: string
+  description?: string
+  industry?: string
+  employeeCount?: number | string
+  website?: string
+  location?: string
+  founded?: string
+  specialties?: string[]
+}
+
 /**
  * Fetch LinkedIn profile data using a hybrid strategy
  */
@@ -359,3 +370,108 @@ export function buildContextualScript(
 
 // Re-export types
 export type { EnhancedLinkedInData, LinkedInPost, CompanyInfo, PersonaProfile } from './persona-generator'
+
+// ==================== ACCOUNT ENRICHMENT ====================
+
+export async function enrichAccount(accountId: string): Promise<boolean> {
+  console.log(`[Enrichment] Starting enrichment for account ${accountId}`);
+  try {
+    const account = await prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) return false;
+
+    // Determine Company Identifier (LinkedIn URL or Domain)
+    let identifier = account.linkedinUrl || account.domain;
+    if (!identifier) {
+      if (account.name) {
+        // Fallback: Try to guess LinkedIn URL or just skip? 
+        // For MVP, just skip if no domain/linkedin.
+        console.warn(`[Enrichment] No domain or LinkedIn URL for account ${account.name}`);
+        return false;
+      }
+      return false;
+    }
+
+    console.log(`[Enrichment] Fetching company data for ${identifier}`);
+    const companyData = await fetchLinkedInCompany(identifier);
+
+    if (companyData) {
+      await prisma.account.update({
+        where: { id: accountId },
+        data: {
+          enriched: true,
+          industry: companyData.industry || account.industry,
+          employeeCount: typeof companyData.employeeCount === 'number' ? companyData.employeeCount : undefined, // Parse if string?
+          location: companyData.location || account.location,
+          enrichmentData: companyData as any,
+          updatedAt: new Date()
+        }
+      });
+      console.log(`[Enrichment] Account ${account.name} enriched successfully.`);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error(`[Enrichment] Error enriching account ${accountId}:`, error);
+    return false;
+  }
+}
+
+async function fetchLinkedInCompany(identifier: string): Promise<LinkedInCompany | null> {
+  // Reuse ScrapeNinja for Company
+  // Note: ScrapeNinja usually supports /company/ URL
+
+  if (identifier.includes('linkedin.com') && !identifier.includes('/company/')) {
+    // Possibly a human URL?
+    return null;
+  }
+
+  // Convert domain to linkedin URL if needed? 
+  // Complex. For now mostly rely on explicit LinkedIn URL.
+  // If identifier is just "microsoft.com", we might not easily find the LI page without Search.
+
+  // Implementation: Use ScrapeNinja with custom generic extractor or specific company endpoint?
+  // Since we don't have a specific Company API set up in this file, we'll try ScrapeNinja with a company URL.
+
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
+  if (!rapidApiKey) return null;
+
+  try {
+    // If it's a domain, we might need a search step. Skipping for MVP.
+    // Assume identifier is a LinkedIn URL.
+    if (!identifier.includes('linkedin.com/company')) {
+      console.warn('[LinkedIn] Identifier is not a company URL. Skipping.');
+      return null;
+    }
+
+    const host = 'scrapeninja.p.rapidapi.com';
+    const url = `https://${host}/scrape-js`;
+
+    // ScrapeNinja JS rendering
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-rapidapi-host': host,
+        'x-rapidapi-key': rapidApiKey
+      },
+      body: JSON.stringify({
+        url: identifier,
+        headers: ["User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"],
+        render_js: false, // Company pages often static enough? Or safer with true?
+        // Basic extraction script or returning HTML?
+        // Returning HTML and parsing is hard here.
+        // Ideally use the "Real-Time LinkedIn Scraper" (RocketAPI etc) which has a proper Company endpoint.
+      })
+    });
+
+    // NOTE: This implementation is a placeholder because parsing raw HTML from ScrapeNinja is complex.
+    // In a real scenario, I would use 'linkedin-scraper-api-real-time...' /company/details endpoint.
+    // Let's switch to that if possible.
+
+    return null; // Placeholder until we confirm API capability.
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+}

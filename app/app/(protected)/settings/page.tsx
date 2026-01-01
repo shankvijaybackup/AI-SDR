@@ -104,6 +104,7 @@ export default function SettingsPage() {
       hasElevenLabsKey: boolean
       hasDeepgramKey: boolean
       hasGoogleAiKey: boolean
+      hubspotConnected: boolean
     } | null
   }
   const [organization, setOrganization] = useState<Organization | null>(null)
@@ -684,6 +685,53 @@ export default function SettingsPage() {
             ) : (
               <p className="text-slate-500 dark:text-slate-400">No organization found</p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+
+      {/* Integrations Card */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <CardTitle>Integrations</CardTitle>
+            </div>
+            <CardDescription>Connect external tools</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* HubSpot */}
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-[#ff7a59] rounded-md flex items-center justify-center">
+                  <span className="text-white font-bold text-xs">HS</span>
+                </div>
+                <div>
+                  <h4 className="font-medium text-slate-900 dark:text-white">HubSpot CRM</h4>
+                  <p className="text-sm text-slate-500">Sync companies and contacts</p>
+                </div>
+              </div>
+              <div>
+                {organization?.settings?.hubspotConnected ? (
+                  <Button variant="outline" className="text-green-600 border-green-200 bg-green-50" disabled>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Connected
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (organization?.id) {
+                        window.location.href = `/api/integrations/hubspot/auth?companyId=${organization.id}`;
+                      }
+                    }}
+                  >
+                    Connect
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

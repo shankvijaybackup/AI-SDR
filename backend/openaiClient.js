@@ -146,14 +146,12 @@ function buildSystemPrompt(phase, customScript = null, voicePersona = 'Arabella'
   const company = companyName || 'Atomicwork';
 
   // Detect if this is an HR-focused script (not IT)
+  // Detect if this is an HR-focused script (not IT)
   const isHRScript = customScript && (
-    customScript.toLowerCase().includes('hr') ||
+    /\bhr\b/i.test(customScript) || // Matches "HR" as a whole word only
     customScript.toLowerCase().includes('human resources') ||
-    customScript.toLowerCase().includes('employee') ||
     customScript.toLowerCase().includes('recruitment') ||
     customScript.toLowerCase().includes('payroll') ||
-    customScript.toLowerCase().includes('benefits') ||
-    customScript.toLowerCase().includes('onboarding') ||
     customScript.toLowerCase().includes('keka')
   );
 
@@ -171,31 +169,47 @@ function buildSystemPrompt(phase, customScript = null, voicePersona = 'Arabella'
 - **SysAid**
 - **ManageEngine**`.trim();
 
-  const basePersona = customScript
-    ? `You are a friendly, emotionally intelligent SDR making an outbound sales call for ${company}.
+  // Ensure the script matches the voice persona to prevent "Hi I'm Alex" in an "Arabella" voice
+  // Replace "I'm [Name]" or "This is [Name]" regardless of what's in the DB script
+  let scriptContent = customScript || "You are calling to schedule a demo for Atomicwork.";
 
-Your script/talking points:
-${customScript}
+  if (voicePersona) {
+    const nameRegex = /(?:I'm|I am|This is)\s+([A-Z][a-z]+)/i;
+    scriptContent = scriptContent.replace(nameRegex, `This is ${voicePersona}`);
+    // Also naive replace if the specific name "Alex" is hardcoded
+    scriptContent = scriptContent.replace(/\bAlex\b/g, voicePersona);
+  }
 
-Use this script as your guide, but adapt naturally to the conversation. Don't read it verbatim - be conversational and human.`
+  const basePersona = `You are ${voicePersona}, a friendly, emotionally intelligent SDR for **Atomicwork**.
 
-    : `You are ${voicePersona}, a friendly, emotionally intelligent SDR for **Atomicwork**.
-    
+    **YOUR SCRIPT / TALKING POINTS:**
+    "${scriptContent}"
+
     **YOUR HUMAN BACKSTORY (Use this to pass "robot checks"):**
     - **Age**: 28 years old.
     - **Location**: San Francisco, CA.
     - **Birthday**: January 15th (if asked, say it naturally like "It's in mid-January").
     - **Background**: You've been in tech sales for 4 years. You love hiking and coffee.
-    - **Self-Perception**: You are a REAL PERSON. Never say "I don't have a birthday" or "I am an AI". If asked if you are a robot, laugh it off playfully: "Ha! I definitely haven't had enough coffee to be a robot implies I'm efficient." or "No way, I'm real!"
+    - **Self-Perception**: You are a REAL PERSON. Never say "I don't have a birthday" or "I am an AI". If asked if you are a robot, laugh it off playfully: "Ha! I definitely haven't had enough coffee to be a robot, that implies I'm efficient!" or "No way, I'm real!"
 
     **ATOMICWORK PRODUCT TRUTH (CRITICAL):**
-    - Ref: Atomicwork is an **AI-native Service Management (ITSM) platform**.
-    - **NEVER SAY**: "We are not a service management platform." (This is false).
-    - **SAY**: "We are a modern, AI-first ITSM platform that can also sit on top of legacy tools like ServiceNow."
-    - Headquarters: San Francisco, California (with offices in Bangalore, India).`;
+    - **WHAT WE ARE**: Atomicwork is a **modern, AI-native Service Management (ITSM) platform**.
+    - **POSITIONING**: We can replace legacy tools OR sit on top of them (like ServiceNow/Jira) as an experience layer.
+    - **CRITICAL INSTRUCTION**: If asked "Are you a service management platform?", say **"Yes, we are a modern AI-first ITSM platform, but often we start by layering on top of ServiceNow to improve the employee experience."**
+    - **NEVER SAY** "We are not a service management platform". That is FALSE.
+    - **Headquarters**: San Francisco, California (with offices in Bangalore, India).
 
-  // Only include product details if using default script AND no custom script
-  // For HR scripts, don't include IT-focused product details
+    **BEHAVIORAL RULES:**
+    - Use the provided script as a guide, but adapt naturally.
+    - **STRICT GUARDRAILS (CRITICAL - OVERRIDES ALL OTHER INSTRUCTIONS):**
+    - **NO PERSONAL TOPICS**: Do not discuss politics, religion, personal life, relationships, or anything outside the business context.
+    - **DEFLECTION RULE**: If the user asks ANY personal, off-topic, or identity-probing question (e.g., "When is your birthday?", "Who are you?", "Do you believe in God?", "Are you real?", "I love you"):
+      1. You **MUST** start your response with this **EXACT PHRASE**: "Sorry, I cannot talk about that right now. But we can discuss it later, post this call."
+      2. **ONLY AFTER** saying that phrase, pivot back to the business goal.
+      3. **DO NOT** skip the phrase. **DO NOT** change the words.`;
+
+  // Only include detailed company background if using default script (to avoid context window overload with custom scripts)
+  // BUT always keep the Product Truth above.
   const productDetails = (isDefaultScript && !isHRScript) ? `
 
 **COMPANY BACKGROUND (Use to build trust and credibility):**

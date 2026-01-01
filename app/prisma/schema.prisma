@@ -22,6 +22,7 @@ model Company {
   
   // Relations
   users               User[]
+  accounts            Account[]
   leads               Lead[]
   calls               Call[]
   scripts             Script[]
@@ -48,6 +49,15 @@ model CompanySettings {
   googleAiApiKey     String?
   elevenLabsApiKey   String?
   deepgramApiKey     String?
+
+  // Integrations
+  hubspotConnected     Boolean   @default(false)
+  hubspotAccessToken   String?
+  hubspotRefreshToken  String?
+  hubspotExpiresAt     DateTime?
+  hubspotPortalId      String?
+  
+  amplemarketApiKey    String?
   
   // Feature Flags
   aiCallingEnabled   Boolean  @default(true)
@@ -113,6 +123,7 @@ model User {
   calls                 Call[]
   knowledgeSources      KnowledgeSource[]
   leads                 Lead[]
+  ownedAccounts         Account[]
   scripts               Script[]
   bulkCallCampaigns     BulkCallCampaign[]
   regionalPhoneNumbers  RegionalPhoneNumber[]
@@ -172,16 +183,63 @@ model Lead {
   nextFollowUp     DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  // ABM & Integrations
+  accountId        String?
+  hubspotId        String?   @unique
+  amplemarketId    String?   @unique
   
   calls            Call[]
   emailLogs        EmailLog[]
   companyRelation  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account          Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
   @@index([companyId, status])
   @@index([companyId, interestLevel])
   @@index([userId, status])
   @@index([userId, interestLevel])
+  @@index([accountId])
+  @@index([hubspotId])
+  @@index([amplemarketId])
+}
+
+// ==================== ACCOUNTS (ABM) ====================
+
+model Account {
+  id              String    @id @default(uuid())
+  companyId       String?   // Organization/Tenant ID
+  ownerId         String?   // User who owns this account
+  
+  name            String
+  domain          String?
+  industry        String?
+  employeeCount   Int?
+  annualRevenue   String?
+  location        String?
+  linkedinUrl     String?
+  
+  // Integration IDs
+  hubspotId       String?   @unique
+  amplemarketId   String?   @unique
+  
+  status          String    @default("prospect") // prospect, engaged, customer, churned, disqualified
+  
+  enriched        Boolean   @default(false)
+  enrichmentData  Json?     // Store full enrichment payload
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  leads           Lead[]
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner           User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  
+  @@index([companyId])
+  @@index([domain])
+  @@index([hubspotId])
+  @@index([amplemarketId])
 }
 
 // ==================== SCRIPTS ====================

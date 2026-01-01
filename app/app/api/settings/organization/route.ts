@@ -62,6 +62,8 @@ export async function GET() {
                     hasElevenLabsKey: !!company.settings?.elevenLabsApiKey,
                     hasDeepgramKey: !!company.settings?.deepgramApiKey,
                     hasGoogleAiKey: !!company.settings?.googleAiApiKey,
+                    hubspotConnected: !!company.settings?.hubspotConnected,
+                    amplemarketConnected: !!company.settings?.amplemarketApiKey,
                 } : null,
             },
             isAdmin: isUserAdmin,

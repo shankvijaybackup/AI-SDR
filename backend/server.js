@@ -33,7 +33,9 @@ import { attachMediaStreamServer } from "./mediaStreamServer.js";
 import { attachRealtimeVoiceServer } from "./realtimeVoiceServer.js";
 import { voiceRealtimeWebhook } from "./routes/voice-realtime.js";
 import { voiceMediaStreamWebhook } from "./routes/voice-media-stream.js";
+import accountsRouter from "./routes/accounts.js";
 import { initiateCall, getActiveCall, updateCallTranscript, endCall } from "./routes/initiate-call.js";
+import integrationsRouter from "./routes/integrations.js";
 import { synthesizeWithChatterbox as chatterboxSynthesize, healthCheck as chatterboxHealth } from "./chatterboxClient.js";
 import { startCampaign, handleCallComplete, controlCampaign } from "./services/bulkCallManager.js";
 import { synthesizeWithDeepgram, healthCheck as deepgramHealth } from "./deepgramTTSClient.js";
@@ -86,13 +88,15 @@ if (!fs.existsSync(TTS_DIR)) {
   console.log("✅ Created TTS directory:", TTS_DIR);
 }
 
-app.use(
-  cors({
-    origin: FRONTEND_ORIGIN,
-    methods: ["GET", "POST"],
-    credentials: true
-  })
-);
+// Middlewares
+app.use(cors({
+  origin: [FRONTEND_ORIGIN, "http://localhost:3000", "https://ai-sdr-web.onrender.com"],
+  methods: ["GET", "POST", "OPTIONS"],
+  credentials: true
+}));
+
+app.use('/api/integrations', integrationsRouter);
+app.use('/api/accounts', accountsRouter);
 
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 

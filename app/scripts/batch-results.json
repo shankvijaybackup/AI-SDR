@@ -1,0 +1,119 @@
+[
+  {
+    "username": "williamhgates",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Bill Gates",
+    "headline": "Chair, Gates Foundation and Founder, Breakthrough ",
+    "company": "Gates Foundation"
+  },
+  {
+    "username": "satyanadella",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Satya Nadella",
+    "headline": "Chairman and CEO at Microsoft",
+    "company": "Microsoft"
+  },
+  {
+    "username": "sundarpichai",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Sundar  Pichai",
+    "headline": "CEO at Google",
+    "company": "Google"
+  },
+  {
+    "username": "reidhoffman",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Reid Hoffman",
+    "headline": "Co-Founder, LinkedIn, Manas AI & Inflection AI. Fo",
+    "company": "Manas AI"
+  },
+  {
+    "username": "marcbenioff",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Marc Benioff",
+    "headline": "Chair & CEO at Salesforce",
+    "company": "Salesforce"
+  },
+  {
+    "username": "brianchesky",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Brian Chesky",
+    "headline": "Co-founder, CEO @ Airbnb",
+    "company": "Airbnb"
+  },
+  {
+    "username": "dara-khosrowshahi-1a52535",
+    "success": false,
+    "error": "Both APIs failed"
+  },
+  {
+    "username": "ariannahuffington",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Arianna Huffington",
+    "headline": "Founder and CEO at Thrive Global | Passionate abou",
+    "company": "Thrive Global"
+  },
+  {
+    "username": "brenebrown",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Brené Brown",
+    "headline": "University of Houston + University of Texas at Aus",
+    "company": "Texas McCombs School of Business"
+  },
+  {
+    "username": "richardbranson",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Richard Branson",
+    "headline": "Technical Director / CTO | IoT & AI Innovator | Bu",
+    "company": "Action Cam Limited"
+  },
+  {
+    "username": "melindagates",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Melinda French Gates",
+    "headline": "Founder of Pivotal. Co-founder of the Gates Founda",
+    "company": "Pivotal Ventures"
+  },
+  {
+    "username": "jessicaalba",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Jessica Alba",
+    "headline": "Vice President Human Resources, International Weld",
+    "company": "Lincoln Electric"
+  },
+  {
+    "username": "simonsinek",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Simon Sinek",
+    "headline": "Optimist, New York Times bestselling author of \"St",
+    "company": "Simon Sinek's The Optimism Company"
+  },
+  {
+    "username": "oprah",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Oprah H.",
+    "headline": "Senior Product Designer | UX Engineer (React.js, N",
+    "company": "Freelancer.com"
+  },
+  {
+    "username": "guykawasaki",
+    "success": true,
+    "source": "Real-Time API",
+    "name": "Guy Kawasaki",
+    "headline": "On a mission to make people remarkable. Chief evan",
+    "company": "University of Hawaii Foundation"
+  }
+]
