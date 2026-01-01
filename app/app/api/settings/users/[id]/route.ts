@@ -5,9 +5,10 @@ import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userIdToDelete = params.id;
+        const { id } = await params;
+        const userIdToDelete = id;
         // Mock Auth: In real app, verify session. Using headers for simplicity or assume middleware.
         // Ideally, we get current user from session.
         // For now, we'll implement a basic check or just proceed if protected by middleware.
