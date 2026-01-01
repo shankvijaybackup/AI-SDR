@@ -723,7 +723,8 @@ export default function SettingsPage() {
                     variant="outline"
                     onClick={() => {
                       if (organization?.id) {
-                        window.location.href = `/api/integrations/hubspot/auth?companyId=${organization.id}`;
+                        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+                        window.location.href = `${backendUrl}/api/integrations/hubspot/auth?companyId=${organization.id}`;
                       }
                     }}
                   >
