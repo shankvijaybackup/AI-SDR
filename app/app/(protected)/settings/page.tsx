@@ -7,6 +7,16 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Linkedin, Shield, AlertCircle, Users, User, CheckCircle, XCircle, Mail, Calendar, UserPlus, Copy, Send, Phone, Plus, Trash2, Globe, Building2, Crown, Loader2, Volume2, Search, ShoppingCart, DollarSign } from 'lucide-react'
 
 interface TeamUser {
@@ -65,6 +75,7 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   // Invite user state
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -296,6 +307,23 @@ export default function SettingsPage() {
       console.error('Failed to fetch users:', error)
     } finally {
       setLoadingUsers(false)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!deleteId) return
+    try {
+      const response = await fetch(`/api/settings/users/${deleteId}`, { method: 'DELETE' })
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'User deleted successfully' })
+        setUsers(users.filter(u => u.id !== deleteId))
+      } else {
+        setMessage({ type: 'error', text: 'Failed to delete user' })
+      }
+    } catch (e) {
+      setMessage({ type: 'error', text: 'Failed to delete user' })
+    } finally {
+      setDeleteId(null)
     }
   }
 
@@ -964,6 +992,14 @@ export default function SettingsPage() {
                         <><CheckCircle className="w-4 h-4 mr-1" /> Activate</>
                       )}
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => setDeleteId(user.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -971,6 +1007,21 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open: boolean) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently remove the user from the organization.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Invite User */}
       <Card>
