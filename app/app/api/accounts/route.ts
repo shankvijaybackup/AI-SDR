@@ -20,27 +20,43 @@ export async function GET(req: NextRequest) {
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { searchParams } = new URL(req.url)
-        const query = searchParams.get('query')
+        const search = searchParams.get('search') || searchParams.get('query') || ''
+        const page = parseInt(searchParams.get('page') || '1')
+        const limit = parseInt(searchParams.get('limit') || '20')
+        const skip = (page - 1) * limit
 
         const where: any = {
             companyId: user.companyId
         }
 
-        if (query) {
-            where.name = { contains: query, mode: 'insensitive' }
+        if (search) {
+            where.name = { contains: search, mode: 'insensitive' }
         }
 
-        const accounts = await prisma.account.findMany({
-            where,
-            orderBy: { updatedAt: 'desc' },
-            include: {
-                _count: {
-                    select: { leads: true }
+        const [accounts, total] = await Promise.all([
+            prisma.account.findMany({
+                where,
+                orderBy: { updatedAt: 'desc' },
+                skip,
+                take: limit,
+                include: {
+                    _count: {
+                        select: { leads: true }
+                    }
                 }
+            }),
+            prisma.account.count({ where })
+        ])
+
+        return NextResponse.json({
+            data: accounts,
+            meta: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit)
             }
         })
-
-        return NextResponse.json({ accounts })
     } catch (error) {
         console.error('Error fetching accounts:', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
