@@ -19,44 +19,52 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         const url = account.domain
-        if (!url) {
-            return NextResponse.json({ error: 'Account has no domain to enrich from.' }, { status: 400 })
-        }
 
-        console.log(`Enriching account ${account.name} from ${url}...`)
+        console.log(`Enriching account ${account.name} (Domain: ${url || 'N/A'})...`)
 
-        // 1. Fetch content
+        // 1. Fetch content (if domain exists)
         let textContent = ''
-        try {
-            // Helper to ensure protocol
-            const targetUrl = url.startsWith('http') ? url : `https://${url}`
-            const { fetchContentFromURL } = await import('@/lib/document-processor')
-            textContent = await fetchContentFromURL(targetUrl)
-        } catch (fetchError) {
-            console.error('Failed to fetch website content:', fetchError)
-            // Fallback to simple name-based hallucination/knowledge if fetch fails? 
-            // No, better to return error or partial data. Let's use simple prompt on name if fetch fails.
-            textContent = `Company Name: ${account.name}. Domain: ${url}. (Website verify failed, infer from name/domain)`
+        if (url) {
+            try {
+                const targetUrl = url.startsWith('http') ? url : `https://${url}`
+                const { fetchContentFromURL } = await import('@/lib/document-processor')
+                textContent = await fetchContentFromURL(targetUrl)
+            } catch (fetchError) {
+                console.warn('Failed to fetch website content:', fetchError)
+                textContent = `(Website fetch failed for ${url})`
+            }
+        } else {
+            textContent = '(No domain provided)'
         }
 
         // 2. AI Extraction (Gemini)
         const { generateContentSafe } = await import('@/lib/gemini')
 
-        const prompt = `Analyze this company data (website content or name) and extract structured information.
+        const prompt = `Analyze this company and extract structured information.
         
         Company: ${account.name}
-        Domain: ${account.domain}
+        Domain: ${url || 'Unknown'}
         
-        Website Content Snippet (if available):
+        Website Content Snippet:
         ${textContent.substring(0, 10000)}
         
-        Return a JSON object with:
-        - description: Short 2 sentence summary of what they do.
-        - specialties: Array of strings (key technologies or services).
-        - industry: Best guess industry.
-        - employeeCount: Estimated number (number only, e.g. 100).
-        - annualRevenue: Estimated revenue range (string).
-        - location: HQ location string.
+        Instructions:
+        - If website content is missing, use your internal knowledge about the company "${account.name}".
+        - Return a VALID JSON object.
+        
+        JSON Structure:
+        {
+            "description": "Short 2 sentence summary",
+            "specialties": ["Tech 1", "Tech 2"],
+            "industry": "Industry Name",
+            "employeeCount": 100,
+            "annualRevenue": "Revenue Range",
+            "location": "City, Country"
+        }
+        
+        Rules:
+        - employeeCount must be a NUMBER (approximate).
+        - annualRevenue should be a string (e.g. "$10M-$50M").
         `
 
         const result = await generateContentSafe(prompt, { jsonMode: true })
@@ -79,7 +87,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             data: {
                 enriched: true,
                 industry: enrichmentData.industry || account.industry,
-                // Map other fields if schema supports them, otherwise store in enrichmentData JSON
+                employeeCount: typeof enrichmentData.employeeCount === 'number' ? enrichmentData.employeeCount : undefined,
+                annualRevenue: enrichmentData.annualRevenue || account.annualRevenue,
+                location: enrichmentData.location || account.location,
                 enrichmentData
             }
         })
