@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle, Bot, Globe, Sparkles, Edit, Check } from 'lucide-react'
+import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle, Bot, Globe, Sparkles, Edit, Check, GraduationCap } from 'lucide-react'
+import Link from 'next/link'
 
 interface KnowledgeSource {
   id: string
@@ -798,82 +799,89 @@ export default function KnowledgePage() {
           ) : knowledgeSources.length === 0 ? (
             <div className="text-center py-12">
               <Upload className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 mb-2">No knowledge sources yet</h3>
-              <p className="text-slate-500 mb-4">Upload documents, videos, or content to get started</p>
-              <Button onClick={() => setShowUploadDialog(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                Add Knowledge
+              <h3 className="text-lg font-medium text-slate-900">No knowledge sources yet</h3>
+              <p className="text-slate-500 mt-2">Upload documents to get started</p>
+              <Button className="mt-4" onClick={() => setShowUploadDialog(true)}>
+                Add First Knowledge Source
               </Button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {knowledgeSources.map((source) => (
                 <div
                   key={source.id}
-                  className={`border rounded-lg p-4 flex items-start justify-between hover:bg-slate-50 transition-colors ${selectedIds.has(source.id) ? 'bg-blue-50 border-blue-300' : ''
+                  className={`flex items-start justify-between p-4 rounded-lg border transition-colors ${selectedIds.has(source.id) ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 hover:border-indigo-300'
                     }`}
                 >
-                  <div className="flex items-start space-x-3 flex-1">
-                    {/* Selection Checkbox */}
+                  <div className="flex items-start space-x-3">
                     <div className="pt-1">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(source.id)}
                         onChange={() => handleSelectOne(source.id)}
-                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
                     </div>
-                    <div className="p-2 bg-slate-100 rounded">
+                    <div className="pt-1 text-slate-500">
                       {getTypeIcon(source.type)}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-medium text-slate-900">{source.title}</h4>
-                        {getStatusIcon(source.status)}
-                        {source.category && (
-                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                            {source.category}
+                    <div>
+                      <h3 className="font-medium text-slate-900">{source.title}</h3>
+                      {source.description && (
+                        <p className="text-sm text-slate-500 line-clamp-1">{source.description}</p>
+                      )}
+
+                      <div className="flex items-center space-x-2 mt-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize 
+                          ${source.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            source.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'}`}>
+                          {getStatusIcon(source.status)}
+                          <span className="ml-1">{source.status}</span>
+                        </span>
+
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 capitalize">
+                          {source.category || 'Uncategorized'}
+                        </span>
+
+                        {source.tags.length > 0 && (
+                          <span className="text-xs text-slate-400">
+                            {source.tags.slice(0, 3).join(', ')}
                           </span>
                         )}
+
+                        <span className="text-xs text-slate-400">
+                          {new Date(source.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
-                      {source.description && (
-                        <p className="text-sm text-slate-600 mt-1">{source.description}</p>
-                      )}
-                      {source.summary && (
-                        <p className="text-xs text-slate-500 mt-2 italic">{source.summary}</p>
-                      )}
-                      <div className="flex items-center space-x-4 mt-2 text-xs text-slate-500">
-                        {source.fileName && <span>📄 {source.fileName}</span>}
-                        {source.fileSize && <span>{(source.fileSize / 1024).toFixed(1)} KB</span>}
-                        {source.videoUrl && <span>🎥 Video</span>}
-                        <span>{new Date(source.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      {source.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {source.tags.map((tag, idx) => (
-                            <span key={idx} className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
-                  {/* Action Buttons */}
+
                   <div className="flex items-center space-x-2">
+                    {source.status === 'completed' && (
+                      <Link href={`/knowledge/${source.id}/study`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        >
+                          <GraduationCap className="w-4 h-4 mr-2" />
+                          Study
+                        </Button>
+                      </Link>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEdit(source)}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       onClick={() => handleDelete(source.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -884,6 +892,8 @@ export default function KnowledgePage() {
           )}
         </CardContent>
       </Card>
+
+
     </div>
   )
 }

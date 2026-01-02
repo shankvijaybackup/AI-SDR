@@ -404,6 +404,9 @@ model KnowledgeSource {
   
   company         Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  mindMap         MindMap?
+  flashcards      Flashcard[]
 
   @@index([companyId, isActive])
   @@index([userId, isActive])
@@ -476,4 +479,27 @@ model VoicemailMessage {
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, isActive])
+}
+
+model MindMap {
+  id              String   @id @default(uuid())
+  sourceId        String   @unique
+  data            Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  knowledgeSource KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+}
+
+model Flashcard {
+  id              String   @id @default(uuid())
+  sourceId        String
+  front           String
+  back            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  knowledgeSource KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
 }

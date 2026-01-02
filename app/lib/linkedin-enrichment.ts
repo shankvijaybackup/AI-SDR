@@ -285,85 +285,84 @@ export async function enrichLead(leadId: string, userId: string): Promise<boolea
         where: { id: leadId },
         data: { linkedinEnriched: true, linkedinData: basicData as any },
       })
-      return true
+      // Continued execution to Account Creation...
+    } else {
+      // Build enhanced data structure from Profile
+      const enhancedData: EnhancedLinkedInData = {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        headline: profile.headline,
+        summary: profile.summary,
+        location: profile.location,
+        profileUrl: profile.profileUrl,
+        company: profile.company,
+        jobTitle: profile.jobTitle,
+        companyInfo: { name: profile.company || '' },
+        experience: profile.experience,
+        education: profile.education,
+        skills: profile.skills,
+        recentPosts: [],
+        enrichedAt: new Date().toISOString(),
+        enrichmentVersion: `2.0-${profile.source}`,
+      }
+
+      // Generate AI persona
+      console.log(`[LinkedIn] Generating AI persona using ${profile.source} data...`)
+      const persona = await generatePersona(enhancedData)
+      enhancedData.persona = persona
+      console.log('[LinkedIn] Persona generated - DISC:', persona.discProfile)
+
+      // Update lead
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: {
+          linkedinEnriched: true,
+          linkedinData: enhancedData as any,
+          company: profile.company || lead.company,
+          jobTitle: profile.jobTitle || lead.jobTitle,
+        },
+      })
     }
-
-    // Build enhanced data structure from Profile
-    const enhancedData: EnhancedLinkedInData = {
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      headline: profile.headline,
-      summary: profile.summary,
-      location: profile.location,
-      profileUrl: profile.profileUrl,
-      company: profile.company,
-      jobTitle: profile.jobTitle,
-      companyInfo: { name: profile.company || '' },
-      experience: profile.experience,
-      education: profile.education,
-      skills: profile.skills,
-      recentPosts: [],
-      enrichedAt: new Date().toISOString(),
-      enrichmentVersion: `2.0-${profile.source}`,
-    }
-
-    // Generate AI persona
-    console.log(`[LinkedIn] Generating AI persona using ${profile.source} data...`)
-    const persona = await generatePersona(enhancedData)
-    enhancedData.persona = persona
-    console.log('[LinkedIn] Persona generated - DISC:', persona.discProfile)
-
-    // Update lead
-    await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        linkedinEnriched: true,
-        linkedinData: enhancedData as any,
-        company: profile.company || lead.company,
-        jobTitle: profile.jobTitle || lead.jobTitle,
-      },
-    })
 
     console.log('[LinkedIn] Lead enriched successfully.')
 
     // POST-ENRICHMENT: Link/Create Account and Trigger Deep Research
-    if (lead.company || profile.company) {
-      const companyName = profile.company || lead.company;
-      if (companyName) {
-        console.log(`[LinkedIn] Attempting to link Account for: ${companyName}`);
-        let account = await prisma.account.findFirst({
-          where: {
-            name: { contains: companyName, mode: 'insensitive' },
-            ownerId: userId
+    const companyName = profile?.company || lead.company;
+    if (companyName) {
+      // Common logic for Account creation
+      console.log(`[LinkedIn] Attempting to link Account for: ${companyName}`);
+      let account = await prisma.account.findFirst({
+        where: {
+          name: { contains: companyName, mode: 'insensitive' },
+          ownerId: userId
+        }
+      });
+
+      if (!account) {
+        console.log(`[LinkedIn] Creating new Account for: ${companyName}`);
+        account = await prisma.account.create({
+          data: {
+            name: companyName,
+            ownerId: userId,
+            domain: profile?.companyInfo?.website || '',
+            location: profile?.location || '',
+            industry: profile?.companyInfo?.industry || '',
           }
         });
+      }
 
-        if (!account) {
-          console.log(`[LinkedIn] Creating new Account for: ${companyName}`);
-          account = await prisma.account.create({
-            data: {
-              name: companyName,
-              ownerId: userId,
-              domain: profile.companyInfo?.website || '',
-              location: profile.location || '',
-              industry: profile.companyInfo?.industry || '',
-            }
-          });
-        }
+      // Link Lead to Account
+      if (account) {
+        await prisma.lead.update({
+          where: { id: leadId },
+          data: { account: { connect: { id: account.id } } }
+        });
 
-        // Link Lead to Account
-        if (account) {
-          await prisma.lead.update({
-            where: { id: leadId },
-            data: { accountId: account.id }
-          });
-
-          // Trigger Account Enrichment (which triggers Deep Research)
-          // Run in background to not block response
-          enrichAccount(account.id).catch(err =>
-            console.error('[LinkedIn] Background Account Enrichment failed:', err)
-          );
-        }
+        // Trigger Account Enrichment (which triggers Deep Research)
+        // Run in background to not block response
+        enrichAccount(account.id).catch(err =>
+          console.error('[LinkedIn] Background Account Enrichment failed:', err)
+        );
       }
     }
 
