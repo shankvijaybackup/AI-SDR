@@ -127,6 +127,8 @@ model User {
   scripts               Script[]
   bulkCallCampaigns     BulkCallCampaign[]
   regionalPhoneNumbers  RegionalPhoneNumber[]
+  mindMaps              MindMap[]
+  flashcards            Flashcard[]
 
   @@index([companyId])
   @@index([isActive])
@@ -240,6 +242,23 @@ model Account {
   @@index([domain])
   @@index([hubspotId])
   @@index([amplemarketId])
+  
+  notes           ResearchNote[]
+}
+
+model ResearchNote {
+  id              String   @id @default(uuid())
+  accountId       String
+  source          String   // "cbs_news", "linkedin_post", "earnings_call", "perplexity", "google_search"
+  url             String?
+  title           String
+  content         String   // AI Summary
+  tags            String[] // ["leadership", "finance", "strategy", "competitor"]
+  relevanceScore  Int      @default(0) // 1-10
+  createdAt       DateTime @default(now())
+  
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId])
 }
 
 // ==================== SCRIPTS ====================
@@ -387,6 +406,9 @@ model KnowledgeSource {
   
   company         Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  mindMap         MindMap[]
+  flashcards      Flashcard[]
 
   @@index([companyId, isActive])
   @@index([userId, isActive])
@@ -459,4 +481,35 @@ model VoicemailMessage {
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, isActive])
+}
+
+model MindMap {
+  id              String   @id @default(uuid())
+  sourceId        String?  // Optional for global maps
+  userId          String?  // Optional (if specific to a source but user-agnostic? No, RAG is per user usually or per company)
+  data            Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  knowledgeSource KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([userId])
+}
+
+model Flashcard {
+  id              String   @id @default(uuid())
+  sourceId        String?
+  userId          String?
+  front           String
+  back            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  knowledgeSource KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([userId])
 }
