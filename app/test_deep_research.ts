@@ -18,17 +18,21 @@ async function main() {
     const finalUserId = user ? user.id : userId;
 
     // Create/Find Test Account
-    const account = await prisma.account.upsert({
-        where: { domain: 'clearwing.com' },
-        update: {},
-        create: {
-            name: "Clearwing Productions",
-            domain: "clearwing.com",
-            industry: "Events",
-            location: "Milwaukee, WI",
-            ownerId: finalUserId
-        }
+    let account = await prisma.account.findFirst({
+        where: { domain: 'clearwing.com' }
     });
+
+    if (!account) {
+        account = await prisma.account.create({
+            data: {
+                name: "Clearwing Productions",
+                domain: "clearwing.com",
+                industry: "Events",
+                location: "Milwaukee, WI",
+                ownerId: finalUserId
+            }
+        });
+    }
 
     console.log(`Using Account: ${account.name} (${account.id})`);
     console.log(`Using User ID: ${finalUserId}`);
