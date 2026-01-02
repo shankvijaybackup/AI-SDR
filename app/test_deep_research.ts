@@ -15,7 +15,7 @@ async function main() {
 
     // Find first user to use as owner
     const user = await prisma.user.findFirst();
-    const finalUserId = user ? user.userId : userId;
+    const finalUserId = user ? user.id : userId;
 
     // Create/Find Test Account
     const account = await prisma.account.upsert({
