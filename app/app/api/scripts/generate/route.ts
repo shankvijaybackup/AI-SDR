@@ -10,7 +10,7 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || '', // Don't crash if missing, handle later
 })
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '')
 
 export async function POST(request: NextRequest) {
     try {
@@ -20,8 +20,9 @@ export async function POST(request: NextRequest) {
         }
 
         // 1. Strict Environment Check
-        if (!process.env.GOOGLE_AI_API_KEY) {
-            console.error('[Script Gen] GOOGLE_AI_API_KEY is missing in environment variables.')
+        const hasGeminiKey = !!(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY)
+        if (!hasGeminiKey) {
+            console.error('[Script Gen] GOOGLE_AI_API_KEY / GEMINI_API_KEY is missing.')
             return NextResponse.json({
                 error: 'Service Misconfigured: AI API Key is missing. Please check server settings.'
             }, { status: 503 })

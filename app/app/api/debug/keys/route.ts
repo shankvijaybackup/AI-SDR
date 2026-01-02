@@ -3,12 +3,13 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
     const checks = {
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'Set (Status unknown)' : 'Missing',
-        GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY ? 'Set (Status unknown)' : 'Missing',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'Set' : 'Missing',
+        GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY ? 'Set' : 'Missing',
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY ? 'Set' : 'Missing',
         DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Missing',
     }
 
-    // Optional: Try a lightweight ping if key exists
+    // 1. Check OpenAI
     let openaiStatus = 'Skipped'
     if (process.env.OPENAI_API_KEY) {
         try {
@@ -25,11 +26,13 @@ export async function GET() {
         }
     }
 
+    // 2. Check Gemini
     let geminiStatus = 'Skipped'
-    if (process.env.GOOGLE_AI_API_KEY) {
+    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
+    if (geminiKey) {
         try {
             const { GoogleGenerativeAI } = await import('@google/generative-ai')
-            const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
+            const genAI = new GoogleGenerativeAI(geminiKey)
             const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
             await model.generateContent('ping')
             geminiStatus = 'Active/Valid'

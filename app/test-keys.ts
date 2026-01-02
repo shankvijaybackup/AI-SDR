@@ -31,9 +31,9 @@ async function testKeys() {
     console.log('\n---------------------------\n');
 
     // 2. Test Gemini
-    const geminiKey = process.env.GOOGLE_AI_API_KEY;
+    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
     if (!geminiKey) {
-        console.log('❌ Gemini: Key NOT FOUND in environment.');
+        console.log('❌ Gemini: Key NOT FOUND in environment (GOOGLE_AI_API_KEY or GEMINI_API_KEY).');
     } else {
         console.log(`ℹ️  Gemini: Key found (${geminiKey.slice(0, 8)}...)`);
         try {
