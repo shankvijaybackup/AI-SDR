@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
-export async function generateMindMap(sourceId: string) {
+export async function generateMindMap(sourceId: string, force: boolean = false) {
     try {
         const source = await prisma.knowledgeSource.findUnique({
             where: { id: sourceId },
@@ -13,11 +13,21 @@ export async function generateMindMap(sourceId: string) {
         })
 
         if (!source || !source.content) {
+            console.error(`Source ${sourceId} has no content`, source)
             throw new Error('Source not found or empty')
         }
 
-        if (source.mindMap) {
+        console.log(`Generating MindMap for source ${sourceId} with content length: ${source.content.length}`)
+
+        // TODO: Add force regenerate param
+        if (!force && source.mindMap) {
+            console.log('Returning existing mindmap')
             return source.mindMap
+        }
+
+        // If forcing, delete existing
+        if (force && source.mindMap) {
+            await prisma.mindMap.delete({ where: { id: source.mindMap.id } })
         }
 
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
@@ -66,7 +76,7 @@ export async function generateMindMap(sourceId: string) {
     }
 }
 
-export async function generateFlashcards(sourceId: string) {
+export async function generateFlashcards(sourceId: string, force: boolean = false) {
     try {
         const source = await prisma.knowledgeSource.findUnique({
             where: { id: sourceId },
@@ -74,11 +84,20 @@ export async function generateFlashcards(sourceId: string) {
         })
 
         if (!source || !source.content) {
+            console.error(`Source ${sourceId} has no content`, source)
             throw new Error('Source not found or empty')
         }
 
-        if (source.flashcards.length > 0) {
+        console.log(`Generating Flashcards for source ${sourceId} with content length: ${source.content.length}`)
+
+        if (!force && source.flashcards.length > 0) {
+            console.log('Returning existing flashcards')
             return source.flashcards
+        }
+
+        // If forcing, delete existing
+        if (force && source.flashcards.length > 0) {
+            await prisma.flashcard.deleteMany({ where: { sourceId } })
         }
 
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })

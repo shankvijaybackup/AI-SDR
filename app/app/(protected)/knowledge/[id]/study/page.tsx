@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { BrainCircuit, BookOpen, Loader2, ArrowLeft } from 'lucide-react'
+import { BrainCircuit, BookOpen, Loader2, ArrowLeft, RotateCw } from 'lucide-react'
 import { MindMapViewer } from '@/components/knowledge/mindmap-viewer'
 import { FlashcardViewer } from '@/components/knowledge/flashcard-viewer'
 import { generateMindMap, generateFlashcards } from '@/app/actions/knowledge-generators'
@@ -26,21 +26,23 @@ export default function StudyPage() {
         }
     }, [id, activeTab])
 
-    const loadTabContent = async (tab: string) => {
-        // Avoid re-fetching if data already exists
-        if (tab === 'mindmap' && mindMapData) return
-        if (tab === 'flashcards' && flashcardsData) return
+    const loadTabContent = async (tab: string, force: boolean = false) => {
+        // Avoid re-fetching if data already exists and not forcing
+        if (!force && tab === 'mindmap' && mindMapData) return
+        if (!force && tab === 'flashcards' && flashcardsData) return
 
         setLoading(true)
         setError('')
         try {
             if (tab === 'mindmap') {
-                const data = await generateMindMap(id)
+                const data = await generateMindMap(id, force)
                 if (data && data.data) {
                     setMindMapData(data.data)
+                } else {
+                    setError('No mind map data returned')
                 }
             } else if (tab === 'flashcards') {
-                const data = await generateFlashcards(id)
+                const data = await generateFlashcards(id, force)
                 setFlashcardsData(data)
             }
         } catch (err: any) {
@@ -51,17 +53,27 @@ export default function StudyPage() {
         }
     }
 
+    const handleRegenerate = () => {
+        loadTabContent(activeTab, true)
+    }
+
     return (
         <div className="h-[calc(100vh-4rem)] flex flex-col p-6 space-y-4">
-            <div className="flex items-center space-x-4">
-                <Button variant="ghost" onClick={() => router.back()}>
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Knowledge
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                    <Button variant="ghost" onClick={() => router.back()}>
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Knowledge
+                    </Button>
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <BrainCircuit className="w-6 h-6 text-indigo-600" />
+                        Study Mode
+                    </h1>
+                </div>
+                <Button variant="outline" onClick={handleRegenerate} disabled={loading}>
+                    <RotateCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                    Regenerate
                 </Button>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <BrainCircuit className="w-6 h-6 text-indigo-600" />
-                    Study Mode
-                </h1>
             </div>
 
             <div className="flex-1 bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
