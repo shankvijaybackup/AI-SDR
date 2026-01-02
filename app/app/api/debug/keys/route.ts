@@ -33,9 +33,25 @@ export async function GET() {
         try {
             const { GoogleGenerativeAI } = await import('@google/generative-ai')
             const genAI = new GoogleGenerativeAI(geminiKey)
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
-            await model.generateContent('ping')
-            geminiStatus = 'Active/Valid'
+            const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-001', 'gemini-1.5-pro', 'gemini-pro']
+            let worked = false
+            let errorMsg = ''
+
+            for (const modelName of modelsToTry) {
+                try {
+                    const model = genAI.getGenerativeModel({ model: modelName })
+                    await model.generateContent('ping')
+                    geminiStatus = `Active (Authorized for ${modelName})`
+                    worked = true
+                    break
+                } catch (e: any) {
+                    errorMsg = e.message
+                }
+            }
+
+            if (!worked) {
+                geminiStatus = `Error: All models failed. Last error: ${errorMsg}`
+            }
         } catch (error: any) {
             geminiStatus = `Error: ${error.message}`
         }
