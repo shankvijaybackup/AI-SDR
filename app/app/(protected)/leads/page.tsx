@@ -21,6 +21,7 @@ interface Lead {
   company?: string
   jobTitle?: string
   linkedinUrl?: string
+  accountId?: string
   status: string
   interestLevel?: string
   region?: string
@@ -365,7 +366,16 @@ export default function LeadsPage() {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-700">
-                        {lead.company || '-'}
+                        {lead.company ? (
+                          lead.accountId ? (
+                            <Link href={`/accounts/${lead.accountId}`} className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 group">
+                              {lead.company}
+                              <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Link>
+                          ) : (
+                            lead.company
+                          )
+                        ) : '-'}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-700">
                         <a href={`tel:${lead.phone}`} className="hover:text-primary hover:underline">

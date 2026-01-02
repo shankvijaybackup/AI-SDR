@@ -2,6 +2,7 @@
 "use client"
 
 import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 const TabsContext = React.createContext<{
@@ -54,17 +55,20 @@ const TabsList = React.forwardRef<
 ))
 TabsList.displayName = "TabsList"
 
+// ... (keep Tabs and TabsList as is, focusing on TabsTrigger)
+
 const TabsTrigger = React.forwardRef<
     HTMLButtonElement,
-    React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string }
->(({ className, value, ...props }, ref) => {
+    React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string; asChild?: boolean }
+>(({ className, value, asChild = false, ...props }, ref) => {
     const context = React.useContext(TabsContext)
     if (!context) throw new Error("TabsTrigger must be used within Tabs")
 
     const isActive = context.value === value
+    const Comp = asChild ? Slot : "button"
 
     return (
-        <button
+        <Comp
             ref={ref}
             type="button"
             className={cn(
@@ -75,6 +79,8 @@ const TabsTrigger = React.forwardRef<
                 className
             )}
             onClick={() => context.onValueChange(value)}
+            // When using asChild (Link), we don't want the button type to interfere or nested buttons
+            // But Slot merges props. 
             {...props}
         />
     )

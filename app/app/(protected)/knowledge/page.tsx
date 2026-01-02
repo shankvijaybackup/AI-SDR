@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle, Bot, Globe, Sparkles, Edit, Check, GraduationCap } from 'lucide-react'
+import { Upload, FileText, Video, Link as LinkIcon, Type, Trash2, CheckCircle, Clock, XCircle, Bot, Globe, Sparkles, Edit, Check, GraduationCap, Brain } from 'lucide-react'
 import Link from 'next/link'
 
 interface KnowledgeSource {
@@ -387,6 +387,12 @@ export default function KnowledgePage() {
           <p className="text-slate-500 mt-2">Upload documents, videos, and content to power your AI SDR</p>
         </div>
         <div className="flex space-x-3">
+          <Link href="/knowledge/study">
+            <Button variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+              <Brain className="w-4 h-4 mr-2" />
+              Study Knowledge Base
+            </Button>
+          </Link>
           <Button variant="outline" onClick={() => setShowPersonaDialog(true)} className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
             <Sparkles className="w-4 h-4 mr-2" />
             Generate Persona
@@ -858,18 +864,7 @@ export default function KnowledgePage() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    {source.status === 'completed' && (
-                      <Link href={`/knowledge/${source.id}/study`}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                        >
-                          <GraduationCap className="w-4 h-4 mr-2" />
-                          Study
-                        </Button>
-                      </Link>
-                    )}
+
                     <Button
                       variant="ghost"
                       size="sm"

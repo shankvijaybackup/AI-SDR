@@ -100,6 +100,7 @@ export async function generateFlashcards(sourceId: string, force: boolean = fals
             await prisma.flashcard.deleteMany({ where: { sourceId } })
         }
 
+
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
         const prompt = `
       You are an expert sales trainer creating flashcards for an SDR (Sales Development Representative).
@@ -146,6 +147,174 @@ export async function generateFlashcards(sourceId: string, force: boolean = fals
         return await prisma.flashcard.findMany({ where: { sourceId } })
     } catch (error) {
         console.error('Error generating flashcards:', error)
+        throw error
+    }
+}
+
+export async function generateGlobalMindMap(userId: string, force: boolean = false) {
+    try {
+        // Check for existing global mindmap
+        const existingMindMap = await prisma.mindMap.findFirst({
+            where: { userId, sourceId: null }
+        })
+
+        if (!force && existingMindMap) {
+            console.log('Returning existing global mindmap')
+            return existingMindMap
+        }
+
+        if (force && existingMindMap) {
+            await prisma.mindMap.delete({ where: { id: existingMindMap.id } })
+        }
+
+        // Fetch all knowledge sources for the user
+        const sources = await prisma.knowledgeSource.findMany({
+            where: { userId, status: 'completed' } // Assuming 'completed' status exists or similar
+        })
+
+        if (sources.length === 0) {
+            // Return empty or throw? Better to return null or empty structure
+            console.log('No knowledge sources found for user')
+            return null
+        }
+
+        // Aggregate content (naive: just concat, maybe limit total length)
+        // Gemini 2.0 Flash has huge context, so we can be generous
+        const combinedContent = sources
+            .map(s => `--- Source: ${s.fileName} ---\n${s.content}`)
+            .join('\n\n')
+            .substring(0, 100000) // Limit to 100k chars for now to be safe, though model supports more
+
+        if (!combinedContent.trim()) {
+            throw new Error('No content available across knowledge sources')
+        }
+
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+        const prompt = `
+      You are an expert at creating educational mind maps.
+      Analyze the following aggregated knowledge base from multiple documents and create a comprehensive mind map structure.
+      Connect related concepts across different documents where applicable.
+      
+      Return ONLY a valid JSON object with two arrays: "nodes" and "edges".
+      
+      Nodes should have:
+      - id: string
+      - label: string (concise concept)
+      - type: "default" | "input" | "output"
+      
+      Edges should have:
+      - id: string
+      - source: node id
+      - target: node id
+      - label?: string (relationship description)
+
+      Keep the structure hierarchical but allow for cross-links. The root node should be "Knowledge Base".
+      Limit to 20-30 nodes max.
+
+      Text to analyze:
+      ${combinedContent}
+    `
+
+        const result = await model.generateContent(prompt)
+        const response = await result.response
+        const text = response.text().replace(/```json/g, '').replace(/```/g, '').trim()
+        const data = JSON.parse(text)
+
+        const mindMap = await prisma.mindMap.create({
+            data: {
+                userId,
+                sourceId: null, // explicitly null for global
+                data: data
+            }
+        })
+
+        return mindMap
+
+    } catch (error) {
+        console.error('Error generating global mind map:', error)
+        throw error
+    }
+}
+
+export async function generateGlobalFlashcards(userId: string, force: boolean = false) {
+    try {
+        // Fetch existing global flashcards
+        const existingCards = await prisma.flashcard.findMany({
+            where: { userId, sourceId: null }
+        })
+
+        if (!force && existingCards.length > 0) {
+            console.log('Returning existing global flashcards')
+            return existingCards
+        }
+
+        if (force && existingCards.length > 0) {
+            await prisma.flashcard.deleteMany({ where: { userId, sourceId: null } })
+        }
+
+        const sources = await prisma.knowledgeSource.findMany({
+            where: { userId, status: 'completed' }
+        })
+
+        if (sources.length === 0) {
+            return []
+        }
+
+        const combinedContent = sources
+            .map(s => `--- Source: ${s.fileName} ---\n${s.content}`)
+            .join('\n\n')
+            .substring(0, 100000)
+
+        if (!combinedContent.trim()) {
+            throw new Error('No content available')
+        }
+
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+        const prompt = `
+      You are an expert sales trainer creating flashcards for an SDR.
+      Your goal is to ensure the SDR masters the ENTIRE Knowledge Base provided below.
+      
+      Analyze the text and create 10-15 high-impact Q&A flashcards.
+      Focus on synthesizing information across documents if possible.
+
+      Key areas:
+      1. **Customer References**: Specific customer names and success stories.
+      2. **Hard Data & Metrics**: ROI, stats.
+      3. **Key Value Props**: Differentiation.
+      4. **Objection Handling**: Common objections found in the text and how to answer them.
+
+      Return ONLY a valid JSON array of objects with "front" and "back" keys.
+
+      Text to analyze:
+      ${combinedContent}
+    `
+
+        const result = await model.generateContent(prompt)
+        const response = await result.response
+        const text = response.text().replace(/```json/g, '').replace(/```/g, '').trim()
+        const cards = JSON.parse(text)
+
+        if (!Array.isArray(cards)) {
+            throw new Error('Invalid response format')
+        }
+
+        await prisma.$transaction(
+            cards.map((card: any) =>
+                prisma.flashcard.create({
+                    data: {
+                        userId,
+                        sourceId: null,
+                        front: card.front,
+                        back: card.back
+                    }
+                })
+            )
+        )
+
+        return await prisma.flashcard.findMany({ where: { userId, sourceId: null } })
+
+    } catch (error) {
+        console.error('Error generating global flashcards:', error)
         throw error
     }
 }
