@@ -8,14 +8,100 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+// ==================== MULTI-TENANCY ====================
+
+model Company {
+  id                  String   @id @default(uuid())
+  name                String
+  slug                String   @unique  // URL-friendly identifier
+  plan                String   @default("trial")  // trial, starter, pro, enterprise
+  twilioSubAccountSid String?  // Optional Twilio sub-account for isolation
+  billingEmail        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relations
+  users               User[]
+  accounts            Account[]
+  leads               Lead[]
+  calls               Call[]
+  scripts             Script[]
+  phoneNumbers        RegionalPhoneNumber[]
+  campaigns           BulkCallCampaign[]
+  knowledgeSources    KnowledgeSource[]
+  invites             CompanyInvite[]
+  settings            CompanySettings?
+  emailTemplates      EmailTemplate[]
+  emailLogs           EmailLog[]
+  voicemailMessages   VoicemailMessage[]
+
+  @@index([slug])
+}
+
+model CompanySettings {
+  id                 String   @id @default(uuid())
+  companyId          String   @unique
+  
+  // API Keys (stored encrypted in production)
+  twilioAccountSid   String?
+  twilioAuthToken    String?
+  openaiApiKey       String?
+  googleAiApiKey     String?
+  elevenLabsApiKey   String?
+  deepgramApiKey     String?
+
+  // Integrations
+  hubspotConnected     Boolean   @default(false)
+  hubspotAccessToken   String?
+  hubspotRefreshToken  String?
+  hubspotExpiresAt     DateTime?
+  hubspotPortalId      String?
+  
+  amplemarketApiKey    String?
+  
+  // Feature Flags
+  aiCallingEnabled   Boolean  @default(true)
+  knowledgeBaseEnabled Boolean @default(true)
+  
+  // Billing
+  trialEndsAt        DateTime?
+  stripeCustomerId   String?
+  stripePriceId      String?
+  subscriptionStatus String?  @default("trialing") // trialing, active, past_due, canceled
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model CompanyInvite {
+  id        String   @id @default(uuid())
+  companyId String
+  email     String
+  role      String   @default("member")  // admin, member
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
+  @@index([token])
+}
+
+// ==================== USERS ====================
+
 model User {
   id                    String            @id @default(uuid())
+  companyId             String?           // Optional for migration, required after
   email                 String            @unique
   password              String
   firstName             String
   lastName              String
-  company               String?
-  role                  String            @default("SDR")
+  companyName           String?           // Deprecated: use company.name
+  role                  String            @default("member")  // admin, member
   linkedinSessionCookie String?
   
   // Activation & Verification
@@ -31,35 +117,56 @@ model User {
 
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
+  
+  // Relations
+  company               Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   calls                 Call[]
   knowledgeSources      KnowledgeSource[]
   leads                 Lead[]
+  ownedAccounts         Account[]
   scripts               Script[]
   bulkCallCampaigns     BulkCallCampaign[]
   regionalPhoneNumbers  RegionalPhoneNumber[]
 
+  @@index([companyId])
   @@index([isActive])
   @@index([isEmailVerified])
 }
 
-// Regional phone numbers for different countries/regions
+// ==================== PHONE NUMBERS ====================
+
 model RegionalPhoneNumber {
   id          String   @id @default(uuid())
-  userId      String
+  companyId   String?  // Company-level phone numbers
+  userId      String?  // Keep for backward compatibility
   region      String   // e.g., "ANZ", "US", "UK", "India", "EU"
   phoneNumber String   // e.g., "+61341574513"
   isDefault   Boolean  @default(false)
+  
+  // Twilio integration fields
+  provider    String   @default("twilio")  // twilio, exotel, manual
+  twilioSid   String?  // Twilio phone number SID
+  capabilities Json?   // { voice: true, sms: true, mms: false }
+  monthlyCost Float?   // Monthly cost in USD
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, region])
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([companyId, region])
+  @@index([companyId])
   @@index([userId])
+  @@index([provider])
 }
+
+// ==================== LEADS ====================
 
 model Lead {
   id               String    @id @default(uuid())
-  userId           String
+  companyId        String?   // Company-scoped
+  userId           String    // Creator/owner
   firstName        String
   lastName         String
   email            String?
@@ -76,15 +183,70 @@ model Lead {
   nextFollowUp     DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
-  calls            Call[]
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // ABM & Integrations
+  accountId        String?
+  hubspotId        String?   @unique
+  amplemarketId    String?   @unique
+  
+  calls            Call[]
+  emailLogs        EmailLog[]
+  companyRelation  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account          Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([companyId, interestLevel])
   @@index([userId, status])
   @@index([userId, interestLevel])
+  @@index([accountId])
+  @@index([hubspotId])
+  @@index([amplemarketId])
 }
+
+// ==================== ACCOUNTS (ABM) ====================
+
+model Account {
+  id              String    @id @default(uuid())
+  companyId       String?   // Organization/Tenant ID
+  ownerId         String?   // User who owns this account
+  
+  name            String
+  domain          String?
+  industry        String?
+  employeeCount   Int?
+  annualRevenue   String?
+  location        String?
+  linkedinUrl     String?
+  
+  // Integration IDs
+  hubspotId       String?   @unique
+  amplemarketId   String?   @unique
+  
+  status          String    @default("prospect") // prospect, engaged, customer, churned, disqualified
+  
+  enriched        Boolean   @default(false)
+  enrichmentData  Json?     // Store full enrichment payload
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  leads           Lead[]
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner           User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  
+  @@index([companyId])
+  @@index([domain])
+  @@index([hubspotId])
+  @@index([amplemarketId])
+}
+
+// ==================== SCRIPTS ====================
 
 model Script {
   id        String   @id @default(uuid())
+  companyId String?   // Company-scoped
   userId    String?
   name      String
   content   String
@@ -93,25 +255,35 @@ model Script {
   createdBy String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
   calls              Call[]
-  user               User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company            Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user               User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bulkCallCampaigns  BulkCallCampaign[]
 
+  @@index([companyId])
   @@index([userId])
   @@index([isShared])
 }
 
+// ==================== CALLS ====================
+
 model Call {
   id               String    @id @default(uuid())
+  companyId        String?   // Company-scoped
   userId           String
   leadId           String
   scriptId         String?
   campaignId       String?   // Link to bulk call campaign
   twilioCallSid    String?   @unique
+  companyName      String?   // Company name for display
+  fromNumber       String?   // Phone number used for calling
+  retryCount       Int       @default(0)  // Number of retry attempts
   voicePersona     String    @default("female")
   transcript       Json
   duration         Int?
   status           String    @default("initiated")
+  disconnectReason String?   // Human-readable: "No answer after 5 rings", etc.
   aiSummary        String?
   interestLevel    String?
   outcome          String?
@@ -123,20 +295,42 @@ model Call {
   emailCaptured    String?
   nextSteps        String?
   scheduledDemo    DateTime?
+  // AMD (Voicemail Detection)
+  amdResult        String?   // "human", "machine_start", "machine_end_beep", "fax", "unknown"
+  voicemailDropped Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  
+  company          Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   script           Script?   @relation(fields: [scriptId], references: [id])
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaign         BulkCallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  callLogs         CallLog[]
 
+  @@index([companyId])
   @@index([userId, leadId])
   @@index([twilioCallSid])
   @@index([campaignId])
 }
 
+model CallLog {
+  id        String   @id @default(uuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  status    String   // call status: initiated, ringing, answered, completed, etc.
+  details   String?  // Additional details about the status change
+  timestamp DateTime @default(now())
+
+  @@index([callId])
+  @@index([timestamp])
+}
+
+// ==================== CAMPAIGNS ====================
+
 model BulkCallCampaign {
   id                String    @id @default(uuid())
+  companyId         String?   // Company-scoped
   userId            String
   name              String
   scriptId          String
@@ -152,15 +346,20 @@ model BulkCallCampaign {
   updatedAt         DateTime  @updatedAt
   completedAt       DateTime?
   
+  company           Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   script            Script    @relation(fields: [scriptId], references: [id])
   calls             Call[]
 
+  @@index([companyId, status])
   @@index([userId, status])
 }
 
+// ==================== KNOWLEDGE ====================
+
 model KnowledgeSource {
   id              String   @id @default(uuid())
+  companyId       String?  // Company-scoped
   userId          String?
   title           String
   description     String?
@@ -185,10 +384,79 @@ model KnowledgeSource {
   processingError String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  
+  company         Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([companyId, isActive])
   @@index([userId, isActive])
   @@index([isShared])
   @@index([category])
   @@index([status])
+}
+
+// ==================== EMAIL AUTOMATION ====================
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  subject     String
+  body        String   // HTML with {{variables}} for personalization
+  triggerType String   // "post_call_high", "post_call_medium", "post_call_low", "demo_reminder", "follow_up"
+  delayMinutes Int     @default(0)  // Delay before sending (0 = immediate)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emails      EmailLog[]
+
+  @@index([companyId, triggerType])
+  @@index([companyId, isActive])
+}
+
+model EmailLog {
+  id          String    @id @default(uuid())
+  companyId   String
+  leadId      String
+  callId      String?   // Link to call that triggered this email
+  templateId  String?
+  subject     String
+  body        String?   // Rendered HTML
+  status      String    @default("pending")  // "pending", "sent", "delivered", "opened", "clicked", "bounced", "failed"
+  sendgridId  String?   // SendGrid message ID for tracking
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
+  errorMessage String?
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  template    EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([leadId])
+  @@index([sendgridId])
+  @@index([createdAt])
+}
+
+// ==================== VOICEMAIL ====================
+
+model VoicemailMessage {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  audioUrl  String   // URL to uploaded audio file
+  duration  Int?     // Duration in seconds
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, isActive])
 }

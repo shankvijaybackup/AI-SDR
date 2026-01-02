@@ -109,6 +109,9 @@ app.use("/api/twilio", bodyParser.urlencoded({ extended: false }));
 // Frontend sends JSON
 app.use(bodyParser.json());
 
+import twilioWebhookRouter from "./routes/twilio-webhooks.js";
+app.use("/api/twilio", twilioWebhookRouter);
+
 // Serve synthesized TTS files so Twilio can <Play> them
 app.use("/tts", express.static(TTS_DIR));
 

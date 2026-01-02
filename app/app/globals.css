@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .midnight *, .sunset *, .forest *, .neon *, .royal *));
 
 @theme inline {
   --color-background: var(--background);
@@ -81,39 +81,203 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@layer base {
+
+  /* 1. Midnight Glass (Deep Blue - Current Dark) */
+  .dark,
+  .midnight {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.6 0.2 270);
+    /* Electric Blue */
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.6 0.2 270);
+    --sidebar: oklch(0.145 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.6 0.2 270);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.6 0.2 270);
+  }
+
+  /* 2. Ocean Breeze (Clean Light) */
+  .ocean {
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #0ea5e9;
+    /* Ocean Blue */
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #e0f2fe;
+    --accent-foreground: #0ea5e9;
+    --destructive: #ef4444;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #0ea5e9;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #0f172a;
+    --sidebar-primary: #0ea5e9;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f0f9ff;
+    --sidebar-accent-foreground: #0ea5e9;
+    --sidebar-border: #e2e8f0;
+    --sidebar-ring: #0ea5e9;
+  }
+
+  /* 3. Sunset Glow (Warm Dark) */
+  [data-theme='sunset'] {
+    --background: #2a0a18;
+    /* Deep Plum */
+    --foreground: #fff1f2;
+    --card: #451a2d;
+    /* Lighter Plum */
+    --card-foreground: #fff1f2;
+    --popover: #451a2d;
+    --popover-foreground: #fff1f2;
+    --primary: #f97316;
+    /* Orange */
+    --primary-foreground: #ffffff;
+    --secondary: #831843;
+    --secondary-foreground: #fff1f2;
+    --muted: #500724;
+    --muted-foreground: #fda4af;
+    --accent: #9d174d;
+    --accent-foreground: #ffffff;
+    --destructive: #be123c;
+    --border: #831843;
+    --input: #831843;
+    --ring: #f97316;
+    --sidebar: #2a0a18;
+    --sidebar-foreground: #fff1f2;
+    --sidebar-primary: #f97316;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #831843;
+    --sidebar-accent-foreground: #fff1f2;
+    --sidebar-border: #831843;
+    --sidebar-ring: #f97316;
+  }
+
+  /* 4. Forest Zen (Calm Green Dark) */
+  .forest {
+    --background: #022c22;
+    /* Very Dark Green */
+    --foreground: #ecfdf5;
+    --card: #064e3b;
+    --card-foreground: #ecfdf5;
+    --popover: #064e3b;
+    --popover-foreground: #ecfdf5;
+    --primary: #10b981;
+    /* Emerald */
+    --primary-foreground: #ffffff;
+    --secondary: #134e4a;
+    --secondary-foreground: #ecfdf5;
+    --muted: #064e3b;
+    --muted-foreground: #6ee7b7;
+    --accent: #115e59;
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --border: #047857;
+    --input: #047857;
+    --ring: #10b981;
+    --sidebar: #022c22;
+    --sidebar-foreground: #ecfdf5;
+    --sidebar-primary: #10b981;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #065f46;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #047857;
+    --sidebar-ring: #10b981;
+  }
+
+  /* 5. Neon Cyber (High Contrast Black) */
+  .neon {
+    --background: #000000;
+    --foreground: #ffffff;
+    --card: #111111;
+    --card-foreground: #ffffff;
+    --popover: #111111;
+    --popover-foreground: #ffffff;
+    --primary: #39ff14;
+    /* Neon Green */
+    --primary-foreground: #000000;
+    --secondary: #1a1a1a;
+    --secondary-foreground: #ffffff;
+    --muted: #1a1a1a;
+    --muted-foreground: #a3a3a3;
+    --accent: #ff00ff;
+    /* Hot Pink */
+    --accent-foreground: #ffffff;
+    --destructive: #ff0000;
+    --border: #333333;
+    --input: #333333;
+    --ring: #39ff14;
+    --sidebar: #000000;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: #39ff14;
+    --sidebar-primary-foreground: #000000;
+    --sidebar-accent: #1a1a1a;
+    --sidebar-accent-foreground: #39ff14;
+    --sidebar-border: #333333;
+    --sidebar-ring: #39ff14;
+  }
+
+  /* 6. Royal Amethyst (Luxury Purple) */
+  .royal {
+    --background: #1e1b4b;
+    /* Indigo 950 */
+    --foreground: #faf5ff;
+    --card: #312e81;
+    /* Indigo 900 */
+    --card-foreground: #faf5ff;
+    --popover: #312e81;
+    --popover-foreground: #faf5ff;
+    --primary: #fbbf24;
+    /* Amber 400 (Gold) */
+    --primary-foreground: #2a0a18;
+    --secondary: #4c1d95;
+    --secondary-foreground: #ffffff;
+    --muted: #312e81;
+    --muted-foreground: #c4b5fd;
+    --accent: #7c3aed;
+    /* Violet 600 */
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --border: #4338ca;
+    --input: #4338ca;
+    --ring: #fbbf24;
+    --sidebar: #1e1b4b;
+    --sidebar-foreground: #faf5ff;
+    --sidebar-primary: #fbbf24;
+    --sidebar-primary-foreground: #2a0a18;
+    --sidebar-accent: #4338ca;
+    --sidebar-accent-foreground: #fbbf24;
+    --sidebar-border: #4338ca;
+    --sidebar-ring: #fbbf24;
+  }
 }
+
 
 @layer base {
   * {
