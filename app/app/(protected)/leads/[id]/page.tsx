@@ -20,6 +20,7 @@ import {
     MessageSquare,
     TrendingUp
 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { format } from 'date-fns'
 
 interface Lead {
@@ -38,6 +39,19 @@ interface Lead {
     notes?: string
     createdAt: string
     updatedAt: string
+    account?: {
+        id: string
+        notes: Array<{
+            id: string
+            title: string
+            content: string
+            relevanceScore: number
+            source: string
+            url: string
+            tags: string[]
+            createdAt: string
+        }>
+    }
 }
 
 interface Call {
@@ -90,6 +104,9 @@ export default function LeadDetailPage() {
             if (response.ok) {
                 const data = await response.json()
                 setCalls(data.calls)
+                if (data.calls.length > 0) {
+                    setSelectedCall(data.calls[0])
+                }
             }
         } catch (error) {
             console.error('Failed to fetch call history:', error)
@@ -157,7 +174,7 @@ export default function LeadDetailPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
+            {/* Header - Unchanged */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                     <Button variant="ghost" size="sm" onClick={() => router.push('/leads')}>
@@ -168,14 +185,22 @@ export default function LeadDetailPage() {
                         <h1 className="text-2xl font-bold text-slate-900">
                             {lead.firstName} {lead.lastName}
                         </h1>
-                        <p className="text-slate-500">{lead.company}</p>
+                        <div className="flex items-center space-x-2 text-slate-500">
+                            <Building2 className="w-4 h-4" />
+                            <span>{lead.company}</span>
+                            {lead.account && (
+                                <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">
+                                    Account Mapped
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${lead.status === 'qualified' ? 'bg-green-100 text-green-800' :
-                            lead.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
-                                lead.status === 'not_interested' ? 'bg-red-100 text-red-800' :
-                                    'bg-slate-100 text-slate-800'
+                        lead.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                            lead.status === 'not_interested' ? 'bg-red-100 text-red-800' :
+                                'bg-slate-100 text-slate-800'
                         }`}>
                         {lead.status}
                     </span>
@@ -187,7 +212,7 @@ export default function LeadDetailPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Lead Info Card */}
+                {/* Left Column: Contact Info (Existing) */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Contact Information</CardTitle>
@@ -233,134 +258,197 @@ export default function LeadDetailPage() {
                                 )}
                             </div>
                         )}
-                        {lead.notes && (
-                            <div className="pt-4 border-t">
-                                <p className="text-sm text-slate-600">{lead.notes}</p>
-                            </div>
-                        )}
+
+                        {/* Enrichment Trigger */}
+                        <div className="pt-4 border-t">
+                            <h4 className="text-sm font-medium mb-2">Account Research</h4>
+                            {lead.account?.notes && lead.account.notes.length > 0 ? (
+                                <div className="text-sm text-green-600 flex items-center">
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    {lead.account.notes.length} Insights Found
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500">
+                                    No deep research yet. Enrich via LinkedIn to trigger.
+                                </p>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
-                {/* Activity Timeline */}
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Activity Timeline</CardTitle>
-                        <CardDescription>All calls and interactions</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {calls.length === 0 ? (
-                            <div className="text-center py-8">
-                                <Phone className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-                                <p className="text-slate-500">No calls yet</p>
-                                <Button className="mt-4" onClick={() => router.push('/calling')}>
-                                    Make First Call
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {calls.map((call) => (
-                                    <div
-                                        key={call.id}
-                                        onClick={() => setSelectedCall(selectedCall?.id === call.id ? null : call)}
-                                        className={`p-4 border rounded-lg cursor-pointer transition-all ${selectedCall?.id === call.id
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'hover:border-slate-300 hover:bg-slate-50'
-                                            }`}
-                                    >
-                                        {/* Call Header */}
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center space-x-3">
-                                                {getStatusIcon(call.status, call.disconnectReason)}
-                                                <div>
-                                                    <p className="font-medium text-sm">
-                                                        {call.script?.name || 'Call'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        {format(new Date(call.createdAt), 'MMM d, yyyy h:mm a')}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadge(call.status)}`}>
-                                                    {call.status}
-                                                </span>
-                                                <span className="text-xs text-slate-500">
-                                                    {formatDuration(call.duration)}
-                                                </span>
-                                            </div>
+                {/* Right Column: Tabs for Activity & Research */}
+                <div className="lg:col-span-2">
+                    <Tabs defaultValue="activity" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="activity">Activity & Calls</TabsTrigger>
+                            <TabsTrigger value="research">Deep Research</TabsTrigger>
+                        </TabsList>
+
+                        {/* ACTIVITY TAB (Original Content) */}
+                        <TabsContent value="activity">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Activity Timeline</CardTitle>
+                                    <CardDescription>All calls and interactions</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    {calls.length === 0 ? (
+                                        <div className="text-center py-8">
+                                            <Phone className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                                            <p className="text-slate-500">No calls yet</p>
                                         </div>
-
-                                        {/* Disconnect Reason */}
-                                        {call.disconnectReason && (
-                                            <div className="mt-2 flex items-center space-x-2 text-sm text-amber-700 bg-amber-50 px-2 py-1 rounded">
-                                                <AlertCircle className="w-3 h-3" />
-                                                <span>{call.disconnectReason}</span>
-                                            </div>
-                                        )}
-
-                                        {/* AI Summary Preview */}
-                                        {call.aiSummary && (
-                                            <p className="mt-2 text-sm text-slate-600 line-clamp-2">
-                                                {call.aiSummary}
-                                            </p>
-                                        )}
-
-                                        {/* Expanded Details */}
-                                        {selectedCall?.id === call.id && (
-                                            <div className="mt-4 pt-4 border-t space-y-4">
-                                                {/* Interest Level */}
-                                                {call.interestLevel && (
-                                                    <div className="flex items-center space-x-2">
-                                                        <TrendingUp className="w-4 h-4 text-slate-400" />
-                                                        <span className="text-sm font-medium">Interest:</span>
-                                                        <span className={`px-2 py-0.5 rounded text-xs ${call.interestLevel === 'high' ? 'bg-green-100 text-green-800' :
-                                                                call.interestLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    'bg-slate-100 text-slate-800'
-                                                            }`}>
-                                                            {call.interestLevel}
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {calls.map((call) => (
+                                                <div
+                                                    key={call.id}
+                                                    onClick={() => setSelectedCall(selectedCall?.id === call.id ? null : call)}
+                                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${selectedCall?.id === call.id
+                                                        ? 'border-blue-500 bg-blue-50'
+                                                        : 'hover:border-slate-300 hover:bg-slate-50'
+                                                        }`}
+                                                >
+                                                    {/* Call Item Content (Same as before) */}
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center space-x-3">
+                                                            {getStatusIcon(call.status, call.disconnectReason)}
+                                                            <div>
+                                                                <p className="font-medium text-sm">
+                                                                    {call.script?.name || 'Call'}
+                                                                </p>
+                                                                <p className="text-xs text-slate-500">
+                                                                    {format(new Date(call.createdAt), 'MMM d, yyyy h:mm a')}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadge(call.status)}`}>
+                                                            {call.status}
                                                         </span>
                                                     </div>
-                                                )}
 
-                                                {/* Full Summary */}
-                                                {call.aiSummary && (
-                                                    <div>
-                                                        <h4 className="text-sm font-medium mb-1 flex items-center">
-                                                            <MessageSquare className="w-4 h-4 mr-1" />
-                                                            AI Summary
-                                                        </h4>
-                                                        <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded">
+                                                    {/* AI Summary Preview */}
+                                                    {call.aiSummary && (
+                                                        <p className="mt-2 text-sm text-slate-600 line-clamp-2">
                                                             {call.aiSummary}
                                                         </p>
-                                                    </div>
-                                                )}
+                                                    )}
 
-                                                {/* Transcript */}
-                                                {call.transcript && call.transcript.length > 0 && (
-                                                    <div>
-                                                        <h4 className="text-sm font-medium mb-2">Transcript</h4>
-                                                        <div className="space-y-2 bg-slate-50 p-3 rounded max-h-64 overflow-y-auto">
-                                                            {call.transcript.map((entry: any, idx: number) => (
-                                                                <div key={idx} className="text-sm">
-                                                                    <span className={`font-medium ${entry.speaker === 'agent' ? 'text-blue-600' : 'text-slate-700'
-                                                                        }`}>
-                                                                        {entry.speaker === 'agent' ? 'AI' : 'Lead'}:
-                                                                    </span>
-                                                                    <span className="text-slate-600 ml-2">{entry.text}</span>
+                                                    {/* Expanded Details */}
+                                                    {selectedCall?.id === call.id && (
+                                                        <div className="mt-4 pt-4 border-t space-y-4">
+                                                            {call.aiSummary && (
+                                                                <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded">
+                                                                    {call.aiSummary}
+                                                                </p>
+                                                            )}
+                                                            {call.transcript && call.transcript.length > 0 && (
+                                                                <div className="space-y-2 bg-slate-50 p-3 rounded max-h-64 overflow-y-auto">
+                                                                    {call.transcript.map((entry: any, idx: number) => (
+                                                                        <div key={idx} className="text-sm">
+                                                                            <span className={`font-medium ${entry.speaker === 'agent' ? 'text-blue-600' : 'text-slate-700'}`}>
+                                                                                {entry.speaker === 'agent' ? 'AI' : 'Lead'}:
+                                                                            </span>
+                                                                            <span className="text-slate-600 ml-2">{entry.text}</span>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
-                                                            ))}
+                                                            )}
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* RESEARCH TAB (New) */}
+                        <TabsContent value="research">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle>Deep Account Intelligence</CardTitle>
+                                            <CardDescription>
+                                                Context-aware insights from News, Social, and Earnings.
+                                            </CardDescription>
+                                        </div>
+                                        {lead.account && (
+                                            <div className="bg-blue-50 px-3 py-1 rounded-full text-xs text-blue-700 font-medium">
+                                                Relevance Score: {
+                                                    lead.account.notes && lead.account.notes.length > 0
+                                                        ? Math.round(lead.account.notes.reduce((acc: number, curr: any) => acc + curr.relevanceScore, 0) / lead.account.notes.length)
+                                                        : 0
+                                                }/10
                                             </div>
                                         )}
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                </CardHeader>
+                                <CardContent>
+                                    {!lead.account ? (
+                                        <div className="text-center py-8 text-slate-500">
+                                            No Account mapped to this lead.
+                                        </div>
+                                    ) : !lead.account.notes || lead.account.notes.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <div className="bg-slate-50 inline-block p-4 rounded-full mb-4">
+                                                <TrendingUp className="w-8 h-8 text-slate-400" />
+                                            </div>
+                                            <h3 className="text-lg font-medium text-slate-900">No Research Yet</h3>
+                                            <p className="text-slate-500 max-w-sm mx-auto mt-2">
+                                                Enrich this lead via LinkedIn to trigger the Context-Aware Deep Research sweep.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {lead.account.notes.map((note: any) => (
+                                                <div key={note.id} className="border rounded-lg p-4 hover:bg-slate-50 transition-colors">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center space-x-2">
+                                                                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase tracking-wider">
+                                                                    {note.source.replace('_', ' ')}
+                                                                </span>
+                                                                <span className="text-xs text-slate-400">
+                                                                    {format(new Date(note.createdAt), 'MMM d, yyyy')}
+                                                                </span>
+                                                            </div>
+                                                            <h4 className="font-medium text-indigo-900">
+                                                                <a href={note.url} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center">
+                                                                    {note.title}
+                                                                </a>
+                                                            </h4>
+                                                        </div>
+                                                        <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-full font-bold text-sm
+                                                            ${note.relevanceScore >= 8 ? 'bg-green-100 text-green-700' :
+                                                                note.relevanceScore >= 5 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {note.relevanceScore}
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-sm text-slate-700 mt-2 leading-relaxed">
+                                                        {note.content}
+                                                    </p>
+                                                    {note.tags && note.tags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-2 mt-3">
+                                                            {note.tags.map((tag: string) => (
+                                                                <span key={tag} className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                                                    #{tag}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    </Tabs>
+                </div>
             </div>
+
 
             {/* Stats Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

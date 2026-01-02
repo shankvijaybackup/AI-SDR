@@ -189,7 +189,14 @@ export function attachMediaStreamServer(httpServer) {
                     latestUserText: currentTranscript,
                     sttConfidence: result.confidence,
                     userId: call.userId,
-                    leadEmail: call.leadEmail
+                    leadEmail: call.leadEmail,
+                    // Pass Context-Aware Research Data
+                    companyName: call.companyName,
+                    leadContext: call.leadContext,
+                    relevantKnowledge: call.relevantKnowledge,
+                    role: call.role,
+                    industry: call.industry,
+                    voicePersona: call.voicePersona
                   });
 
                   // Add agent reply to transcript with timestamp

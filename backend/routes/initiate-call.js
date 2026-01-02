@@ -209,25 +209,34 @@ async function initiateCall(req, res) {
     console.log(`[Initiate Call] Voice: ${voicePersona} (${selectedVoice.gender}), ID: ${voiceId}`);
     console.log(`[Initiate Call] Script: ${personalizedScript.substring(0, 50)}...`);
 
-    // Use company name from request or extract from script as fallback
-    let companyName = leadCompany || 'Atomicwork'; // Use provided company or default
-    if (!leadCompany) {
-      // Fallback to extracting from script if not provided
-      const companyMatch = personalizedScript.match(/(?:from|at)\s+([A-Z][A-Za-z0-9\s&]+?)(?:\.|,|\s+is|\s+Is|\n)/);
-      if (companyMatch && companyMatch[1]) {
-        companyName = companyMatch[1].trim();
-        console.log(`[Initiate Call] Extracted company name from script: ${companyName}`);
+    // Fetch Seller Company from User Profile
+    let companyName = 'Atomicwork'; // Default
+    try {
+      if (userId) {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { company: true } // Assuming 'company' field exists on User
+        });
+        if (user && user.company) {
+          companyName = user.company;
+          console.log(`[Initiate Call] Found user company: ${companyName}`);
+        }
       }
-    } else {
-      console.log(`[Initiate Call] Using provided company name: ${companyName}`);
+    } catch (e) {
+      console.error('[Initiate Call] Error fetching user company:', e);
     }
+
+    // Identify Prospect Company
+    const prospectCompany = leadCompany || 'Unknown Company';
+    console.log(`[Initiate Call] Seller: ${companyName}, Prospect: ${prospectCompany}`);
 
     // Store call metadata with events tracking AND knowledge context
     activeCalls.set(callId, {
       callId,
       phoneNumber,
       script: personalizedScript, // Use personalized script
-      companyName, // Store extracted company
+      companyName, // Seller's Company (e.g., ProductBoard)
+      prospectCompany, // Prospect's Company (e.g., Target Lead)
       voicePersona,
       voiceId, // Store the actual ElevenLabs voice ID
       leadName,

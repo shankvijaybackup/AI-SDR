@@ -29,7 +29,7 @@ const RAPPORT_RESPONSES = {
 
     // When they say "who is this?" or "what company?"
     whoIsThis: [
-        "This is {{voicePersona}} from Atomicwork - we help IT teams automate service management with AI. Is now a good time?",
+        "This is {{voicePersona}} from {{companyName}}. Is now a good time?",
     ],
 };
 
@@ -110,7 +110,7 @@ const CLOSING_RESPONSES = {
  */
 export function getCachedResponse(input, phase, context = {}) {
     const normalized = input.toLowerCase().trim();
-    const { voicePersona = 'Alex', leadEmail = '' } = context;
+    const { voicePersona = 'Alex', leadEmail = '', companyName = 'our company' } = context;
 
     // ===== RAPPORT PHASE =====
     if (phase === 'rapport') {
@@ -129,10 +129,10 @@ export function getCachedResponse(input, phase, context = {}) {
             return randomPick(RAPPORT_RESPONSES.yesPermission);
         }
 
-        // "who is this?"
-        if (/who (is|are) (this|you)|what company|where (are|r) you (from|calling)/i.test(normalized)) {
-            return randomPick(RAPPORT_RESPONSES.whoIsThis).replace('{{voicePersona}}', voicePersona);
-        }
+        // "who is this?" -> LET AI HANDLE IT based on Knowledge Base
+        // if (/who (is|are) (this|you)|what company|where (are|r) you (from|calling)/i.test(normalized)) {
+        //     return null; // Fall through to AI
+        // }
     }
 
     // ===== OBJECTION HANDLING =====

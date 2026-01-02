@@ -601,11 +601,20 @@ export async function getAiSdrReply({
     const isCompanyInfoQuestion =
       /\b(company|who are you|what is|tell me about|background|founded|headquarter|location|based|office|pricing|cost|funding|investor|ceo|cto)\b/i.test(lowerUserText);
 
-    if (mentionsAtomicwork || isCompanyInfoQuestion) {
-      // ALWAYS provide Atomicwork info when asked directly
-      const atomicworkInfo = `Atomicwork is an AI-native service management platform. Headquarters: San Francisco, California (with offices in Bangalore, India). We help IT, HR, and Finance teams automate employee support using agentic AI. Our Universal AI Agent "Atom" meets employees in Slack and Teams to resolve requests without portals or tickets. Key capabilities: identity & access management automation, 40-60% ticket deflection, 100+ preconfigured AI skills.`;
-      console.log(`[RAG] Retrieved company info for Atomicwork question`);
-      companyInfo = atomicworkInfo;
+    if (isCompanyInfoQuestion) {
+      // Check if we are actually representing Atomicwork
+      const isAtomicwork = companyName && companyName.toLowerCase().includes('atomicwork');
+
+      if (isAtomicwork) {
+        // ONLY provide Atomicwork info if that is the configured company
+        const atomicworkInfo = `Atomicwork is an AI-native service management platform. Headquarters: San Francisco, California (with offices in Bangalore, India). We help IT, HR, and Finance teams automate employee support using agentic AI. Our Universal AI Agent "Atom" meets employees in Slack and Teams to resolve requests without portals or tickets. Key capabilities: identity & access management automation, 40-60% ticket deflection, 100+ preconfigured AI skills.`;
+        console.log(`[RAG] Retrieved default info for Atomicwork`);
+        companyInfo = atomicworkInfo;
+      } else {
+        // For other companies, reliance on RAG context (relevantKnowledge) is preferred.
+        // If no RAG context is available, the AI will rely on the System Prompt's persona.
+        console.log(`[RAG] Company info question for ${companyName || 'unknown company'} - deferring to Knowledge Base`);
+      }
     }
   }
 

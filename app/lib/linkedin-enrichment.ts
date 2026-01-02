@@ -29,6 +29,11 @@ interface LinkedInProfile {
   skills?: string[]
   profileUrl?: string
   source?: 'realtime' | 'scrapeninja' | 'basic'
+  companyInfo?: {
+    name: string
+    industry?: string
+    website?: string
+  }
 }
 
 export interface LinkedInCompany {
@@ -320,6 +325,48 @@ export async function enrichLead(leadId: string, userId: string): Promise<boolea
     })
 
     console.log('[LinkedIn] Lead enriched successfully.')
+
+    // POST-ENRICHMENT: Link/Create Account and Trigger Deep Research
+    if (lead.company || profile.company) {
+      const companyName = profile.company || lead.company;
+      if (companyName) {
+        console.log(`[LinkedIn] Attempting to link Account for: ${companyName}`);
+        let account = await prisma.account.findFirst({
+          where: {
+            name: { contains: companyName, mode: 'insensitive' },
+            ownerId: userId
+          }
+        });
+
+        if (!account) {
+          console.log(`[LinkedIn] Creating new Account for: ${companyName}`);
+          account = await prisma.account.create({
+            data: {
+              name: companyName,
+              ownerId: userId,
+              domain: profile.companyInfo?.website || '',
+              location: profile.location || '',
+              industry: profile.companyInfo?.industry || '',
+            }
+          });
+        }
+
+        // Link Lead to Account
+        if (account) {
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: { accountId: account.id }
+          });
+
+          // Trigger Account Enrichment (which triggers Deep Research)
+          // Run in background to not block response
+          enrichAccount(account.id).catch(err =>
+            console.error('[LinkedIn] Background Account Enrichment failed:', err)
+          );
+        }
+      }
+    }
+
     return true
   } catch (error) {
     console.error('[LinkedIn] Enrich lead error:', error)
@@ -373,6 +420,8 @@ export type { EnhancedLinkedInData, LinkedInPost, CompanyInfo, PersonaProfile } 
 
 // ==================== ACCOUNT ENRICHMENT ====================
 
+import { performDeepResearch } from './account-research';
+
 export async function enrichAccount(accountId: string): Promise<boolean> {
   console.log(`[Enrichment] Starting enrichment for account ${accountId}`);
   try {
@@ -383,8 +432,6 @@ export async function enrichAccount(accountId: string): Promise<boolean> {
     let identifier = account.linkedinUrl || account.domain;
     if (!identifier) {
       if (account.name) {
-        // Fallback: Try to guess LinkedIn URL or just skip? 
-        // For MVP, just skip if no domain/linkedin.
         console.warn(`[Enrichment] No domain or LinkedIn URL for account ${account.name}`);
         return false;
       }
@@ -400,13 +447,25 @@ export async function enrichAccount(accountId: string): Promise<boolean> {
         data: {
           enriched: true,
           industry: companyData.industry || account.industry,
-          employeeCount: typeof companyData.employeeCount === 'number' ? companyData.employeeCount : undefined, // Parse if string?
+          employeeCount: typeof companyData.employeeCount === 'number' ? companyData.employeeCount : undefined,
           location: companyData.location || account.location,
           enrichmentData: companyData as any,
           updatedAt: new Date()
         }
       });
       console.log(`[Enrichment] Account ${account.name} enriched successfully.`);
+
+      // TRIGGER DEEP CONTEXT AWARE RESEARCH
+      if (account.ownerId) {
+        try {
+          console.log(`[Enrichment] Triggering Deep Research for ${account.name}...`);
+          await performDeepResearch(accountId, account.ownerId);
+        } catch (drError) {
+          console.error('[Enrichment] Deep Research Failed:', drError);
+          // Don't fail the whole enrichment if deep research fails
+        }
+      }
+
       return true;
     }
 

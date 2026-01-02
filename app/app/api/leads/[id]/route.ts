@@ -38,6 +38,13 @@ export async function GET(
         calls: {
           orderBy: { createdAt: 'desc' },
         },
+        account: {
+          include: {
+            notes: {
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        },
       },
     })
 

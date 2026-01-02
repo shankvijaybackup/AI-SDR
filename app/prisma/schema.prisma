@@ -240,6 +240,23 @@ model Account {
   @@index([domain])
   @@index([hubspotId])
   @@index([amplemarketId])
+  
+  notes           ResearchNote[]
+}
+
+model ResearchNote {
+  id              String   @id @default(uuid())
+  accountId       String
+  source          String   // "cbs_news", "linkedin_post", "earnings_call", "perplexity", "google_search"
+  url             String?
+  title           String
+  content         String   // AI Summary
+  tags            String[] // ["leadership", "finance", "strategy", "competitor"]
+  relevanceScore  Int      @default(0) // 1-10
+  createdAt       DateTime @default(now())
+  
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId])
 }
 
 // ==================== SCRIPTS ====================
