@@ -5,8 +5,9 @@ import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Initialize both AI clients
+// Initialize both AI clients
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY || '', // Don't crash if missing, handle later
 })
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
@@ -16,6 +17,14 @@ export async function POST(request: NextRequest) {
         const currentUser = await getCurrentUser()
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+        }
+
+        // 1. Strict Environment Check
+        if (!process.env.GOOGLE_AI_API_KEY) {
+            console.error('[Script Gen] GOOGLE_AI_API_KEY is missing in environment variables.')
+            return NextResponse.json({
+                error: 'Service Misconfigured: AI API Key is missing. Please check server settings.'
+            }, { status: 503 })
         }
 
         const { knowledgeSourceIds, scriptType, targetPersona } = await request.json()
@@ -30,6 +39,7 @@ export async function POST(request: NextRequest) {
                 id: { in: knowledgeSourceIds },
                 OR: [
                     { userId: currentUser.userId },
+                    { createdBy: currentUser.userId }, // Include user-created shared files
                     { isShared: true },
                 ],
             },
@@ -54,9 +64,10 @@ export async function POST(request: NextRequest) {
             if (source.summary) content += `Summary: ${source.summary}\n`
 
             if (source.content) {
-                content += `\nContent:\n${source.content.slice(0, 5000)}`
+                content += `\nContent:\n${source.content.slice(0, 8000)}` // Increased context for Flash
             } else if (source.chunks && Array.isArray(source.chunks)) {
-                const chunkTexts = (source.chunks as any[]).slice(0, 10).map((c: any) => c.text || c.content || '').join('\n')
+                // Use more chunks if valid
+                const chunkTexts = (source.chunks as any[]).slice(0, 20).map((c: any) => c.text || c.content || '').join('\n')
                 content += `\nContent:\n${chunkTexts}`
             }
 
@@ -80,7 +91,7 @@ export async function POST(request: NextRequest) {
 TARGET PERSONA: ${targetPersona || 'B2B decision makers'}
 
 KNOWLEDGE BASE CONTENT:
-${knowledgeContent}
+${knowledgeContent.slice(0, 500000)}
 
 REQUIREMENTS:
 - Natural, conversational tone (not robotic)
@@ -91,52 +102,47 @@ REQUIREMENTS:
 - 200-400 words
 ${scriptType === 'objection' ? '- Include 3-5 common objections with responses' : ''}`
 
-        console.log('[Script Gen] Using hybrid AI approach (Gemini + OpenAI)...')
+        console.log('[Script Gen] Using AI approach...')
 
-        // HYBRID APPROACH: Use both models and combine insights
-        let geminiScript = ''
-        let openaiScript = ''
+        let generatedScript = ''
+        let generatedWith = 'gemini-only'
 
-        // Step 1: Generate initial draft with Gemini (fast, creative)
+        // Step 1: Gemini Generation
         try {
             const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
             const geminiResult = await geminiModel.generateContent(
                 `You are a sales script expert. ${basePrompt}\n\nGenerate ONLY the script content, no commentary.`
             )
-            geminiScript = geminiResult.response.text()
+            generatedScript = geminiResult.response.text()
             console.log('[Script Gen] ✅ Gemini draft generated')
         } catch (geminiError) {
-            console.log('[Script Gen] ⚠️ Gemini failed, falling back to OpenAI only:', geminiError)
+            console.error('[Script Gen] ⚠️ Gemini failed:', geminiError)
+            return NextResponse.json({
+                error: 'AI Service Error: Failed to generate content. Please check quotas or validity of GOOGLE_AI_API_KEY.'
+            }, { status: 502 }) // Bad Gateway / Upstream error
         }
 
-        // Step 2: Refine with OpenAI (polish, structure)
-        const openaiPrompt = geminiScript
-            ? `You are a senior sales coach. Review and improve this sales script draft, making it more natural and effective while keeping its structure. Fix any awkward phrasing.
-
-DRAFT SCRIPT:
-${geminiScript}
-
-CONTEXT:
-${basePrompt}
-
-Return ONLY the improved script, no commentary.`
-            : `You are an expert sales script writer. ${basePrompt}\n\nGenerate ONLY the script content, no commentary.`
-
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                { role: 'system', content: 'You are an expert sales script writer who creates natural, effective sales scripts. Output only the script, no meta-commentary.' },
-                { role: 'user', content: openaiPrompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 1500,
-        })
-
-        openaiScript = completion.choices[0]?.message?.content || ''
-        console.log('[Script Gen] ✅ OpenAI refinement complete')
-
-        // Use the final refined script
-        const generatedScript = openaiScript
+        // Step 2: Optional OpenAI Refinement (Only if key exists and previous step succeeded)
+        // We skip this if OpenAI key is likely busted or missing, to avoid 429
+        if (process.env.OPENAI_API_KEY && generatedScript) {
+            try {
+                const completion = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: 'You are an expert sales script writer. Output only the script.' },
+                        { role: 'user', content: `Refine this script to be more natural:\n\n${generatedScript}` }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 1500,
+                })
+                generatedScript = completion.choices[0]?.message?.content || generatedScript
+                generatedWith = 'gemini+openai'
+                console.log('[Script Gen] ✅ OpenAI refinement complete')
+            } catch (openaiError: any) {
+                console.warn('[Script Gen] ⚠️ OpenAI refinement skipped (quota/error):', openaiError.status || openaiError.message)
+                // Do not fail the request, just use Gemini output
+            }
+        }
 
         // Generate a suggested name for the script
         const firstSource = knowledgeSources[0]
@@ -151,12 +157,12 @@ Return ONLY the improved script, no commentary.`
                 name: suggestedName,
                 content: generatedScript,
                 sources: knowledgeSources.map((s) => ({ id: s.id, title: s.title })),
-                generatedWith: geminiScript ? 'gemini+openai' : 'openai-only',
+                generatedWith,
             },
         })
 
     } catch (error) {
         console.error('Error generating script:', error)
-        return NextResponse.json({ error: 'Failed to generate script' }, { status: 500 })
+        return NextResponse.json({ error: 'Failed to generate script: ' + (error instanceof Error ? error.message : String(error)) }, { status: 500 })
     }
 }
