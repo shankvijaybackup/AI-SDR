@@ -20,14 +20,15 @@ export async function generateMindMap(sourceId: string, force: boolean = false) 
         console.log(`Generating MindMap for source ${sourceId} with content length: ${source.content.length}`)
 
         // TODO: Add force regenerate param
-        if (!force && source.mindMap) {
+        // TODO: Add force regenerate param
+        if (!force && source.mindMap && source.mindMap.length > 0) {
             console.log('Returning existing mindmap')
-            return source.mindMap
+            return source.mindMap[0]
         }
 
         // If forcing, delete existing
-        if (force && source.mindMap) {
-            await prisma.mindMap.delete({ where: { id: source.mindMap.id } })
+        if (force && source.mindMap && source.mindMap.length > 0) {
+            await prisma.mindMap.deleteMany({ where: { sourceId } })
         }
 
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })

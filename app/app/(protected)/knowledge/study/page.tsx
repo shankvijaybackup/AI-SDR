@@ -18,8 +18,9 @@ async function StudyContent({ userId, type, force = false }: { userId: string, t
     try {
         if (type === 'mindmap') {
             const mindMap = await generateGlobalMindMap(userId, force)
-            if (!mindMap) return <div className="p-8 text-center text-muted-foreground">No content available to generate Mind Map.</div>
-            return <MindMapViewer data={{ nodes: mindMap.data.nodes, edges: mindMap.data.edges }} />
+            if (!mindMap || !mindMap.data) return <div className="p-8 text-center text-muted-foreground">No content available to generate Mind Map.</div>
+            const data = mindMap.data as any
+            return <MindMapViewer data={{ nodes: data.nodes || [], edges: data.edges || [] }} />
         } else {
             const flashcards = await generateGlobalFlashcards(userId, force)
             if (!flashcards || flashcards.length === 0) return <div className="p-8 text-center text-muted-foreground">No content available to generate Flashcards.</div>
