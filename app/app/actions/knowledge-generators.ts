@@ -31,7 +31,7 @@ export async function generateMindMap(sourceId: string, force: boolean = false) 
             await prisma.mindMap.deleteMany({ where: { sourceId } })
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
         const prompt = `
       You are an expert at creating educational mind maps.
       Analyze the following text and create a mind map structure.
@@ -102,7 +102,7 @@ export async function generateFlashcards(sourceId: string, force: boolean = fals
         }
 
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
         const prompt = `
       You are an expert sales trainer creating flashcards for an SDR (Sales Development Representative).
       Your goal is to ensure the SDR masters the "Knowledge Source" provided below to effectively pitch and handle objections.
@@ -196,7 +196,7 @@ export async function generateGlobalMindMap(userId: string, force: boolean = fal
             throw new Error('No content available across knowledge sources')
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
         const prompt = `
       You are an expert at creating educational mind maps.
       Analyze the following aggregated knowledge base and create a COMPREHENSIVE mind map structure.
@@ -285,7 +285,7 @@ export async function generateGlobalFlashcards(userId: string, force: boolean = 
             throw new Error('No content available')
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
         const prompt = `
       You are an expert sales trainer creating flashcards for an SDR.
       Your goal is to ensure the SDR masters the ENTIRE Knowledge Base provided below.

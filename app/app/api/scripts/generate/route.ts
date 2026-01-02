@@ -110,7 +110,7 @@ ${scriptType === 'objection' ? '- Include 3-5 common objections with responses' 
 
         // Step 1: Gemini Generation
         try {
-            const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+            const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
             const geminiResult = await geminiModel.generateContent(
                 `You are a sales script expert. ${basePrompt}\n\nGenerate ONLY the script content, no commentary.`
             )

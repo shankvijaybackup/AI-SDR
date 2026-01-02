@@ -66,7 +66,7 @@ export async function generateSummary(content: string, maxLength: number = 500):
     // Truncate content if too long (Gemini 1.5 Flash has huge window but let's be reasonable)
     const truncatedContent = content.slice(0, 30000)
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
     const prompt = `You are a helpful assistant that creates concise summaries of documents for a sales knowledge base. Focus on key points, features, benefits, and use cases.
     
     Summarize the following content in ${maxLength} characters or less:\n\n${truncatedContent}`
