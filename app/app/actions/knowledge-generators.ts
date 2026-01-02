@@ -168,9 +168,15 @@ export async function generateGlobalMindMap(userId: string, force: boolean = fal
             await prisma.mindMap.delete({ where: { id: existingMindMap.id } })
         }
 
-        // Fetch all knowledge sources for the user
+        // Fetch all knowledge sources for the user (including shared ones created by them)
         const sources = await prisma.knowledgeSource.findMany({
-            where: { userId, status: 'completed' } // Assuming 'completed' status exists or similar
+            where: {
+                OR: [
+                    { userId },
+                    { createdBy: userId }
+                ],
+                status: 'completed'
+            }
         })
 
         if (sources.length === 0) {
@@ -257,7 +263,13 @@ export async function generateGlobalFlashcards(userId: string, force: boolean = 
         }
 
         const sources = await prisma.knowledgeSource.findMany({
-            where: { userId, status: 'completed' }
+            where: {
+                OR: [
+                    { userId },
+                    { createdBy: userId }
+                ],
+                status: 'completed'
+            }
         })
 
         if (sources.length === 0) {

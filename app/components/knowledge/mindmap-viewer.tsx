@@ -34,6 +34,13 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => 
     dagreGraph.setGraph({ rankdir: direction })
 
     nodes.forEach((node) => {
+        // Ensure data object exists and has label
+        if (!node.data) {
+            node.data = { label: (node as any).label || node.id }
+        } else if (!node.data.label && (node as any).label) {
+            node.data.label = (node as any).label
+        }
+
         dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight })
     })
 
