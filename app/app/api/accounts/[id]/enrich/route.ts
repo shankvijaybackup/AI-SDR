@@ -40,37 +40,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         // 2. AI Extraction (Gemini)
-        const { GoogleGenerativeAI } = await import('@google/generative-ai')
-        const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || ''
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
+        const { generateContentSafe } = await import('@/lib/gemini')
 
         const prompt = `Analyze this company data (website content or name) and extract structured information.
         
-        Input Data:
-        ${textContent.slice(0, 50000)}
-
-        Return a JSON object with these fields:
-        {
-            "description": "Short 1-2 sentence description of what they do",
-            "industry": "Specific industry (e.g. B2B SaaS, FinTech)",
-            "specialties": ["List", "of", "3-5", "keywords"],
-            "employees": "Approximate range (e.g. 50-200, 1000+)",
-            "headquarters": "City, Country (if found)",
-            "revenue": "Approximate revenue (if found, else 'Private')"
-        }
+        Company: ${account.name}
+        Domain: ${account.domain}
         
-        CRITICAL: Return ONLY valid JSON.`
+        Website Content Snippet (if available):
+        ${textContent.substring(0, 10000)}
+        
+        Return a JSON object with:
+        - description: Short 2 sentence summary of what they do.
+        - specialties: Array of strings (key technologies or services).
+        - industry: Best guess industry.
+        - employeeCount: Estimated number (number only, e.g. 100).
+        - annualRevenue: Estimated revenue range (string).
+        - location: HQ location string.
+        `
 
-        const result = await model.generateContent(prompt)
-        const responseText = result.response.text()
-
+        const result = await generateContentSafe(prompt, { jsonMode: true })
+        const response = await result.response
+        const text = response.text()
         let enrichmentData: any = {}
         try {
-            const cleanedJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim()
+            const cleanedJson = text.replace(/```json/g, '').replace(/```/g, '').trim()
             enrichmentData = JSON.parse(cleanedJson)
         } catch (e) {
-            console.error('Failed to parse AI response:', responseText)
+            console.error('Failed to parse AI response:', text)
             enrichmentData = {
                 description: `Could not analyze ${account.name}.`,
                 specialties: []

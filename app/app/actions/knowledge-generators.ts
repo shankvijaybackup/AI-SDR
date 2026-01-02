@@ -285,7 +285,7 @@ export async function generateGlobalFlashcards(userId: string, force: boolean = 
             throw new Error('No content available')
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
+        const { generateContentSafe } = await import('@/lib/gemini')
         const prompt = `
       You are an expert sales trainer creating flashcards for an SDR.
       Your goal is to ensure the SDR masters the ENTIRE Knowledge Base provided below.
@@ -304,8 +304,7 @@ export async function generateGlobalFlashcards(userId: string, force: boolean = 
       Text to analyze:
       ${combinedContent}
     `
-
-        const result = await model.generateContent(prompt)
+        const result = await generateContentSafe(prompt, { jsonMode: true })
         const response = await result.response
         const text = response.text().replace(/```json/g, '').replace(/```/g, '').trim()
         const cards = JSON.parse(text)
