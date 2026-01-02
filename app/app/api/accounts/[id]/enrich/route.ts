@@ -18,9 +18,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
-        const url = account.website || account.domain
+        const url = account.domain
         if (!url) {
-            return NextResponse.json({ error: 'Account has no website or domain to enrich from.' }, { status: 400 })
+            return NextResponse.json({ error: 'Account has no domain to enrich from.' }, { status: 400 })
         }
 
         console.log(`Enriching account ${account.name} from ${url}...`)
