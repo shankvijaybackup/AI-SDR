@@ -129,16 +129,17 @@ export default function AccountDetailPage() {
                     </div>
                 </div>
                 <div>
-                    {!account.enriched ? (
+                    <div className="flex gap-2">
+                        {account.enriched && (
+                            <Badge variant="outline" className="h-10 px-4 text-green-600 border-green-200 bg-green-50 gap-2">
+                                <CheckCircle2 className="w-4 h-4" /> Enriched
+                            </Badge>
+                        )}
                         <Button onClick={handleEnrich} disabled={enriching} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90">
                             <Sparkles className={`w-4 h-4 mr-2 ${enriching ? 'animate-spin' : ''}`} />
-                            {enriching ? 'Enriching...' : 'Enrich Account'}
+                            {enriching ? 'Enriching...' : account.enriched ? 'Re-Enrich' : 'Enrich Account'}
                         </Button>
-                    ) : (
-                        <Button variant="outline" disabled className="text-green-600 border-green-200 bg-green-50">
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> Data Enriched
-                        </Button>
-                    )}
+                    </div>
                 </div>
             </div>
 
