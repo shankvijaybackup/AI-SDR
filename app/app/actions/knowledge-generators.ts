@@ -184,7 +184,7 @@ export async function generateGlobalMindMap(userId: string, force: boolean = fal
         const combinedContent = sources
             .map(s => `--- Source: ${s.fileName} ---\n${s.content}`)
             .join('\n\n')
-            .substring(0, 100000) // Limit to 100k chars for now to be safe, though model supports more
+            .substring(0, 500000)
 
         if (!combinedContent.trim()) {
             throw new Error('No content available across knowledge sources')
@@ -193,24 +193,27 @@ export async function generateGlobalMindMap(userId: string, force: boolean = fal
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
         const prompt = `
       You are an expert at creating educational mind maps.
-      Analyze the following aggregated knowledge base from multiple documents and create a comprehensive mind map structure.
-      Connect related concepts across different documents where applicable.
+      Analyze the following aggregated knowledge base and create a COMPREHENSIVE mind map structure.
       
-      Return ONLY a valid JSON object with two arrays: "nodes" and "edges".
+      CRITICAL: Return ONLY valid JSON. No markdown formatting, no comments.
       
-      Nodes should have:
-      - id: string
-      - label: string (concise concept)
-      - type: "default" | "input" | "output"
-      
-      Edges should have:
-      - id: string
-      - source: node id
-      - target: node id
-      - label?: string (relationship description)
+      Structure:
+      {
+        "nodes": [
+          { "id": "root", "label": "Knowledge Base", "type": "input" },
+          { "id": "child1", "label": "Concept", "type": "default" }
+        ],
+        "edges": [
+          { "id": "e1-2", "source": "root", "target": "child1" }
+        ]
+      }
 
-      Keep the structure hierarchical but allow for cross-links. The root node should be "Knowledge Base".
-      Limit to 20-30 nodes max.
+      Requirements:
+      1. Create a deep hierarchy (at least 3 levels depth).
+      2. Cover ALL major topics found in the text.
+      3. Use concise labels (1-4 words).
+      4. Ensure every node is connected to the root eventually.
+      5. Generate at least 25-40 nodes to ensure coverage.
 
       Text to analyze:
       ${combinedContent}
@@ -264,7 +267,7 @@ export async function generateGlobalFlashcards(userId: string, force: boolean = 
         const combinedContent = sources
             .map(s => `--- Source: ${s.fileName} ---\n${s.content}`)
             .join('\n\n')
-            .substring(0, 100000)
+            .substring(0, 500000)
 
         if (!combinedContent.trim()) {
             throw new Error('No content available')
@@ -275,17 +278,17 @@ export async function generateGlobalFlashcards(userId: string, force: boolean = 
       You are an expert sales trainer creating flashcards for an SDR.
       Your goal is to ensure the SDR masters the ENTIRE Knowledge Base provided below.
       
-      Analyze the text and create 10-15 high-impact Q&A flashcards.
-      Focus on synthesizing information across documents if possible.
-
-      Key areas:
-      1. **Customer References**: Specific customer names and success stories.
-      2. **Hard Data & Metrics**: ROI, stats.
-      3. **Key Value Props**: Differentiation.
-      4. **Objection Handling**: Common objections found in the text and how to answer them.
+      CRITICAL: Create at least 30-50 high-impact Q&A flashcards. Do not stop at 10.
+      
+      Analyze the text deeply. Extract every distinct:
+      1. Customer Story (Problem -> Solution -> Result)
+      2. Statistic/Metric (Exact numbers)
+      3. Feature/Capability (How it works + benefit)
+      4. Objection Handling (Scenario + Best Response)
+      5. Competitive Differentiator (Us vs Them)
 
       Return ONLY a valid JSON array of objects with "front" and "back" keys.
-
+      
       Text to analyze:
       ${combinedContent}
     `
