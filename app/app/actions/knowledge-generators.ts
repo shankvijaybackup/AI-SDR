@@ -102,12 +102,20 @@ export async function generateFlashcards(sourceId: string, force: boolean = fals
 
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
         const prompt = `
-      You are an expert at creating study flashcards.
-      Analyze the following text and create 5-10 high-quality Q&A flashcards.
-      Return ONLY a valid JSON array of objects with "front" and "back" keys.
+      You are an expert sales trainer creating flashcards for an SDR (Sales Development Representative).
+      Your goal is to ensure the SDR masters the "Knowledge Source" provided below to effectively pitch and handle objections.
+
+      Analyze the text and create 5-10 high-impact Q&A flashcards.
       
-      - Front: Question or Term
-      - Back: Answer or Definition (concise)
+      shape the flashcards around these key areas if present in the text:
+      1. **Customer References**: Specific customer names, their challenges, and how they succeeded (e.g., "How did [Customer] reduce costs?").
+      2. **Hard Data & Metrics**: ROI numbers, performance percentages, speed improvements.
+      3. **Key Value Props**: What differentiates this product?
+      4. **Technical Capabilities**: Specific features and how they work.
+
+      Return ONLY a valid JSON array of objects with "front" and "back" keys.
+      - Front: A challenging question or prompt (e.g., "What is the ROI for X?").
+      - Back: The specific, data-backed answer.
 
       Text to analyze:
       ${source.content.substring(0, 15000)}

@@ -139,7 +139,9 @@ export default function ProtectedLayout({
                             <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                               {user?.firstName} {user?.lastName}
                             </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.companyName || user?.email}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate" title={user?.email}>
+                              {user?.email}
+                            </p>
                           </div>
                           <Settings className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors flex-shrink-0" />
                         </>
