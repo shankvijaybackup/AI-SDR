@@ -114,7 +114,7 @@ export default async function GlobalStudyPage({ searchParams }: { searchParams: 
                                 </div>
                             }>
                                 <div className="h-full p-8">
-                                    <StudyContent userId={user.userId} type="flashcards" />
+                                    <StudyContent userId={user.userId} type="flashcards" force={force} />
                                 </div>
                             </Suspense>
                         </TabsContent>
