@@ -7,6 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Loader2, ArrowLeft, Building2, Globe, Users, MapPin, DollarSign, Sparkles, CheckCircle2 } from 'lucide-react'
 
+interface ResearchNote {
+    id: string
+    title: string
+    content: string
+    url: string | null
+    tags: string[]
+    relevanceScore: number
+    source: string
+}
+
 interface Lead {
     id: string
     firstName: string
@@ -27,6 +37,7 @@ interface Account {
     enriched: boolean
     enrichmentData: any
     leads: Lead[]
+    researchNotes: ResearchNote[]
 }
 
 export default function AccountDetailPage() {
@@ -69,7 +80,14 @@ export default function AccountDetailPage() {
             const res = await fetch(`/api/accounts/${id}/enrich`, { method: 'POST' })
             if (res.ok) {
                 const updated = await res.json()
+                // Merge the updated data (which includes new research notes)
+                // We need to re-fetch or trust the return. Assuming return is partial account.
+                // But account-research.ts returns notes? No, the route returns json(updatedAccount).
+                // Let's force a refetch or merge correctly.
                 setAccount(prev => prev ? { ...prev, ...updated } : updated)
+                // Actually the API enrich returns just 'success' or the record?
+                // Let's re-fetch to be safe and get the relations.
+                fetchAccount()
                 setMessage({ type: 'success', text: 'Account enriched successfully.' })
             } else {
                 setMessage({ type: 'error', text: 'Enrichment failed' })
@@ -137,7 +155,7 @@ export default function AccountDetailPage() {
                         )}
                         <Button onClick={handleEnrich} disabled={enriching} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90">
                             <Sparkles className={`w-4 h-4 mr-2 ${enriching ? 'animate-spin' : ''}`} />
-                            {enriching ? 'Enriching...' : account.enriched ? 'Re-Enrich' : 'Enrich Account'}
+                            {enriching ? 'Deep Researching...' : account.enriched ? 'Re-Enrich' : 'Enrich Account'}
                         </Button>
                     </div>
                 </div>
@@ -170,6 +188,53 @@ export default function AccountDetailPage() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* NEW: Deep Research Notes Section */}
+                    {account.researchNotes && account.researchNotes.length > 0 && (
+                        <div className="space-y-4">
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-purple-500" />
+                                Deep Research Insights
+                            </h3>
+                            <div className="grid gap-4">
+                                {account.researchNotes.map((note) => (
+                                    <Card key={note.id} className="overflow-hidden border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
+                                        <CardContent className="p-4">
+                                            <div className="flex justify-between items-start gap-4 mb-2">
+                                                <h4 className="font-semibold text-base text-slate-900 dark:text-slate-100">
+                                                    {note.url ? (
+                                                        <a href={note.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1">
+                                                            {note.title}
+                                                            <Globe className="w-3 h-3 text-slate-400" />
+                                                        </a>
+                                                    ) : (
+                                                        note.title
+                                                    )}
+                                                </h4>
+                                                <Badge className={note.relevanceScore >= 8 ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700"}>
+                                                    Score: {note.relevanceScore}/10
+                                                </Badge>
+                                            </div>
+                                            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
+                                                {note.content}
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {note.tags && note.tags.map((tag, i) => (
+                                                    <Badge key={i} variant="outline" className="text-xs px-2 py-0 h-5">
+                                                        {tag}
+                                                    </Badge>
+                                                ))}
+                                                <span className="text-xs text-slate-400 ml-auto self-center">
+                                                    Source: {note.source}
+                                                </span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
 
                     {/* Contacts List */}
                     <Card>

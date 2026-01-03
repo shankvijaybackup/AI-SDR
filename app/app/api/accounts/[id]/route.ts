@@ -16,6 +16,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 leads: {
                     take: 50,
                     orderBy: { createdAt: 'desc' }
+                },
+                researchNotes: {
+                    orderBy: { relevanceScore: 'desc' }
                 }
             }
         })
