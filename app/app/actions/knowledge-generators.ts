@@ -31,7 +31,7 @@ export async function generateMindMap(sourceId: string, force: boolean = false) 
             await prisma.mindMap.deleteMany({ where: { sourceId } })
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' })
         const prompt = `
       You are an expert at creating educational mind maps.
       Analyze the following text and create a mind map structure.
@@ -49,7 +49,7 @@ export async function generateMindMap(sourceId: string, force: boolean = false) 
       - label?: string (relationship description)
 
       Keep the structure hierarchical. The main topic should be the root node.
-      Limit to 15-20 nodes max for clarity.
+      Limit to 40 nodes max for clarity, but ensure main topics are covered.
 
       Text to analyze:
       ${source.content.substring(0, 15000)}
@@ -102,7 +102,7 @@ export async function generateFlashcards(sourceId: string, force: boolean = fals
         }
 
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' })
         const prompt = `
       You are an expert sales trainer creating flashcards for an SDR (Sales Development Representative).
       Your goal is to ensure the SDR masters the "Knowledge Source" provided below to effectively pitch and handle objections.
@@ -196,7 +196,7 @@ export async function generateGlobalMindMap(userId: string, force: boolean = fal
             throw new Error('No content available across knowledge sources')
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' })
         const prompt = `
       You are an expert at creating educational mind maps.
       Analyze the following aggregated knowledge base and create a COMPREHENSIVE mind map structure.
@@ -219,7 +219,8 @@ export async function generateGlobalMindMap(userId: string, force: boolean = fal
       2. Cover ALL major topics found in the text.
       3. Use concise labels (1-4 words).
       4. Ensure every node is connected to the root eventually.
-      5. Generate at least 25-40 nodes to ensure coverage.
+      5. Generate at least 50-75 nodes to ensure comprehensive coverage.
+      6. If you find transcriptions of calls or demos, create specific branches for them.
 
       Text to analyze:
       ${combinedContent}
@@ -290,7 +291,8 @@ export async function generateGlobalFlashcards(userId: string, force: boolean = 
       You are an expert sales trainer creating flashcards for an SDR.
       Your goal is to ensure the SDR masters the ENTIRE Knowledge Base provided below.
       
-      CRITICAL: Create at least 30-50 high-impact Q&A flashcards. Do not stop at 10.
+      CRITICAL: Create at least 50-75 high-impact Q&A flashcards. Do not stop at 10.
+      If you find Customer Call transcripts or Demo scripts, create specific scenario-based cards.
       
       Analyze the text deeply. Extract every distinct:
       1. Customer Story (Problem -> Solution -> Result)
