@@ -202,14 +202,7 @@ export default function AccountDetailPage() {
                                         <CardContent className="p-4">
                                             <div className="flex justify-between items-start gap-4 mb-2">
                                                 <h4 className="font-semibold text-base text-slate-900 dark:text-slate-100">
-                                                    {note.url ? (
-                                                        <a href={note.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline flex items-center gap-1">
-                                                            {note.title}
-                                                            <Globe className="w-3 h-3 text-slate-400" />
-                                                        </a>
-                                                    ) : (
-                                                        note.title
-                                                    )}
+                                                    {note.title}
                                                 </h4>
                                                 <Badge className={note.relevanceScore >= 8 ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700"}>
                                                     Score: {note.relevanceScore}/10
@@ -218,15 +211,31 @@ export default function AccountDetailPage() {
                                             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
                                                 {note.content}
                                             </p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {note.tags && note.tags.map((tag, i) => (
-                                                    <Badge key={i} variant="outline" className="text-xs px-2 py-0 h-5">
-                                                        {tag}
-                                                    </Badge>
-                                                ))}
-                                                <span className="text-xs text-slate-400 ml-auto self-center">
-                                                    Source: {note.source}
-                                                </span>
+                                            <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {note.tags && note.tags.map((tag, i) => (
+                                                        <Badge key={i} variant="outline" className="text-xs px-2 py-0 h-5">
+                                                            {tag}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+
+                                                {note.url ? (
+                                                    <a href={note.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:text-blue-700 underline flex items-center gap-1">
+                                                        Source: {(() => {
+                                                            try {
+                                                                return new URL(note.url).hostname.replace('www.', '');
+                                                            } catch {
+                                                                return 'Link';
+                                                            }
+                                                        })()}
+                                                        <Globe className="w-3 h-3" />
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400">
+                                                        Source: {note.source.length > 30 ? note.source.substring(0, 30) + '...' : note.source}
+                                                    </span>
+                                                )}
                                             </div>
                                         </CardContent>
                                     </Card>

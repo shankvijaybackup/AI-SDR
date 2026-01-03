@@ -67,14 +67,16 @@ export async function performDeepResearch(accountId: string, userId: string) {
     Output Format:
     Return a JSON array of objects. Each object must have:
     - title: Headline of the finding
-    - source: URL or "Internal Analysis"
+    - source: Full valid URL (e.g. "https://techcrunch.com/2024/01/01/startup-raises-series-b/") or "Internal Analysis"
     - content: Summary of the finding (2-3 sentences)
     - tags: Array of strings (e.g. ["Funding", "Risk", "Hiring"])
     - relevanceScore: Number 1-10
     
+    IMPORTANT: Do NOT truncate URLs. Provide the full, clickable link.
+    
     Example:
     [
-        { "title": "Raised Series B", "source": "https://techcrunch.com...", "content": "...", "tags": ["Funding"], "relevanceScore": 10 }
+        { "title": "Raised Series B", "source": "https://techcrunch.com/2024/01/01/startup-raises-series-b", "content": "...", "tags": ["Funding"], "relevanceScore": 10 }
     ]
     
     Return ONLY VALID JSON.
