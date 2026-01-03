@@ -1,5 +1,4 @@
 
-
 /**
  * Account Research Service (Gemini + Google Search Grounding)
  * 
@@ -14,9 +13,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 async function generateWithSearch(prompt: string, apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Use gemini-2.0-flash-exp or gemini-flash-latest which usually support grounding
-    // If the user access list showed 'gemini-2.0-flash', we try that.
-    // If it fails, we assume standard knowledge.
+    // Use gemini-flash-latest first (stable, high limits).
+    // Then 2.0-flash (often rate limited).
+    // Then 2.0-exp.
 
     const strategies = ['gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.0-flash-exp'];
 
@@ -24,7 +23,7 @@ async function generateWithSearch(prompt: string, apiKey: string) {
         try {
             const model = genAI.getGenerativeModel({
                 model: modelName,
-                tools: [{ googleSearch: {} } as any] // Enable Grounding
+                tools: [{ googleSearch: {} } as any] // Enable Grounding (Cast to any to avoid old typing issues)
             });
 
             const result = await model.generateContent(prompt);
@@ -90,7 +89,6 @@ export async function performDeepResearch(accountId: string, userId: string) {
             researchNotes = JSON.parse(cleaned);
         } catch (e) {
             console.error('[Deep Research] Failed to parse JSON:', textResponse);
-            // Attempt to recover partials? No, just abort.
             return [];
         }
 
@@ -108,13 +106,7 @@ export async function performDeepResearch(accountId: string, userId: string) {
 
         console.log(`[Deep Research] Saving ${notesToCreate.length} notes...`);
 
-        // Use transaction or separate creates? createMany is fine.
-        // But schema 'ResearchNote' might be different. 
-        // Let's check schema.prisma previously. 
-        // It has `id`, `accountId`. 
-        // Wait, does it have `title`, `source`, `url`, `tags`, `relevanceScore`, `content`?
-        // I need to verify 'ResearchNote' schema.
-
+        // Use createMany
         await prisma.researchNote.createMany({
             data: notesToCreate
         });
@@ -126,4 +118,3 @@ export async function performDeepResearch(accountId: string, userId: string) {
         return [];
     }
 }
-
