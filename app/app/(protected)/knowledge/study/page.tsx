@@ -102,7 +102,7 @@ export default async function GlobalStudyPage({ searchParams }: { searchParams: 
                                     <p className="text-slate-500 animate-pulse">Generating comprehensive Mind Map...</p>
                                 </div>
                             }>
-                                <StudyContent userId={user.userId} type="mindmap" />
+                                <StudyContent userId={user.userId} type="mindmap" force={force} />
                             </Suspense>
                         </TabsContent>
 

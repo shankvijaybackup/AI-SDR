@@ -85,8 +85,16 @@ export async function performDeepResearch(accountId: string, userId: string) {
 
         let researchNotes: any[] = [];
         try {
-            const cleaned = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-            researchNotes = JSON.parse(cleaned);
+            // Robust JSON extraction: Find the first '[' and last ']'
+            const start = textResponse.indexOf('[');
+            const end = textResponse.lastIndexOf(']');
+
+            if (start === -1 || end === -1) {
+                throw new Error('No JSON array found in response');
+            }
+
+            const jsonStr = textResponse.substring(start, end + 1);
+            researchNotes = JSON.parse(jsonStr);
         } catch (e) {
             console.error('[Deep Research] Failed to parse JSON:', textResponse);
             return [];
