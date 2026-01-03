@@ -1,14 +1,15 @@
 
 import { GoogleGenerativeAI, GenerateContentResult } from '@google/generative-ai'
 
-// Priority list: Try specific stable versions first, then generic aliases, then fallback to Pro.
+// Priority list: Try generic 'latest' first as it seems most stable for this key.
+// Then try 2.0 (often 429s on free tier).
 const MODELS_TO_TRY = [
-    'gemini-2.0-flash',     // Newest Flash (User has access)
+    'gemini-flash-latest',  // Top priority (User key supports this well)
+    'gemini-2.0-flash',     // Newest Flash (often quota limited)
     'gemini-2.0-flash-exp', // Experimental
-    'gemini-1.5-flash',     // Stable 1.5
+    'gemini-1.5-flash',     // Stable 1.5 (often 404 on this key)
     'gemini-1.5-flash-001', // Explicit 1.5
     'gemini-1.5-pro',       // Pro 1.5
-    'gemini-flash-latest',  // Generic Latest
     'gemini-pro',           // Legacy 1.0 (fallback)
 ]
 

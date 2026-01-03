@@ -18,7 +18,7 @@ async function generateWithSearch(prompt: string, apiKey: string) {
     // If the user access list showed 'gemini-2.0-flash', we try that.
     // If it fails, we assume standard knowledge.
 
-    const strategies = ['gemini-2.0-flash-exp', 'gemini-2.0-flash', 'gemini-flash-latest'];
+    const strategies = ['gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.0-flash-exp'];
 
     for (const modelName of strategies) {
         try {
