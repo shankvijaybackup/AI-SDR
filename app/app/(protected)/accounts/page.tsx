@@ -55,10 +55,8 @@ export default function AccountsPage() {
     }, [])
 
     useEffect(() => {
-        if (companyId) {
-            fetchAccounts()
-        }
-    }, [companyId, page, search])
+        fetchAccounts()
+    }, [page, search])
 
     const fetchProfile = async () => {
         try {
@@ -75,12 +73,10 @@ export default function AccountsPage() {
     }
 
     const fetchAccounts = async () => {
-        if (!companyId) return
         setLoading(true)
         setMessage(null)
         try {
             const params = new URLSearchParams({
-                companyId,
                 page: page.toString(),
                 limit: '20',
                 search

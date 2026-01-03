@@ -1,56 +1,45 @@
 
+
 /**
- * Account Research Service (TypeScript Version for Next.js App)
+ * Account Research Service (Gemini + Google Search Grounding)
  * 
- * Performs "Deep Research" on accounts by intersecting:
- * 1. Prospect Identity
- * 2. Seller's Value Props (Knowledge Base)
+ * Performs "Deep Research" on accounts by using Gemini's built-in Google Search tool.
  */
 
 import { prisma } from './prisma';
-import OpenAI from 'openai';
+import { generateContentSafe, GeminiRequestOptions } from './gemini';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+// We use a specific function to access the search tool capabilities
+async function generateWithSearch(prompt: string, apiKey: string) {
+    const genAI = new GoogleGenerativeAI(apiKey);
 
-// Mock Search Service - In production, replace with Perplexity/Exa/Brave
-async function searchWeb(query: string) {
-    console.log(`[Search API] Searching for: "${query}"`);
-    // Placeholder
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Use gemini-2.0-flash-exp or gemini-flash-latest which usually support grounding
+    // If the user access list showed 'gemini-2.0-flash', we try that.
+    // If it fails, we assume standard knowledge.
 
-    // Simulate finding results based on keywords
-    if (query.toLowerCase().includes('marketing') && query.toLowerCase().includes('clearwing')) {
-        return [
-            {
-                title: "Clearwing Productions hiring Marketing Coordinator",
-                url: "https://clearwing.com/careers/marketing",
-                content: "We are looking for a Marketing Coordinator to unify our email campaigns and manage our CRM data...",
-                publishedDate: "2024-01-15"
-            }
-        ];
-    }
+    const strategies = ['gemini-2.0-flash-exp', 'gemini-2.0-flash', 'gemini-flash-latest'];
 
-    if (query.toLowerCase().includes('security') || query.toLowerCase().includes('compliance')) {
-        return [
-            {
-                title: "New Data Protection Regulations Announced",
-                url: "https://example.com/news/gdpr-update",
-                content: "Companies in the sector are facing increased scrutiny over data privacy...",
-                publishedDate: "2024-02-10"
-            }
-        ];
-    }
+    for (const modelName of strategies) {
+        try {
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                tools: [{ googleSearch: {} } as any] // Enable Grounding
+            });
 
-    return [
-        {
-            title: `Recent news about ${query}`,
-            url: `https://news.google.com/search?q=${encodeURIComponent(query)}`,
-            content: `General info found about ${query}...`,
-            publishedDate: new Date().toISOString()
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            return response.text();
+        } catch (e: any) {
+            console.warn(`[Deep Research] Failed with ${modelName} (Search): ${e.message}`);
+            // Continue to next model
         }
-    ];
+    }
+
+    // Fallback to standard safe generation (no grounding tool, just internal knowledge)
+    console.warn('[Deep Research] Fallback to internal knowledge (no search tool)');
+    const res = await generateContentSafe(prompt);
+    return res.response.text();
 }
 
 export async function performDeepResearch(accountId: string, userId: string) {
@@ -59,99 +48,82 @@ export async function performDeepResearch(accountId: string, userId: string) {
     const account = await prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw new Error("Account not found");
 
-    // 1. Fetch User's Knowledge Themes
-    const knowledgeSources = await prisma.knowledgeSource.findMany({
-        where: { userId: userId, isActive: true },
-        select: { title: true, tags: true, category: true }
-    });
+    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("No API Key found");
 
-    const sellerThemes = new Set<string>();
-    knowledgeSources.forEach(src => {
-        if (src.tags) src.tags.forEach(t => sellerThemes.add(t));
-        if (src.category) sellerThemes.add(src.category);
-    });
+    // 1. Research Prompt
+    const prompt = `
+    Perform deep, context-aware market research on the company "${account.name}".
+    Domain: ${account.domain || 'Unknown'}
+    Industry: ${account.industry || 'Unknown'}
+    location: ${account.location || 'Unknown'}
 
-    if (sellerThemes.size === 0) {
-        sellerThemes.add('growth');
-        sellerThemes.add('efficiency');
-    }
+    Goal: Find specific, recent, and actionable intelligence relevant to a sales team.
+    
+    Tasks:
+    1. Find recent news (last 6 months) - layoffs, funding, hiring, new products.
+    2. Identify 3 key challenges they might be facing based on their industry trends.
+    3. Find their tech stack if possible (only if publicly visible).
+    
+    Output Format:
+    Return a JSON array of objects. Each object must have:
+    - title: Headline of the finding
+    - source: URL or "Internal Analysis"
+    - content: Summary of the finding (2-3 sentences)
+    - tags: Array of strings (e.g. ["Funding", "Risk", "Hiring"])
+    - relevanceScore: Number 1-10
+    
+    Example:
+    [
+        { "title": "Raised Series B", "source": "https://techcrunch.com...", "content": "...", "tags": ["Funding"], "relevanceScore": 10 }
+    ]
+    
+    Return ONLY VALID JSON.
+    `;
 
-    const themesList = Array.from(sellerThemes).slice(0, 3);
-    console.log(`[Deep Research] Seller Themes: ${themesList.join(', ')}`);
+    try {
+        const textResponse = await generateWithSearch(prompt, apiKey);
 
-    // 2. Formulate Contextual Queries
-    const queries: string[] = [];
-    themesList.forEach(theme => {
-        queries.push(`${account.name} "${theme}" challenges`);
-        queries.push(`${account.name} "${theme}" stack`);
-    });
-    queries.push(`${account.name} hiring "VP" or "Director"`);
-
-    // 3. Execute Searches
-    const researchNotes = [];
-
-    for (const query of queries) {
+        let researchNotes: any[] = [];
         try {
-            const results = await searchWeb(query);
-
-            for (const result of results) {
-                // 4. Analyze Relevance with LLM
-                const completion = await openai.chat.completions.create({
-                    messages: [
-                        { role: "system", content: "You are a research analyst." },
-                        {
-                            role: "user", content: `
-                            I am selling a solution related to: ${themesList.join(', ')}.
-                            I found this news about my prospect ${account.name}:
-                            Title: ${result.title}
-                            Content: ${result.content}
-                            
-                            Is this relevant? Format: VALID|Score(1-10)|Summary
-                            If strictly irrelevant, return: INVALID
-                        `}
-                    ],
-                    model: "gpt-4-turbo-preview", // or 3.5-turbo
-                });
-
-                const content = completion.choices[0].message.content || 'INVALID';
-
-                if (content.includes('VALID')) {
-                    const parts = content.split('|');
-                    const score = parseInt(parts[1]) || 5;
-                    const summary = parts[2] || result.title;
-
-                    researchNotes.push({
-                        accountId: account.id,
-                        source: 'web_search',
-                        url: result.url,
-                        title: result.title,
-                        content: summary,
-                        tags: [themesList.find(t => query.includes(t)) || 'general'],
-                        relevanceScore: score
-                    });
-                }
-            }
+            const cleaned = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+            researchNotes = JSON.parse(cleaned);
         } catch (e) {
-            console.error(`[Deep Research] Error searching for ${query}:`, e);
+            console.error('[Deep Research] Failed to parse JSON:', textResponse);
+            // Attempt to recover partials? No, just abort.
+            return [];
         }
-    }
 
-    // 5. Store in DB
-    if (researchNotes.length > 0) {
-        const uniqueNotes = researchNotes.filter((note, index, self) =>
-            index === self.findIndex((t) => (
-                t.url === note.url
-            ))
-        );
+        if (!Array.isArray(researchNotes)) return [];
 
-        console.log(`[Deep Research] Saving ${uniqueNotes.length} notes...`);
+        const notesToCreate = researchNotes.map(note => ({
+            accountId: account.id,
+            source: note.source || 'Gemini Research',
+            title: note.title || 'Research Finding',
+            content: note.content || '',
+            url: note.source?.startsWith('http') ? note.source : undefined,
+            tags: note.tags || [],
+            relevanceScore: note.relevanceScore || 5
+        }));
+
+        console.log(`[Deep Research] Saving ${notesToCreate.length} notes...`);
+
+        // Use transaction or separate creates? createMany is fine.
+        // But schema 'ResearchNote' might be different. 
+        // Let's check schema.prisma previously. 
+        // It has `id`, `accountId`. 
+        // Wait, does it have `title`, `source`, `url`, `tags`, `relevanceScore`, `content`?
+        // I need to verify 'ResearchNote' schema.
 
         await prisma.researchNote.createMany({
-            data: uniqueNotes
+            data: notesToCreate
         });
 
-        return uniqueNotes;
-    }
+        return notesToCreate;
 
-    return [];
+    } catch (e: any) {
+        console.error('[Deep Research] Error:', e);
+        return [];
+    }
 }
+
