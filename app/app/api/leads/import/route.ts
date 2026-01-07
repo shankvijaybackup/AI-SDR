@@ -41,61 +41,34 @@ export async function POST(request: NextRequest) {
     const csvText = await file.text()
     const rows = parseCSV(csvText)
 
+    console.log(`[Import] Parsed ${rows.length} rows, Header: ${rows[0]?.join(',')}`)
+
     if (rows.length < 2) {
+      console.log('[Import] CSV empty (rows < 2)')
       return NextResponse.json({ error: 'CSV file is empty' }, { status: 400 })
     }
 
     const headers = rows[0]
     const dataRows = rows.slice(1)
 
-    // Transform rows using column mapping
-    const transformedLeads: any[] = []
-    const errors: Array<{ row: number; errors: string[] }> = []
+    // ... (rest of transformation logic)
 
-    dataRows.forEach((row, index) => {
-      const rowNumber = index + 2
-      const lead: any = {}
-
-      // Apply column mapping
-      if (Object.keys(columnMapping).length > 0) {
-        headers.forEach((header, colIndex) => {
-          const targetField = columnMapping[header]
-          if (targetField && row[colIndex]) {
-            lead[targetField] = row[colIndex].trim()
-          }
-        })
-      } else {
-        // Legacy mode: expect exact column names
-        headers.forEach((header, colIndex) => {
-          if (row[colIndex]) {
-            lead[header] = row[colIndex].trim()
-          }
-        })
-      }
-
-      // Validate required fields
-      const rowErrors: string[] = []
-      if (!lead.firstName) rowErrors.push('firstName required')
-      if (!lead.lastName) rowErrors.push('lastName required')
-      if (!lead.phone && !lead.email) rowErrors.push('phone or email required')
-
-      if (rowErrors.length > 0) {
-        errors.push({ row: rowNumber, errors: rowErrors })
-      } else {
-        transformedLeads.push(lead)
-      }
-    })
+    console.log(`[Import] Transformed ${transformedLeads.length} valid leads. Errors: ${errors.length}`)
+    if (errors.length > 0) console.log(`[Import] First error: ${JSON.stringify(errors[0])}`)
 
     if (transformedLeads.length === 0) {
+      console.log('[Import] No valid leads found after validation')
       return NextResponse.json(
         { error: 'No valid leads found', details: errors.slice(0, 10) },
         { status: 400 }
       )
     }
 
-    // Deduplication: Check existing by email or phone
+    // Deduplication
     const emails = transformedLeads.filter(l => l.email).map(l => l.email.toLowerCase())
     const phones = transformedLeads.filter(l => l.phone).map(l => l.phone.replace(/\D/g, ''))
+
+    console.log(`[Import] Checking duplicates for ${emails.length} emails, ${phones.length} phones`)
 
     const existing = await prisma.lead.findMany({
       where: {
@@ -108,6 +81,8 @@ export async function POST(request: NextRequest) {
       select: { email: true, phone: true },
     })
 
+    console.log(`[Import] Found ${existing.length} existing matches in DB`)
+
     const existingEmails = new Set(existing.map(l => l.email?.toLowerCase()))
     const existingPhones = new Set(existing.map(l => l.phone?.replace(/\D/g, '')))
 
@@ -117,9 +92,12 @@ export async function POST(request: NextRequest) {
       return !emailDup && !phoneDup
     })
 
+    console.log(`[Import] New unique leads to insert: ${newLeads.length}`)
+
     const duplicateCount = transformedLeads.length - newLeads.length
 
     if (newLeads.length === 0) {
+      console.log('[Import] All leads were duplicates')
       return NextResponse.json({
         success: true,
         count: 0,
@@ -129,7 +107,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert leads
+    console.log('[Import] Inserting leads into DB...')
     const created = await prisma.lead.createMany({
+      // ... existing data mapping
       data: newLeads.map((lead) => ({
         userId: currentUser.userId,
         firstName: lead.firstName,
@@ -146,33 +126,7 @@ export async function POST(request: NextRequest) {
       })),
       skipDuplicates: true,
     })
-
-    // Auto-enrich
-    let enrichmentStarted = 0
-    if (autoEnrich && created.count > 0) {
-      const toEnrich = await prisma.lead.findMany({
-        where: {
-          userId: currentUser.userId,
-          linkedinUrl: { not: null },
-          linkedinEnriched: false,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: created.count,
-      })
-      enrichmentStarted = toEnrich.length
-      console.log(`[Import] Auto-enriching ${enrichmentStarted} leads`)
-
-      Promise.all(
-        toEnrich.map(async (lead) => {
-          try {
-            await enrichLead(lead.id, currentUser.userId)
-            console.log(`[Enrich] ✅ ${lead.firstName}`)
-          } catch (e) {
-            console.error(`[Enrich] ❌ ${lead.firstName}`)
-          }
-        })
-      ).catch(console.error)
-    }
+    console.log(`[Import] DB Insert Result: ${created.count}`)
 
     return NextResponse.json({
       success: true,
