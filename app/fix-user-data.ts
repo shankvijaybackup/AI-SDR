@@ -32,7 +32,8 @@ async function main() {
                 role: 'admin',
                 companyId: company.id,
                 isActive: true
-            }
+            },
+            include: { company: true }
         });
         console.log('User created with company.');
     } else {
