@@ -25,18 +25,20 @@ export type LeadCsvRow = z.infer<typeof leadCsvSchema>
 export type ScriptCsvRow = z.infer<typeof scriptCsvSchema>
 
 export function parseCSV(csvText: string): string[][] {
-  const lines = csvText.split('\n').filter(line => line.trim())
+  // Strip BOM if present
+  const cleanText = csvText.replace(/^\uFEFF/, '');
+  const lines = cleanText.split('\n').filter(line => line.trim())
   const result: string[][] = []
-  
+
   for (const line of lines) {
     const row: string[] = []
     let currentField = ''
     let insideQuotes = false
-    
+
     for (let i = 0; i < line.length; i++) {
       const char = line[i]
       const nextChar = line[i + 1]
-      
+
       if (char === '"') {
         if (insideQuotes && nextChar === '"') {
           // Escaped quote
@@ -54,12 +56,12 @@ export function parseCSV(csvText: string): string[][] {
         currentField += char
       }
     }
-    
+
     // Add last field
     row.push(currentField.trim())
     result.push(row)
   }
-  
+
   return result
 }
 
@@ -68,30 +70,30 @@ export function csvToObjects<T>(
   schema: z.ZodSchema<T>
 ): { data: T[]; errors: Array<{ row: number; errors: string[] }> } {
   const rows = parseCSV(csvText)
-  
+
   if (rows.length === 0) {
     return { data: [], errors: [{ row: 0, errors: ['CSV file is empty'] }] }
   }
-  
+
   const headers = rows[0].map(h => h.trim())
   const dataRows = rows.slice(1)
-  
+
   const data: T[] = []
   const errors: Array<{ row: number; errors: string[] }> = []
-  
+
   dataRows.forEach((row, index) => {
     const rowNumber = index + 2 // +2 because index 0 is headers, and we want 1-based row numbers
-    
+
     // Create object from row
     const obj: any = {}
     headers.forEach((header, i) => {
       const value = row[i] || ''
       obj[header] = value
     })
-    
+
     // Validate
     const result = schema.safeParse(obj)
-    
+
     if (result.success) {
       data.push(result.data)
     } else {
@@ -101,6 +103,6 @@ export function csvToObjects<T>(
       })
     }
   })
-  
+
   return { data, errors }
 }
