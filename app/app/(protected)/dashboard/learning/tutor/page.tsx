@@ -23,7 +23,7 @@ interface KnowledgeSource {
 
 export default function DeepTutorPage() {
     const [messages, setMessages] = useState<Message[]>([
-        { role: 'model', content: "Hello! I'm your Deep Tutor. Select some documents from the right to get started, and ask me anything about them." }
+        { role: 'model', content: "Hello! I'm your Deep Tutor. I've loaded your knowledge base context. Ask me anything!" }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -36,7 +36,11 @@ export default function DeepTutorPage() {
         fetch('/api/knowledge')
             .then(res => res.json())
             .then(data => {
-                if (data.knowledgeSources) setSources(data.knowledgeSources);
+                if (data.knowledgeSources) {
+                    setSources(data.knowledgeSources);
+                    // NotebookLM behavior: Select all by default
+                    setSelectedSourceIds(new Set(data.knowledgeSources.map((s: any) => s.id)));
+                }
             })
             .catch(err => console.error("Failed to fetch sources", err));
     }, []);
@@ -51,7 +55,8 @@ export default function DeepTutorPage() {
     const handleSend = async () => {
         if (!input.trim()) return;
         if (selectedSourceIds.size === 0) {
-            alert("Please select at least one document to chat with.");
+            // Optional: Alert or just do nothing. Let's alert to be safe if they deselected everything.
+            alert("Please ensure at least one document is active.");
             return;
         }
 
