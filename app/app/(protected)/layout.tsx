@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Phone, Users, FileText, Calendar, Settings, LogOut, BarChart3, BookOpen, PhoneCall, User, PanelLeftClose, PanelLeft, Building2, GraduationCap } from 'lucide-react'
+import { Phone, Users, FileText, Calendar, Settings, LogOut, BarChart3, BookOpen, PhoneCall, User, PanelLeftClose, PanelLeft, Building2, GraduationCap, Swords } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
   DropdownMenu,

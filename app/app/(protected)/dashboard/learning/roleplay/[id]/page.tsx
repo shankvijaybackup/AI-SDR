@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter, use } from 'next/navigation';
+import { useState, useEffect, useRef, use } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -138,8 +138,8 @@ export default function RoleplaySessionPage({ params }: { params: Promise<{ id: 
                                 </Avatar>
                             )}
                             <div className={`rounded-2xl px-4 py-2.5 max-w-[80%] text-sm shadow-sm ${m.role === 'user'
-                                    ? 'bg-blue-600 text-white rounded-tr-sm'
-                                    : 'bg-white border text-slate-800 rounded-tl-sm'
+                                ? 'bg-blue-600 text-white rounded-tr-sm'
+                                : 'bg-white border text-slate-800 rounded-tl-sm'
                                 }`}>
                                 {m.content}
                             </div>
