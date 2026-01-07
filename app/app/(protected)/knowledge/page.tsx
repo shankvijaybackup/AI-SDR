@@ -216,6 +216,22 @@ export default function KnowledgePage() {
     else setSelectedIds(new Set(knowledgeSources.map(s => s.id)));
   }
 
+  const handleDeleteQuiz = async (quizId: string) => {
+    if (!confirm("Are you sure you want to delete this quiz?")) return;
+    try {
+      const res = await fetch(`/api/learning/quiz/${quizId}`, { method: 'DELETE' });
+      if (res.ok) {
+        // alert("Quiz deleted successfully"); // Optional, maybe too noisy
+        fetchData();
+      } else {
+        alert("Failed to delete quiz");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error deleting quiz");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -309,9 +325,14 @@ export default function KnowledgePage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {quizzes.length === 0 && <div className="col-span-3 text-center p-10 text-muted-foreground">No quizzes yet. Go to Documents and generate one!</div>}
             {quizzes.map((quiz) => (
-              <Card key={quiz.id} className="hover:bg-accent/50 transition-colors cursor-pointer" onClick={() => router.push(`/dashboard/learning/quiz/${quiz.id}`)}>
+              <Card key={quiz.id} className="group relative hover:bg-accent/50 transition-colors cursor-pointer" onClick={() => router.push(`/dashboard/learning/quiz/${quiz.id}`)}>
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteQuiz(quiz.id); }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
                 <CardHeader>
-                  <CardTitle className="text-lg">{quiz.title}</CardTitle>
+                  <CardTitle className="text-lg pr-8">{quiz.title}</CardTitle>
                   <CardDescription className="line-clamp-2">{quiz.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
