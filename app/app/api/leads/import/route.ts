@@ -51,7 +51,43 @@ export async function POST(request: NextRequest) {
     const headers = rows[0]
     const dataRows = rows.slice(1)
 
-    // ... (rest of transformation logic)
+    // Transform rows using column mapping
+    const transformedLeads: any[] = []
+    const errors: Array<{ row: number; errors: string[] }> = []
+
+    dataRows.forEach((row, index) => {
+      const rowNumber = index + 2
+      const lead: any = {}
+
+      // Apply column mapping
+      if (Object.keys(columnMapping).length > 0) {
+        headers.forEach((header, colIndex) => {
+          const targetField = columnMapping[header]
+          if (targetField && row[colIndex]) {
+            lead[targetField] = row[colIndex].trim()
+          }
+        })
+      } else {
+        // Legacy mode: expect exact column names
+        headers.forEach((header, colIndex) => {
+          if (row[colIndex]) {
+            lead[header] = row[colIndex].trim()
+          }
+        })
+      }
+
+      // Validate required fields
+      const rowErrors: string[] = []
+      if (!lead.firstName) rowErrors.push('firstName required')
+      if (!lead.lastName) rowErrors.push('lastName required')
+      if (!lead.phone && !lead.email) rowErrors.push('phone or email required')
+
+      if (rowErrors.length > 0) {
+        errors.push({ row: rowNumber, errors: rowErrors })
+      } else {
+        transformedLeads.push(lead)
+      }
+    })
 
     console.log(`[Import] Transformed ${transformedLeads.length} valid leads. Errors: ${errors.length}`)
     if (errors.length > 0) console.log(`[Import] First error: ${JSON.stringify(errors[0])}`)
@@ -130,14 +166,36 @@ export async function POST(request: NextRequest) {
 
     // Auto-enrich
     let enrichmentStarted = 0
-    // (autoEnrich logic removed for brevity in logs? No, user needs it)
-    // Re-adding auto-enrich logic trigger if needed, or just defining var
+    if (autoEnrich && created.count > 0) {
+      const toEnrich = await prisma.lead.findMany({
+        where: {
+          userId: currentUser.userId,
+          linkedinUrl: { not: null },
+          linkedinEnriched: false,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: created.count,
+      })
+      enrichmentStarted = toEnrich.length
+      console.log(`[Import] Auto-enriching ${enrichmentStarted} leads`)
+
+      Promise.all(
+        toEnrich.map(async (lead) => {
+          try {
+            await enrichLead(lead.id, currentUser.userId)
+            console.log(`[Enrich] ✅ ${lead.firstName}`)
+          } catch (e) {
+            console.error(`[Enrich] ❌ ${lead.firstName}`)
+          }
+        })
+      ).catch(console.error)
+    }
 
     return NextResponse.json({
       success: true,
       count: created.count,
       duplicateCount,
-      enrichmentStarted: 0, // Simplified for now to avoid complexity in this hotfix
+      enrichmentStarted,
       message: `Imported ${created.count} leads${duplicateCount > 0 ? ` (${duplicateCount} duplicates skipped)` : ''}`,
     })
   } catch (error) {
