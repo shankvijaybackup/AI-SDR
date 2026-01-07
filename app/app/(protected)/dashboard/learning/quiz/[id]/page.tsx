@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
@@ -34,9 +34,9 @@ interface QuizResult {
     }[];
 }
 
-export default function QuizPage({ params }: { params: { id: string } }) {
+export default function QuizPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter()
-    const { id } = params
+    const { id } = use(params)
 
     const [quiz, setQuiz] = useState<Quiz | null>(null)
     const [loading, setLoading] = useState(true)
