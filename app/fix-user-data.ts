@@ -23,7 +23,7 @@ async function main() {
             }
         });
 
-        user = await prisma.user.create({
+        await prisma.user.create({
             data: {
                 email,
                 password: 'test', // hash properly in real app
