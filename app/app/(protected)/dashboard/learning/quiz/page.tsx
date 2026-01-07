@@ -7,6 +7,8 @@ import { Plus } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: 'Quizzes | AI-SDR',
     description: 'Practice quizzes.',
