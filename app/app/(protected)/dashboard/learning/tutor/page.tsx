@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Send, Bot, User, FileText, Loader2, Sparkles } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface Message {
@@ -123,8 +122,8 @@ export default function DeepTutorPage() {
                                         </Avatar>
                                     )}
                                     <div className={`rounded-lg px-4 py-2 max-w-[80%] text-sm ${m.role === 'user'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-slate-100 text-slate-900'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-100 text-slate-900'
                                         }`}>
                                         <div className="whitespace-pre-wrap">{m.content}</div>
                                     </div>
@@ -172,7 +171,7 @@ export default function DeepTutorPage() {
                     Knowledge Context
                 </div>
                 <div className="text-xs text-muted-foreground mb-4">
-                    Select documents to include in the AI's context window.
+                    Select documents to include in the AI&apos;s context window.
                 </div>
                 <ScrollArea className="h-[calc(100vh-10rem)] pr-4">
                     <div className="space-y-3">
