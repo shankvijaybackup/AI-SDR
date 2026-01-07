@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth'; // Assuming auth helper exists
+import { getCurrentUser } from '@/lib/auth';
 
 export const metadata: Metadata = {
     title: 'Quizzes | AI-SDR',
