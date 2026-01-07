@@ -100,8 +100,19 @@ INSTRUCTIONS:
 
         return response;
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("[DeepTutor] Error:", error);
+
+        // Handle Quota Exceeded (429)
+        if (error.message?.includes('429') || error.status === 429) {
+            return "⚠️ **AI Service Busy (Quota Exceeded)**\n\nThe AI service is currently experiencing high demand or has hit a free tier limit. Please wait a minute and try again.\n\n*(Admin: Check Gemini API Quotas)*";
+        }
+
+        // Handle Overloaded (503)
+        if (error.message?.includes('503') || error.status === 503) {
+            return "⚠️ **AI Service Overloaded**\n\nThe AI is temporarily unavailable. Please try again in 30 seconds.";
+        }
+
         throw error;
     }
 }
