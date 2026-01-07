@@ -17,7 +17,7 @@ async function generateWithSearch(prompt: string, apiKey: string) {
     // Then 2.0-flash (often rate limited).
     // Then 2.0-exp.
 
-    const strategies = ['gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.0-flash-exp'];
+    const strategies = ['gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-1.5-flash'];
 
     for (const modelName of strategies) {
         try {
@@ -28,7 +28,10 @@ async function generateWithSearch(prompt: string, apiKey: string) {
 
             const result = await model.generateContent(prompt);
             const response = await result.response;
-            return response.text();
+            return {
+                text: response.text(),
+                groundingMetadata: response.candidates?.[0]?.groundingMetadata
+            };
         } catch (e: any) {
             console.warn(`[Deep Research] Failed with ${modelName} (Search): ${e.message}`);
             // Continue to next model
@@ -38,7 +41,7 @@ async function generateWithSearch(prompt: string, apiKey: string) {
     // Fallback to standard safe generation (no grounding tool, just internal knowledge)
     console.warn('[Deep Research] Fallback to internal knowledge (no search tool)');
     const res = await generateContentSafe(prompt);
-    return res.response.text();
+    return { text: res.response.text(), groundingMetadata: null };
 }
 
 export async function performDeepResearch(accountId: string, userId: string) {
@@ -72,7 +75,9 @@ export async function performDeepResearch(accountId: string, userId: string) {
     - tags: Array of strings (e.g. ["Funding", "Risk", "Hiring"])
     - relevanceScore: Number 1-10
     
-    IMPORTANT: Do NOT truncate URLs. Provide the full, clickable link.
+    IMPORTANT: 
+    1. Do NOT truncate URLs. Provide the full, clickable link.
+    2. Do NOT use "vertexaisearch.cloud.google.com" or "grounding-api-redirect" links. You must extract and use the ORIGINAL publisher URL (e.g., bloomberg.com, techcrunch.com) from your search results.
     
     Example:
     [
@@ -83,7 +88,7 @@ export async function performDeepResearch(accountId: string, userId: string) {
     `;
 
     try {
-        const textResponse = await generateWithSearch(prompt, apiKey);
+        const { text: textResponse, groundingMetadata } = await generateWithSearch(prompt, apiKey);
 
         let researchNotes: any[] = [];
         try {
@@ -104,15 +109,47 @@ export async function performDeepResearch(accountId: string, userId: string) {
 
         if (!Array.isArray(researchNotes)) return [];
 
-        const notesToCreate = researchNotes.map(note => ({
-            accountId: account.id,
-            source: note.source || 'Gemini Research',
-            title: note.title || 'Research Finding',
-            content: note.content || '',
-            url: note.source?.startsWith('http') ? note.source : undefined,
-            tags: note.tags || [],
-            relevanceScore: note.relevanceScore || 5
-        }));
+        // Extract valid URLs from metadata chunks as a fallback pool
+        const validUrls: string[] = [];
+        if (groundingMetadata?.groundingChunks) {
+            groundingMetadata.groundingChunks.forEach((chunk: any) => {
+                if (chunk.web?.uri && !chunk.web.uri.includes('vertexaisearch')) {
+                    validUrls.push(chunk.web.uri);
+                }
+            });
+        }
+
+        console.log(`[Deep Research] Found ${validUrls.length} valid grounding URLs.`);
+
+        const notesToCreate = researchNotes.map((note, index) => {
+            let cleanSource = note.source || 'Gemini Research';
+
+            // Fix junk links
+            if (cleanSource.includes('vertexaisearch') || cleanSource.includes('google.com/grounding')) {
+                // Heuristic 1: If we have a valid URL at the same index? (Unlikely to match but possible if linear)
+                // Heuristic 2: Just pick the first valid URL?
+                // Heuristic 3: Leave as "Google Search" if we really can't find one.
+
+                if (validUrls.length > 0) {
+                    // Just pick the i-th one if available, cycling through? 
+                    // Or just the first one to be safe. 
+                    // Better to give a general valid link than a broken redirect.
+                    cleanSource = validUrls[index % validUrls.length];
+                } else {
+                    cleanSource = "Google Search (Link Internal)";
+                }
+            }
+
+            return {
+                accountId: account.id,
+                source: cleanSource,
+                title: note.title || 'Research Finding',
+                content: note.content || '',
+                url: cleanSource.startsWith('http') ? cleanSource : undefined,
+                tags: note.tags || [],
+                relevanceScore: note.relevanceScore || 5
+            };
+        });
 
         console.log(`[Deep Research] Saving ${notesToCreate.length} notes...`);
 

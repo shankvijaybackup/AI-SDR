@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatsOverview } from '@/components/analytics/StatsOverview'
 import { OutcomeDistribution } from '@/components/analytics/OutcomeDistribution'
@@ -201,7 +201,7 @@ export default function AnalyticsPage() {
 
               {/* Rows */}
               {DAYS.map((day, dayIdx) => (
-                <>
+                <React.Fragment key={day}>
                   <div key={`label-${day}`} className="text-xs text-slate-500 font-medium pr-2 flex items-center justify-end">{day}</div>
                   {HOURS.map(hour => {
                     const cell = heatmapData.find(d => d.day === dayIdx && d.hour === hour)
@@ -229,7 +229,7 @@ export default function AnalyticsPage() {
                       </div>
                     )
                   })}
-                </>
+                </React.Fragment>
               ))}
             </div>
           </div>

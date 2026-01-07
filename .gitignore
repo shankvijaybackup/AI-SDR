@@ -57,3 +57,7 @@ test-*.js
 
 # OS files
 Thumbs.db
+
+# Ngrok
+ngrok.exe
+ngrok.zip
