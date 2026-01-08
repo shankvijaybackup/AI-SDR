@@ -219,10 +219,10 @@ export default function ScriptsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Scripts</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Scripts</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2">Manage your call scripts and templates</p>
         </div>
         <div className="flex items-center space-x-3">
@@ -230,7 +230,7 @@ export default function ScriptsPage() {
             <Sparkles className="w-4 h-4 mr-2" />
             AI Generate
           </Button>
-          <Button onClick={() => setShowUpload(!showUpload)} variant="outline">
+          <Button onClick={() => setShowUpload(!showUpload)} variant="outline" className="hover:bg-blue-50">
             <UploadIcon className="w-4 h-4 mr-2" />
             {showUpload ? 'Hide Upload' : 'Import CSV'}
           </Button>
@@ -238,7 +238,7 @@ export default function ScriptsPage() {
             setShowNewScript(true)
             setEditingScript(null)
             setFormData({ name: '', content: '', isDefault: false })
-          }}>
+          }} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
             <Plus className="w-4 h-4 mr-2" />
             New Script
           </Button>

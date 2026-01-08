@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,7 +10,9 @@ import { CsvColumnMapper } from '@/components/csv-column-mapper'
 import { AddLeadDialog } from '@/components/add-lead-dialog'
 import LeadPersonaDisplay from '@/components/lead-persona-display'
 import { QuickCallModal } from '@/components/quick-call-modal'
-import { Search, Plus, Phone, Mail, Linkedin, Upload as UploadIcon, Trash2, Sparkles, Eye, RefreshCw, ExternalLink } from 'lucide-react'
+import { ModuleHeader } from '@/components/ui/module-header'
+import { StatCard, STAT_COLORS } from '@/components/ui/stat-card'
+import { Search, Plus, Phone, Mail, Linkedin, Upload as UploadIcon, Trash2, Sparkles, Eye, RefreshCw, ExternalLink, Users, Flame, Clock, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface Lead {
@@ -43,6 +46,15 @@ export default function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const [callLead, setCallLead] = useState<Lead | null>(null)  // For quick call modal
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = leads.length
+    const hot = leads.filter(l => l.interestLevel === 'high').length
+    const pending = leads.filter(l => l.status === 'pending').length
+    const completed = leads.filter(l => l.status === 'completed').length
+    return { total, hot, pending, completed }
+  }, [leads])
 
   useEffect(() => {
     fetchLeads()
@@ -208,51 +220,62 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Leads</h1>
-          <p className="text-slate-500 mt-2">Manage your lead pipeline</p>
-        </div>
+    <div className="flex-1 space-y-6 p-8 pt-6">
+      {/* Modern Header */}
+      <ModuleHeader
+        title="Leads"
+        subtitle="Manage your lead pipeline"
+      >
         <div className="flex items-center space-x-3">
-          {/* Bulk actions - always show for debugging */}
           <Button
             onClick={handleBulkEnrich}
             variant="outline"
             disabled={enrichingLeads.size > 0 || selectedLeads.size === 0}
+            className="hover:bg-purple-50"
           >
             <Sparkles className="w-4 h-4 mr-2" />
             {enrichingLeads.size > 0 ? 'Enriching...' : `Enrich ${selectedLeads.size}`}
           </Button>
           <Button
-            onClick={() => {
-              console.log('[DEBUG] Delete clicked, selectedLeads:', selectedLeads.size, Array.from(selectedLeads))
-              handleBulkDelete()
-            }}
+            onClick={() => handleBulkDelete()}
             variant="destructive"
             disabled={isDeleting || selectedLeads.size === 0}
           >
             <Trash2 className="w-4 h-4 mr-2" />
             {isDeleting ? 'Deleting...' : `Delete ${selectedLeads.size}`}
           </Button>
-          <Button onClick={() => setShowUpload(!showUpload)} variant="outline">
+          <Button onClick={() => setShowUpload(!showUpload)} variant="outline" className="hover:bg-blue-50">
             <UploadIcon className="w-4 h-4 mr-2" />
             {showUpload ? 'Hide Upload' : 'Import CSV'}
           </Button>
-          <Button onClick={() => setShowAddDialog(true)} variant="outline">
+          <Button onClick={() => setShowAddDialog(true)} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
             <Plus className="w-4 h-4 mr-2" />
             Add Lead
           </Button>
         </div>
+      </ModuleHeader>
+
+      {/* Stat Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Total Leads" value={stats.total} color={STAT_COLORS.blue} icon={Users} />
+        <StatCard label="Hot Leads" value={stats.hot} color={STAT_COLORS.red} icon={Flame} />
+        <StatCard label="Pending" value={stats.pending} color={STAT_COLORS.amber} icon={Clock} />
+        <StatCard label="Completed" value={stats.completed} color={STAT_COLORS.green} icon={CheckCircle2} />
       </div>
 
       {showUpload && (
-        <CsvColumnMapper
-          onSuccess={() => {
-            fetchLeads()
-            setShowUpload(false)
-          }}
-        />
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+        >
+          <CsvColumnMapper
+            onSuccess={() => {
+              fetchLeads()
+              setShowUpload(false)
+            }}
+          />
+        </motion.div>
       )}
 
       <AddLeadDialog

@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { StatsOverview } from '@/components/analytics/StatsOverview'
 import { OutcomeDistribution } from '@/components/analytics/OutcomeDistribution'
 import { ObjectionsChart } from '@/components/analytics/ObjectionsChart'
-import { Loader2 } from 'lucide-react'
+import { ModuleHeader } from '@/components/ui/module-header'
+import { Loader2, BarChart3 } from 'lucide-react'
 
 
 // Chart colors
@@ -115,17 +116,18 @@ export default function AnalyticsPage() {
   const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Analytics Dashboard</h1>
-          <p className="text-slate-500 mt-2">Track your calling performance and insights</p>
-        </div>
-
+    <div className="flex-1 space-y-6 p-8 pt-6">
+      {/* Modern Header */}
+      <ModuleHeader
+        title="Analytics Dashboard"
+        subtitle="Track your calling performance and insights"
+        score={{ value: Math.round(overview.summary.interestRate), label: "Interest Rate" }}
+        scoreIcon={BarChart3}
+      >
         <div className="flex items-center gap-2">
           <label className="text-sm text-slate-600">Range</label>
           <select
-            className="border rounded-md px-3 py-2 text-sm"
+            className="border rounded-md px-3 py-2 text-sm bg-white hover:bg-slate-50 transition-colors"
             value={range}
             onChange={(e) => setRange(e.target.value as TimeRange)}
           >
@@ -135,7 +137,7 @@ export default function AnalyticsPage() {
             <option value="all">All time</option>
           </select>
         </div>
-      </div>
+      </ModuleHeader>
 
       {/* Key Metrics */}
       <StatsOverview overview={overview} legacy={legacy} />

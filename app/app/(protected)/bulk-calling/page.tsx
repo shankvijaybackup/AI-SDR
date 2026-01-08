@@ -520,13 +520,13 @@ export default function BulkCallingPage() {
 
     // Create Campaign View
     return (
-        <div className="space-y-6">
+        <div className="flex-1 space-y-6 p-8 pt-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Create Bulk Campaign</h1>
+                    <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Create Bulk Campaign</h1>
                     <p className="text-slate-500 mt-1">Select leads and start automated calling</p>
                 </div>
-                <Button variant="outline" onClick={() => setViewMode('campaigns')}>
+                <Button variant="outline" onClick={() => setViewMode('campaigns')} className="hover:bg-slate-50">
                     <BarChart3 className="w-4 h-4 mr-2" /> View Campaigns
                 </Button>
             </div>

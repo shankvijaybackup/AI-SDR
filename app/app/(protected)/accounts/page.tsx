@@ -1,14 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Search, Loader2, Building2, RefreshCw, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { Search, Loader2, Building2, RefreshCw, ChevronLeft, ChevronRight, CheckCircle2, Users, Sparkles, Clock } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { ModuleHeader } from '@/components/ui/module-header'
+import { StatCard, STAT_COLORS } from '@/components/ui/stat-card'
 
 interface Account {
     id: string
@@ -49,6 +52,15 @@ export default function AccountsPage() {
     const [isImporting, setIsImporting] = useState(false)
 
     const [companyId, setCompanyId] = useState<string | null>(null)
+
+    // Calculate stats
+    const stats = useMemo(() => {
+        const total = meta?.total || accounts.length
+        const enriched = accounts.filter(a => a.enriched).length
+        const pending = accounts.filter(a => !a.enriched).length
+        const totalLeads = accounts.reduce((sum, a) => sum + a._count.leads, 0)
+        return { total, enriched, pending, totalLeads }
+    }, [accounts, meta])
 
     useEffect(() => {
         fetchProfile()
@@ -169,25 +181,33 @@ export default function AccountsPage() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Accounts</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Target companies and enrichment status</p>
-                </div>
+        <div className="flex-1 space-y-6 p-8 pt-6">
+            {/* Modern Header */}
+            <ModuleHeader
+                title="Accounts"
+                subtitle="Target companies and enrichment status"
+            >
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={handleOpenImport}>
+                    <Button variant="outline" onClick={handleOpenImport} className="hover:bg-blue-50">
                         <RefreshCw className="w-4 h-4 mr-2" />
                         Import List
                     </Button>
-                    <Button variant="outline" onClick={handleSync} disabled={syncing}>
+                    <Button variant="outline" onClick={handleSync} disabled={syncing} className="hover:bg-green-50">
                         <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                         Sync All
                     </Button>
                     <Link href="/settings">
-                        <Button variant="outline">Settings</Button>
+                        <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">Settings</Button>
                     </Link>
                 </div>
+            </ModuleHeader>
+
+            {/* Stat Cards */}
+            <div className="grid gap-4 md:grid-cols-4">
+                <StatCard label="Total Accounts" value={stats.total} color={STAT_COLORS.blue} icon={Building2} />
+                <StatCard label="Enriched" value={stats.enriched} color={STAT_COLORS.green} icon={Sparkles} />
+                <StatCard label="Pending" value={stats.pending} color={STAT_COLORS.amber} icon={Clock} />
+                <StatCard label="Total Leads" value={stats.totalLeads} color={STAT_COLORS.purple} icon={Users} />
             </div>
 
             {/* Import Dialog */}
@@ -217,7 +237,7 @@ export default function AccountsPage() {
                                 )}
                             </select>
                         </div>
-                        <Button onClick={handleImportList} disabled={!selectedListId || isImporting} className="w-full">
+                        <Button onClick={handleImportList} disabled={!selectedListId || isImporting} className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
                             {isImporting ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...
