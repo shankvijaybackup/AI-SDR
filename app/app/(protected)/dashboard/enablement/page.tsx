@@ -115,19 +115,24 @@ function KnowledgeTab() {
         for (let i = 0; i < files.length; i++) {
             const file = files[i]
             const formData = new FormData()
-            formData.append('file', file)
+            formData.append('files', file)  // API expects 'files' for multi-file upload
+            formData.append('title', file.name.replace(/\.[^/.]+$/, ''))  // Use filename as title
+            formData.append('type', 'document')  // Required field
 
             try {
-                const res = await fetch('/api/knowledge-source/upload', {
+                const res = await fetch('/api/knowledge/upload', {
                     method: 'POST',
                     body: formData
                 })
                 if (res.ok) {
                     uploadedCount.success++
                 } else {
+                    const errData = await res.json().catch(() => ({}))
+                    console.error('Upload failed:', errData)
                     uploadedCount.failed++
                 }
-            } catch {
+            } catch (e) {
+                console.error('Upload error:', e)
                 uploadedCount.failed++
             }
         }
