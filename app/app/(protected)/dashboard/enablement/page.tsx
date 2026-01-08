@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -82,10 +82,13 @@ function ModuleCard({ title, subtitle, description, href, icon: Icon, color, bgC
 
 // Knowledge Tab Content
 function KnowledgeTab() {
-    const [sources, setSources] = useState<any[]>([])
+    const [sources, setSources] = useState<Array<{ id: string; title: string; type: string; createdAt: string }>>([])
     const [loading, setLoading] = useState(true)
+    const [uploading, setUploading] = useState(false)
+    const [dragActive, setDragActive] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
-    useEffect(() => {
+    const fetchSources = () => {
         fetch('/api/knowledge-source')
             .then(res => res.json())
             .then(data => {
@@ -93,21 +96,121 @@ function KnowledgeTab() {
                 setLoading(false)
             })
             .catch(() => setLoading(false))
+    }
+
+    useEffect(() => {
+        fetchSources()
     }, [])
+
+    const handleFileUpload = async (files: FileList | null) => {
+        if (!files || files.length === 0) return
+        if (files.length > 10) {
+            alert('Maximum 10 files can be uploaded at a time')
+            return
+        }
+
+        setUploading(true)
+        const uploadedCount = { success: 0, failed: 0 }
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i]
+            const formData = new FormData()
+            formData.append('file', file)
+
+            try {
+                const res = await fetch('/api/knowledge-source/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                if (res.ok) {
+                    uploadedCount.success++
+                } else {
+                    uploadedCount.failed++
+                }
+            } catch {
+                uploadedCount.failed++
+            }
+        }
+
+        setUploading(false)
+        fetchSources() // Refresh the list
+
+        if (uploadedCount.failed > 0) {
+            alert(`Uploaded ${uploadedCount.success} file(s). ${uploadedCount.failed} failed.`)
+        }
+    }
+
+    const handleDrag = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true)
+        } else if (e.type === 'dragleave') {
+            setDragActive(false)
+        }
+    }
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDragActive(false)
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleFileUpload(e.dataTransfer.files)
+        }
+    }
 
     return (
         <div className="space-y-6">
+            {/* Hidden File Input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.txt,.md,.json"
+                className="hidden"
+                onChange={(e) => handleFileUpload(e.target.files)}
+            />
+
             {/* Upload Section */}
-            <Card className="border-dashed border-2 border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/30">
+            <Card
+                className={`border-dashed border-2 transition-colors cursor-pointer ${dragActive
+                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20'
+                    : 'border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/30'
+                    }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+            >
                 <CardContent className="p-8 text-center">
-                    <Upload className="h-12 w-12 mx-auto text-slate-400 mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Upload Knowledge</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Drag & drop documents or click to browse
-                    </p>
-                    <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
-                        <Upload className="h-4 w-4 mr-2" /> Upload Files
-                    </Button>
+                    {uploading ? (
+                        <>
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold mb-2">Uploading...</h3>
+                            <p className="text-sm text-muted-foreground">Please wait while files are being uploaded</p>
+                        </>
+                    ) : (
+                        <>
+                            <Upload className={`h-12 w-12 mx-auto mb-4 ${dragActive ? 'text-blue-500' : 'text-slate-400'}`} />
+                            <h3 className="text-lg font-semibold mb-2">Upload Knowledge</h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Drag &amp; drop up to 10 files or click to browse
+                            </p>
+                            <Button
+                                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    fileInputRef.current?.click()
+                                }}
+                            >
+                                <Upload className="h-4 w-4 mr-2" /> Upload Files
+                            </Button>
+                            <p className="text-xs text-muted-foreground mt-3">
+                                Supported: PDF, DOC, DOCX, TXT, MD, JSON
+                            </p>
+                        </>
+                    )}
                 </CardContent>
             </Card>
 
@@ -127,7 +230,7 @@ function KnowledgeTab() {
                 ) : (
                     <ScrollArea className="h-[400px]">
                         <div className="space-y-2 pr-4">
-                            {sources.map((source: any) => (
+                            {sources.map((source) => (
                                 <Card key={source.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                     <CardContent className="p-4 flex items-center gap-4">
                                         <Checkbox id={source.id} />
@@ -136,7 +239,7 @@ function KnowledgeTab() {
                                             <p className="text-xs text-muted-foreground">{source.type}</p>
                                         </div>
                                         <span className="text-xs text-muted-foreground">
-                                            {new Date(source.createdAt).toLocaleDateString()}
+                                            {source.createdAt ? new Date(source.createdAt).toLocaleDateString() : 'N/A'}
                                         </span>
                                     </CardContent>
                                 </Card>
