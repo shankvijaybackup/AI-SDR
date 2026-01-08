@@ -8,6 +8,14 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+// ==================== SALES PERSONAS ====================
+
+enum SalesPersona {
+  AE        // Account Executive
+  SC        // Solutions Consultant
+  PARTNER   // Partner/Reseller
+}
+
 // ==================== MULTI-TENANCY ====================
 
 model Company {
@@ -39,6 +47,7 @@ model Company {
   roleplayScenarios   RoleplayScenario[]
   learningPaths       LearningPath[]
   battlecards         Battlecard[]
+  pitchTemplates      PitchTemplate[]
 
   @@index([slug])
 }
@@ -141,6 +150,11 @@ model User {
   // Phase 2
   roleplaySessions      RoleplaySession[]
   learningProgress      UserLearningProgress[]
+  onboardingMilestones  OnboardingMilestone[]
+  
+  // Sales Enablement
+  salesPersona          SalesPersona?    @default(AE)
+  readinessScore        Int?             @default(0)
 
   @@index([companyId])
   @@index([isActive])
@@ -694,20 +708,71 @@ model UserLearningProgress {
   @@index([userId])
 }
 
-// --- Just-in-Time (Battlecards) ---
+// --- Just-in-Time (Battlecards - Extended for PRD) ---
 model Battlecard {
-  id              String   @id @default(uuid())
-  companyId       String?
-  competitorName  String
-  overview        String?
-  strengths       String[]
-  weaknesses      String[]
-  pricing         String?
-  killPoints      String[] // Specific points to win the deal
+  id                  String   @id @default(uuid())
+  companyId           String?
+  competitorName      String
+  overview            String?
+  strengths           String[]  // Legacy - keep for compatibility
+  weaknesses          String[]  // Legacy - keep for compatibility
+  pricing             String?
+  killPoints          String[]  // Legacy - keep for compatibility
   
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  // PRD Extensions
+  whenTheyWin         String[]  // Competitor strengths/scenarios
+  whenWeWin           String[]  // Our advantages/scenarios
+  landmines           String[]  // What NOT to say
+  positioning         String[]  // Best angles to position
+  discoveryQuestions  String[]  // Questions to expose their weaknesses
+  whyChange           String?   // Change narrative
+  nextSteps           String[]  // Recommended deal strategy
   
-  company         Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  company             Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   @@index([companyId])
+}
+
+// --- Pitch Templates (Sales Enablement) ---
+model PitchTemplate {
+  id                String       @id @default(uuid())
+  companyId         String?
+  title             String
+  duration          String       // "30sec" | "2min" | "10min" | "30min" | "45min" | "90min"
+  salesStage        String       // "INTRO" | "DISCOVERY" | "DEMO" | "OBJECTIONS" | "CLOSING" | "COMPETITION"
+  targetPersona     SalesPersona @default(AE)
+  
+  // Structured content as JSON
+  opening           Json?        // { short: string, expanded: string }
+  discovery         Json?        // { questions: string[], flow: string }
+  narrative         Json?        // { core: string, proofPoints: string[] }
+  demo              Json?        // { flow: string[], keyMoments: string[] }
+  objectionHandling Json?        // { common: Array<{objection, response}> }
+  closing           Json?        // { short: string, expanded: string }
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  company           Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@index([companyId, targetPersona, duration])
+}
+
+// --- Onboarding Milestones (30-60-90) ---
+model OnboardingMilestone {
+  id              String    @id @default(uuid())
+  userId          String
+  phase           String    // "foundation" | "mastery" | "execution"
+  week            Int       // 1-12
+  topic           String
+  status          String    @default("pending") // "pending" | "in_progress" | "completed"
+  completedAt     DateTime?
+  deliverables    String[]  // Required outputs
+  quizScore       Float?
+  
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, phase])
 }

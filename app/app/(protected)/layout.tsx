@@ -88,9 +88,7 @@ export default function ProtectedLayout({
     { name: 'Scripts', href: '/scripts', icon: FileText },
     { name: 'Calling', href: '/bulk-calling', icon: PhoneCall },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
-    { name: 'Deep Tutor', href: '/dashboard/learning/tutor', icon: GraduationCap },
-    { name: 'Roleplay', href: '/dashboard/learning/roleplay', icon: Swords },
+    { name: 'Enablement', href: '/dashboard/enablement', icon: GraduationCap },
     { name: 'Follow-ups', href: '/follow-ups', icon: Calendar },
     { name: 'Settings', href: '/settings', icon: Settings },
   ]
