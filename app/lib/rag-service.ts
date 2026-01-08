@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 export interface ChatMessage {
     role: "user" | "model";
@@ -100,19 +100,20 @@ INSTRUCTIONS:
 
         return response;
 
-    } catch (error: any) {
-        console.error("[DeepTutor] Error:", error);
+    } catch (error: unknown) {
+        const err = error as { message?: string; status?: number };
+        console.error("[DeepTutor] Error:", err);
 
         // Handle Quota Exceeded (429)
-        if (error.message?.includes('429') || error.status === 429) {
+        if (err.message?.includes('429') || err.status === 429) {
             return "⚠️ **AI Service Busy (Quota Exceeded)**\n\nThe AI service is currently experiencing high demand or has hit a free tier limit. Please wait a minute and try again.\n\n*(Admin: Check Gemini API Quotas)*";
         }
 
         // Handle Overloaded (503)
-        if (error.message?.includes('503') || error.status === 503) {
+        if (err.message?.includes('503') || err.status === 503) {
             return "⚠️ **AI Service Overloaded**\n\nThe AI is temporarily unavailable. Please try again in 30 seconds.";
         }
 
-        throw error;
+        throw err;
     }
 }
