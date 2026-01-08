@@ -8,23 +8,50 @@ interface ColumnMapping {
   [csvColumn: string]: string | null
 }
 
+// Structured audit log helper
+function auditLog(requestId: string, event: string, data?: Record<string, unknown>) {
+  const timestamp = new Date().toISOString()
+  console.log(JSON.stringify({
+    timestamp,
+    requestId,
+    event: `[IMPORT] ${event}`,
+    ...data
+  }))
+}
+
 export async function POST(request: NextRequest) {
+  const requestId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
   try {
+    auditLog(requestId, 'START', { url: request.url })
+
     const currentUser = await getCurrentUser()
     if (!currentUser) {
+      auditLog(requestId, 'AUTH_FAIL', { error: 'Not authenticated' })
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+    auditLog(requestId, 'AUTH_OK', { userId: currentUser.userId })
 
     const formData = await request.formData()
     const file = formData.get('file') as File
     const autoEnrich = formData.get('autoEnrich') === 'true'
     const columnMappingStr = formData.get('columnMapping') as string
 
+    auditLog(requestId, 'FORM_DATA', {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileSize: file?.size,
+      autoEnrich,
+      hasColumnMapping: !!columnMappingStr
+    })
+
     if (!file) {
+      auditLog(requestId, 'ERROR', { error: 'No file uploaded' })
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
     }
 
     if (!file.name.endsWith('.csv')) {
+      auditLog(requestId, 'ERROR', { error: 'File must be a CSV', fileName: file.name })
       return NextResponse.json({ error: 'File must be a CSV' }, { status: 400 })
     }
 
@@ -33,18 +60,21 @@ export async function POST(request: NextRequest) {
     if (columnMappingStr) {
       try {
         columnMapping = JSON.parse(columnMappingStr)
+        auditLog(requestId, 'COLUMN_MAPPING', { mapping: columnMapping })
       } catch {
+        auditLog(requestId, 'ERROR', { error: 'Invalid column mapping JSON' })
         return NextResponse.json({ error: 'Invalid column mapping' }, { status: 400 })
       }
     }
 
     const csvText = await file.text()
-    const rows = parseCSV(csvText)
+    auditLog(requestId, 'CSV_READ', { textLength: csvText.length, preview: csvText.substring(0, 200) })
 
-    console.log(`[Import] Parsed ${rows.length} rows, Header: ${rows[0]?.join(',')}`)
+    const rows = parseCSV(csvText)
+    auditLog(requestId, 'CSV_PARSED', { rowCount: rows.length, headers: rows[0] })
 
     if (rows.length < 2) {
-      console.log('[Import] CSV empty (rows < 2)')
+      auditLog(requestId, 'ERROR', { error: 'CSV empty', rowCount: rows.length })
       return NextResponse.json({ error: 'CSV file is empty' }, { status: 400 })
     }
 
