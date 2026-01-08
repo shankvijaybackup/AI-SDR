@@ -47,7 +47,11 @@ export async function chatWithKnowledge(
             contextText += `\n--- SOURCE: ${source.title} (${source.type}) ---\n${source.content}\n`;
         });
 
-        // 3. Construct System Prompt
+        // 3. Build source reference map for clean citations
+        const sourceMap = sources.map((s, i) => ({ num: i + 1, title: s.title, type: s.type }));
+        const sourceRefText = sourceMap.map(s => `[${s.num}] "${s.title}"`).join(', ');
+
+        // 4. Construct System Prompt
         const systemPrompt = `
 You are the "Deep Tutor", an intelligent AI sales enablement coach.
 Your goal is to answer the user's questions based ONLY on the provided context.
@@ -56,14 +60,24 @@ If the answer is not in the context, say "I don't have enough information in the
 CONTEXT:
 ${contextText}
 
+AVAILABLE SOURCES: ${sourceRefText}
+
 INSTRUCTIONS:
 - Be concise and actionable.
-- Cite the source title if you are referencing a specific document.
+- When referencing information from a document, use superscript-style numbered citations like [1], [2] etc.
+- DO NOT include raw filenames or parentheses like "(filename.pdf)" in your response.
+- At the END of your response, add a "---" divider followed by a brief "📚 Sources" section listing only the sources you actually referenced.
 - If the user asks for a roleplay or quiz, suggest they use the specific features for that, but you can provide a quick example.
 - Format your response in Markdown.
+
+EXAMPLE FORMAT:
+Your answer here with citations [1]. More info [2].
+
+---
+📚 **Sources**: [1] Document Title, [2] Another Document
 `;
 
-        // 4. Start Chat (Stateless for this service wrapper, but using history from frontend)
+        // 5. Start Chat (Stateless for this service wrapper, but using history from frontend)
         // We construct the full prompt history for the generative model
         // Note: Google's SDK 'startChat' is stateful, but for a REST API we often rebuild state or use 'generateContent' with history string.
         // Let's use 'startChat' by mapping history.
