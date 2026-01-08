@@ -384,8 +384,13 @@ function AskAITab() {
                 } catch { /* ignore */ }
             }
 
-            // Build history from previous messages
-            const history = messages.map(m => ({ role: m.role, content: m.content }))
+            // Build history from previous messages - convert 'assistant' to 'model' for Gemini API
+            const history = messages
+                .filter(m => !m.content.includes('[GoogleGenerativeAI Error]'))  // Skip error messages
+                .map(m => ({
+                    role: m.role === 'assistant' ? 'model' : m.role,
+                    content: m.content
+                }))
 
             const res = await fetch('/api/tutor/chat', {
                 method: 'POST',
