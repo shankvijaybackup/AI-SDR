@@ -341,27 +341,64 @@ function AskAITab() {
     const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
+    const [sourceIds, setSourceIds] = useState<string[]>([])
+
+    // Fetch available sources on mount
+    useEffect(() => {
+        fetch('/api/knowledge-source')
+            .then(res => res.json())
+            .then(data => {
+                const ids = (data.sources || []).map((s: { id: string }) => s.id)
+                setSourceIds(ids)
+            })
+            .catch(() => { })
+    }, [])
 
     const sendMessage = async () => {
         if (!input.trim() || loading) return
 
         const userMessage = { role: 'user', content: input }
         setMessages(prev => [...prev, userMessage])
+        const currentInput = input
         setInput('')
         setLoading(true)
 
         try {
+            // Get userId from cookie
+            const cookies = document.cookie.split(';').reduce((acc, c) => {
+                const [key, val] = c.trim().split('=')
+                acc[key] = val
+                return acc
+            }, {} as Record<string, string>)
+
+            let userId = 'anonymous'
+            if (cookies['auth-token']) {
+                try {
+                    const payload = JSON.parse(atob(cookies['auth-token'].split('.')[1]))
+                    userId = payload.userId || 'anonymous'
+                } catch { /* ignore */ }
+            }
+
+            // Build history from previous messages
+            const history = messages.map(m => ({ role: m.role, content: m.content }))
+
             const res = await fetch('/api/tutor/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
-                    docId: 'all'
+                    userId,
+                    message: currentInput,
+                    sourceIds: sourceIds.length > 0 ? sourceIds : ['all'],
+                    history
                 })
             })
             const data = await res.json()
-            setMessages(prev => [...prev, { role: 'assistant', content: data.response || data.error || 'No response' }])
-        } catch (e) {
+            if (data.success) {
+                setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
+            } else {
+                setMessages(prev => [...prev, { role: 'assistant', content: data.error || 'No response received' }])
+            }
+        } catch {
             setMessages(prev => [...prev, { role: 'assistant', content: 'Error connecting to AI service.' }])
         } finally {
             setLoading(false)
