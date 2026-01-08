@@ -10,8 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Send, User, Bot, Loader2, Trophy, AlertTriangle } from 'lucide-react';
+import { Send, Bot, Loader2, Trophy, AlertTriangle } from 'lucide-react';
 
 interface Message {
     role: 'user' | 'model';
@@ -34,24 +33,51 @@ export default function RoleplaySessionPage({ params }: { params: Promise<{ id: 
     const [scenario, setScenario] = useState<Scenario | null>(null);
     const [feedback, setFeedback] = useState<any>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [sessionError, setSessionError] = useState<string | null>(null);
 
-    // Initial Fetch (Should get session details + history)
-    // For MVP, just assuming start and local state, but we really should fetch from DB if rejoining.
-    // Let's implement a fetchSession API call or use the previous POST response if we passed state (we didn't).
-    // So we fetch session.
-    // Wait, I didn't make a GET session endpoint.
-    // I entered this "blind". I should add GET /api/roleplay/[id] later.
-    // For now, let's just initialize assuming it's new or empty history.
-    // Actually, I can use the same generic POST 'chat' to execute a 'load' action if I wanted, or just standard GET.
-
-    // Let's assume we fetch the scenario details at least.
-
+    // Fetch session details on load
     useEffect(() => {
-        // Mock fetch or real implementation
-        // fetch(`/api/roleplay/${sessionId}`)...
-        // Since I don't have it, I'll rely on the user start context or just show generic for now?
-        // No, that's bad UX. I need the scenario details.
-        // I will implement a GET endpoint in Step 2 of this fix.
+        const fetchSession = async () => {
+            try {
+                const res = await fetch(`/api/roleplay/${sessionId}`);
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    setSessionError(data.error || 'Session not found');
+                    return;
+                }
+
+                if (data.session.scenario) {
+                    setScenario({
+                        title: data.session.scenario.title,
+                        personaName: data.session.scenario.personaName,
+                        personaRole: data.session.scenario.personaRole,
+                        objectives: data.session.scenario.objectives || []
+                    });
+                }
+
+                // Restore transcript if session was resumed
+                if (data.session.transcript && Array.isArray(data.session.transcript)) {
+                    setMessages(data.session.transcript.map((t: any) => ({
+                        role: t.role === 'user' ? 'user' : 'model',
+                        content: t.content
+                    })));
+                }
+
+                // If session already has feedback, show it
+                if (data.session.feedback) {
+                    setFeedback({
+                        score: data.session.score,
+                        feedback: data.session.feedback
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to fetch session:', e);
+                setSessionError('Failed to load session');
+            }
+        };
+
+        fetchSession();
     }, [sessionId]);
 
     const handleSend = async () => {
@@ -104,6 +130,26 @@ export default function RoleplaySessionPage({ params }: { params: Promise<{ id: 
             setLoading(false);
         }
     };
+
+    // Session error view
+    if (sessionError) {
+        return (
+            <div className="max-w-md mx-auto mt-20 text-center p-8">
+                <Card>
+                    <CardContent className="pt-8 pb-6">
+                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle className="h-8 w-8 text-red-500" />
+                        </div>
+                        <h2 className="text-xl font-semibold text-red-600 mb-2">Session Not Found</h2>
+                        <p className="text-slate-500 mb-6">{sessionError}</p>
+                        <Button onClick={() => router.push('/dashboard/learning/roleplay')}>
+                            Return to Scenarios
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-4xl mx-auto h-[calc(100vh-6rem)] flex flex-col gap-4">

@@ -8,7 +8,8 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 export interface ChatMessage {
     role: "user" | "model";
-    parts: string;
+    parts?: string;
+    content?: string; // Frontend might send 'content' instead of 'parts'
 }
 
 export async function chatWithKnowledge(
@@ -82,10 +83,24 @@ Your answer here with citations [1]. More info [2].
         // Note: Google's SDK 'startChat' is stateful, but for a REST API we often rebuild state or use 'generateContent' with history string.
         // Let's use 'startChat' by mapping history.
 
-        const geminiHistory = history.map(h => ({
-            role: h.role,
-            parts: [{ text: h.parts }]
-        }));
+        // Handle both 'parts' and 'content' fields from frontend, filter out empty/invalid messages
+        console.log('[DeepTutor] Raw history received:', JSON.stringify(history));
+
+        const geminiHistory = history
+            .filter(h => {
+                const text = h.parts || h.content;
+                return text && typeof text === 'string' && text.trim().length > 0;
+            })
+            .map(h => {
+                const textContent = String(h.parts || h.content || '').trim();
+                console.log(`[DeepTutor] Mapping message - role: ${h.role}, text: ${textContent.substring(0, 50)}...`);
+                return {
+                    role: h.role as 'user' | 'model',
+                    parts: [{ text: textContent }]
+                };
+            });
+
+        console.log('[DeepTutor] Processed history count:', geminiHistory.length);
 
         // Inject system prompt into the first message or use systemInstruction if supported (Gemini 1.5)
         // For broad compatibility, we'll prepend context to the latest message or system instruction.

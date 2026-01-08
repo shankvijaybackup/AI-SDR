@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
     BookOpen,
     Brain,
@@ -259,8 +260,10 @@ function KnowledgeTab() {
 
 // Practice Tab Content
 function PracticeTab() {
+    const router = useRouter()
     const [scenarios, setScenarios] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [startingSession, setStartingSession] = useState<string | null>(null)
 
     useEffect(() => {
         fetch('/api/roleplay/scenarios')
@@ -272,8 +275,48 @@ function PracticeTab() {
             .catch(() => setLoading(false))
     }, [])
 
+    const startSession = async (scenarioId: string) => {
+        if (startingSession) return
+        setStartingSession(scenarioId)
+
+        try {
+            // Get user ID from auth
+            const userRes = await fetch('/api/auth/me')
+            const userData = await userRes.json()
+
+            if (!userData.user?.id) {
+                alert('Please log in to start a practice session')
+                setStartingSession(null)
+                return
+            }
+
+            const res = await fetch('/api/roleplay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'start',
+                    userId: userData.user.id,
+                    scenarioId
+                })
+            })
+
+            const data = await res.json()
+            if (data.success && data.session?.id) {
+                // Navigate to the new session
+                router.push(`/dashboard/learning/roleplay/${data.session.id}`)
+            } else {
+                alert('Failed to start session: ' + (data.error || 'Unknown error'))
+                setStartingSession(null)
+            }
+        } catch (e) {
+            console.error('Failed to start session:', e)
+            alert('Failed to start session. Please try again.')
+            setStartingSession(null)
+        }
+    }
+
     const PRACTICE_MODULES = [
-        { title: "Pitch Library", description: "Ready-to-use talk tracks", href: "/dashboard/learning/pitches", icon: Presentation, color: "text-blue-600" },
+        { title: "Pitch Library", description: "Ready-to-use talk tracks", href: "/dashboard/enablement/pitch-library", icon: Presentation, color: "text-blue-600" },
         { title: "Quizzes", description: "Test your knowledge", href: "/dashboard/learning/quiz", icon: GraduationCap, color: "text-amber-600" },
         { title: "Battlecards", description: "Competitive intel", href: "/dashboard/learning/battlecards", icon: Swords, color: "text-red-600" },
     ]
@@ -306,6 +349,10 @@ function PracticeTab() {
                 </h3>
                 {loading ? (
                     <div className="text-center py-8 text-muted-foreground">Loading scenarios...</div>
+                ) : scenarios.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                        No scenarios available. Please check the database.
+                    </div>
                 ) : (
                     <div className="grid md:grid-cols-2 gap-4">
                         {scenarios.map((scenario: any) => (
@@ -326,11 +373,22 @@ function PracticeTab() {
                                 </CardHeader>
                                 <CardContent>
                                     <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{scenario.description}</p>
-                                    <Link href={`/dashboard/learning/roleplay/${scenario.id}`}>
-                                        <Button size="sm" className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
-                                            <Play className="h-4 w-4 mr-2" /> Start Practice
-                                        </Button>
-                                    </Link>
+                                    <Button
+                                        size="sm"
+                                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                                        onClick={() => startSession(scenario.id)}
+                                        disabled={startingSession === scenario.id}
+                                    >
+                                        {startingSession === scenario.id ? (
+                                            <>
+                                                <span className="animate-spin mr-2">⏳</span> Starting...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Play className="h-4 w-4 mr-2" /> Start Practice
+                                            </>
+                                        )}
+                                    </Button>
                                 </CardContent>
                             </Card>
                         ))}
@@ -385,11 +443,20 @@ function AskAITab() {
             }
 
             // Build history from previous messages - convert 'assistant' to 'model' for Gemini API
+            // Filter out error messages and ensure valid content
             const history = messages
-                .filter(m => !m.content.includes('[GoogleGenerativeAI Error]'))  // Skip error messages
+                .filter(m => {
+                    // Skip error messages from Google AI
+                    if (m.content.includes('[GoogleGenerativeAI Error]')) return false
+                    // Skip empty messages
+                    if (!m.content || m.content.trim().length === 0) return false
+                    // Skip error connecting messages
+                    if (m.content.includes('Error connecting to AI')) return false
+                    return true
+                })
                 .map(m => ({
-                    role: m.role === 'assistant' ? 'model' : m.role,
-                    content: m.content
+                    role: m.role === 'assistant' ? 'model' : 'user',  // Only user or model allowed
+                    content: m.content.trim()  // Ensure trimmed content
                 }))
 
             const res = await fetch('/api/tutor/chat', {
