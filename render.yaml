@@ -73,7 +73,23 @@ services:
       - key: ELEVEN_VOICE_JANE
         sync: false
       # Legacy voice IDs (backward compatibility)
-      - key: ELEVEN_VOICE_ID_MALE
-        sync: false
       - key: ELEVEN_VOICE_ID_FEMALE
+        sync: false
+
+  # Technographic Enrichment Service (Python)
+  - type: web
+    name: ai-sdr-technographic
+    runtime: docker
+    region: oregon
+    plan: free
+    rootDir: technographic-service
+    dockerfilePath: technographic-service/Dockerfile
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: CPU_ONLY
+        value: "true" 
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GOOGLE_CSE_ID
         sync: false

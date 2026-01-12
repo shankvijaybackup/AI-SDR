@@ -33,14 +33,22 @@ async def lifespan(app: FastAPI):
     global hunter_instance
     logger.info("🚀 STARTUP: Initializing Technographic Hunter Model...")
     
+    # Check for CPU_ONLY mode (e.g. for Render free tier)
+    if os.getenv("CPU_ONLY", "false").lower() == "true":
+        logger.warning("⚠️ CPU_ONLY mode detected. Skipping Heavy Model Load.")
+        logger.warning("   Technographic extraction will rely on Waterfall Search and basic Regex/Heuristics only.")
+        hunter_instance = None # Or a lightweight mock if needed
+        yield
+        return
+
     try:
-        # Initialize with 4-bit quantization for efficiency
+        # Initialize with 4-bit quantization for efficiency (Requires GPU)
         hunter_instance = TechnographicHunter(load_4bit=True)
         logger.info("✅ MODEL LOADED: Ready for extraction.")
     except Exception as e:
         logger.critical(f"❌ MODEL FAILED TO LOAD: {e}")
-        # We don't raise e here to allow the app to start even if model fails (health check will report it)
-        # But for this specific use case, maybe we should fail hard? Let's log heavily.
+        logger.warning("   Continuing in DEGRADED mode (Search only).")
+        # We allow app to start even if model fails
         
     yield
     
