@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, ArrowLeft, Building2, Globe, Users, MapPin, DollarSign, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Loader2, ArrowLeft, Building2, Globe, Users, MapPin, DollarSign, Sparkles, CheckCircle2, Linkedin, ExternalLink, Cpu } from 'lucide-react'
 
 interface ResearchNote {
     id: string
@@ -34,8 +35,10 @@ interface Account {
     employeeCount: number | null
     annualRevenue: string | null
     location: string | null
+    linkedinUrl: string | null
     enriched: boolean
     enrichmentData: any
+    technographics: any
     leads: Lead[]
     researchNotes: ResearchNote[]
 }
@@ -63,7 +66,7 @@ export default function AccountDetailPage() {
                 setAccount(data)
             } else {
                 setMessage({ type: 'error', text: 'Account not found' })
-                setTimeout(() => router.push('/accounts'), 2000)
+                // Removed router.push redirect to allow user to see error message
             }
         } catch (error) {
             console.error(error)
@@ -107,7 +110,32 @@ export default function AccountDetailPage() {
         )
     }
 
-    if (!account) return null
+    if (!account) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+                <div className="text-center space-y-2">
+                    <h2 className="text-2xl font-bold tracking-tight">Account Not Found</h2>
+                    <p className="text-muted-foreground">The account you are looking for does not exist or you don&apos;t have permission to view it.</p>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => router.back()}>
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Go Back
+                    </Button>
+                    <Link href="/accounts">
+                        <Button>
+                            Go to Accounts
+                        </Button>
+                    </Link>
+                </div>
+                {message && (
+                    <div className="mt-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-700">
+                        {message.text}
+                    </div>
+                )}
+            </div>
+        )
+    }
 
     return (
         <div className="space-y-6">
@@ -283,6 +311,96 @@ export default function AccountDetailPage() {
 
                 {/* Sidebar / Enrichment Data */}
                 <div className="space-y-6">
+                    {/* Social Media & Contact */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Contact & Social</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {account.linkedinUrl ? (
+                                <a
+                                    href={account.linkedinUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 transition-colors group"
+                                >
+                                    <div className="w-10 h-10 rounded bg-[#0077b5] flex items-center justify-center text-white">
+                                        <Linkedin className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium group-hover:text-[#0077b5] transition-colors">LinkedIn Profile</div>
+                                        <div className="text-xs text-slate-500">View Company Page</div>
+                                    </div>
+                                    <ExternalLink className="w-4 h-4 ml-auto text-slate-400 group-hover:text-[#0077b5]" />
+                                </a>
+                            ) : (
+                                <div className="text-center p-4 text-slate-500 text-sm bg-slate-50 rounded-lg">
+                                    No LinkedIn URL available
+                                </div>
+                            )}
+
+                            {account.domain && (
+                                <a
+                                    href={`https://${account.domain}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 transition-colors group"
+                                >
+                                    <div className="w-10 h-10 rounded bg-slate-900 flex items-center justify-center text-white">
+                                        <Globe className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium group-hover:text-blue-600 transition-colors">Website</div>
+                                        <div className="text-xs text-slate-500">{account.domain}</div>
+                                    </div>
+                                    <ExternalLink className="w-4 h-4 ml-auto text-slate-400 group-hover:text-blue-600" />
+                                </a>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Technographics */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <Cpu className="w-5 h-5 text-indigo-500" />
+                                Technographics
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {account.technographics && Object.keys(account.technographics).length > 0 ? (
+                                <div className="space-y-3">
+                                    {Object.entries(account.technographics as Record<string, any>).map(([category, techs]) => (
+                                        <div key={category}>
+                                            <h4 className="text-xs uppercase text-slate-500 font-bold mb-2">{category.replace(/_/g, ' ')}</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                                {Array.isArray(techs) ? (
+                                                    techs.map((tech: string, i: number) => (
+                                                        <Badge key={i} variant="outline" className="bg-slate-50 font-normal">
+                                                            {tech}
+                                                        </Badge>
+                                                    ))
+                                                ) : (
+                                                    <Badge variant="outline" className="bg-slate-50 font-normal">
+                                                        {typeof techs === 'string' ? techs : JSON.stringify(techs)}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-6">
+                                    <p className="text-slate-500 text-sm mb-4">No technographic data found.</p>
+                                    <Button size="sm" variant="outline" onClick={handleEnrich} disabled={enriching}>
+                                        <Sparkles className="w-3 h-3 mr-2" />
+                                        {enriching ? 'Scanning...' : 'Scan Technographics'}
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
                     <Card className="h-full border-l-4 border-l-purple-500">
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">

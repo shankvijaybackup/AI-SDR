@@ -421,6 +421,9 @@ export type { EnhancedLinkedInData, LinkedInPost, CompanyInfo, PersonaProfile } 
 
 import { performDeepResearch } from './account-research';
 
+// ...
+import { performTechnographicEnrichment } from './technographic-client';
+
 export async function enrichAccount(accountId: string): Promise<boolean> {
   console.log(`[Enrichment] Starting enrichment for account ${accountId}`);
   try {
@@ -464,6 +467,11 @@ export async function enrichAccount(accountId: string): Promise<boolean> {
           // Don't fail the whole enrichment if deep research fails
         }
       }
+
+      // TRIGGER TECHNOGRAPHIC ENRICHMENT
+      performTechnographicEnrichment(accountId).catch(err =>
+        console.error('[Enrichment] Technographic Enrichment Failed:', err)
+      );
 
       return true;
     }

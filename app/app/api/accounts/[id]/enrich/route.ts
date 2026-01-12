@@ -97,13 +97,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // 3. Trigger Deep Research (Context-Aware Grounding)
         try {
             const { performDeepResearch } = await import('@/lib/account-research')
-            console.log('Triggering deep research...')
-            // Fire and forget? No, wait for it so user sees results immediately if possible.
-            // Or Fire and forget to speed up UI?
-            // User wants results. Let's await it but catch errors safely.
-            await performDeepResearch(id, user.userId)
+            const { performTechnographicEnrichment } = await import('@/lib/technographic-client')
+
+            console.log('Triggering deep research and technographic enrichment...')
+
+            // Run in parallel
+            await Promise.allSettled([
+                performDeepResearch(id, user.userId),
+                performTechnographicEnrichment(id)
+            ])
+
         } catch (researchError) {
-            console.error('Deep research failed:', researchError)
+            console.error('Research/Enrichment failed:', researchError)
             // Do not fail the request
         }
 

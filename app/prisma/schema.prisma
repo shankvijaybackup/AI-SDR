@@ -256,6 +256,11 @@ model Account {
   enriched        Boolean   @default(false)
   enrichmentData  Json?     // Store full enrichment payload
   
+  // Technographics
+  technographics      Json?
+  technographicEnriched Boolean @default(false)
+  lastEnrichedAt      DateTime?
+  
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
