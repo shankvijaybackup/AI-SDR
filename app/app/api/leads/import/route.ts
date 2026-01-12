@@ -26,238 +26,237 @@ export async function POST(request: NextRequest) {
     auditLog(requestId, 'START', { url: request.url })
 
     let currentUser = await getCurrentUser()
-    // DEBUG: Bypass auth for local testing
-    if (!currentUser && process.env.NODE_ENV !== 'production' && request.headers.get('x-debug-bypass-auth') === 'true') {
-      if (!currentUser) {
-        auditLog(requestId, 'AUTH_FAIL', { error: 'Not authenticated' })
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
+    if (!currentUser) {
+      auditLog(requestId, 'AUTH_FAIL', { error: 'Not authenticated' })
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+    auditLog(requestId, 'AUTH_OK', { userId: currentUser.userId })
+
+    const formData = await request.formData()
+    const file = formData.get('file') as File
+    const autoEnrich = formData.get('autoEnrich') === 'true'
+    const columnMappingStr = formData.get('columnMapping') as string
+
+    auditLog(requestId, 'FORM_DATA', {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileSize: file?.size,
+      autoEnrich,
+      hasColumnMapping: !!columnMappingStr
+    })
+
+    if (!file) {
+      auditLog(requestId, 'ERROR', { error: 'No file uploaded' })
+      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+    }
+
+    if (!file.name.endsWith('.csv')) {
+      auditLog(requestId, 'ERROR', { error: 'File must be a CSV', fileName: file.name })
+      return NextResponse.json({ error: 'File must be a CSV' }, { status: 400 })
+    }
+
+    // Parse column mapping
+    let columnMapping: ColumnMapping = {}
+    if (columnMappingStr) {
+      try {
+        columnMapping = JSON.parse(columnMappingStr)
+        auditLog(requestId, 'COLUMN_MAPPING', { mapping: columnMapping })
+      } catch {
+        auditLog(requestId, 'ERROR', { error: 'Invalid column mapping JSON' })
+        return NextResponse.json({ error: 'Invalid column mapping' }, { status: 400 })
       }
-      auditLog(requestId, 'AUTH_OK', { userId: currentUser.userId })
+    }
 
-      const formData = await request.formData()
-      const file = formData.get('file') as File
-      const autoEnrich = formData.get('autoEnrich') === 'true'
-      const columnMappingStr = formData.get('columnMapping') as string
+    const csvText = await file.text()
+    auditLog(requestId, 'CSV_READ', { textLength: csvText.length, preview: csvText.substring(0, 200) })
 
-      auditLog(requestId, 'FORM_DATA', {
-        hasFile: !!file,
-        fileName: file?.name,
-        fileSize: file?.size,
-        autoEnrich,
-        hasColumnMapping: !!columnMappingStr
-      })
+    const rows = parseCSV(csvText)
+    auditLog(requestId, 'CSV_PARSED', { rowCount: rows.length, headers: rows[0] })
 
-      if (!file) {
-        auditLog(requestId, 'ERROR', { error: 'No file uploaded' })
-        return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
-      }
+    if (rows.length < 2) {
+      auditLog(requestId, 'ERROR', { error: 'CSV empty', rowCount: rows.length })
+      return NextResponse.json({ error: 'CSV file is empty' }, { status: 400 })
+    }
 
-      if (!file.name.endsWith('.csv')) {
-        auditLog(requestId, 'ERROR', { error: 'File must be a CSV', fileName: file.name })
-        return NextResponse.json({ error: 'File must be a CSV' }, { status: 400 })
-      }
+    const headers = rows[0]
+    const dataRows = rows.slice(1)
 
-      // Parse column mapping
-      let columnMapping: ColumnMapping = {}
-      if (columnMappingStr) {
-        try {
-          columnMapping = JSON.parse(columnMappingStr)
-          auditLog(requestId, 'COLUMN_MAPPING', { mapping: columnMapping })
-        } catch {
-          auditLog(requestId, 'ERROR', { error: 'Invalid column mapping JSON' })
-          return NextResponse.json({ error: 'Invalid column mapping' }, { status: 400 })
-        }
-      }
+    // Transform rows using column mapping
+    const transformedLeads: any[] = []
+    const errors: Array<{ row: number; errors: string[] }> = []
 
-      const csvText = await file.text()
-      auditLog(requestId, 'CSV_READ', { textLength: csvText.length, preview: csvText.substring(0, 200) })
+    dataRows.forEach((row, index) => {
+      const rowNumber = index + 2
+      const lead: any = {}
 
-      const rows = parseCSV(csvText)
-      auditLog(requestId, 'CSV_PARSED', { rowCount: rows.length, headers: rows[0] })
+      // Apply column mapping
+      if (Object.keys(columnMapping).length > 0) {
+        headers.forEach((header, colIndex) => {
+          const targetField = columnMapping[header]
+          if (targetField && row[colIndex]) {
+            lead[targetField] = row[colIndex].trim()
+          }
+        })
+      } else {
+        // Legacy/Auto mode: fuzzy match headers
+        headers.forEach((header, colIndex) => {
+          if (row[colIndex]) {
+            const cleanHeader = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+            let targetField = header; // default to exact match
 
-      if (rows.length < 2) {
-        auditLog(requestId, 'ERROR', { error: 'CSV empty', rowCount: rows.length })
-        return NextResponse.json({ error: 'CSV file is empty' }, { status: 400 })
-      }
+            // Common mappings
+            if (['firstname', 'first', 'fname'].includes(cleanHeader)) targetField = 'firstName';
+            else if (['lastname', 'last', 'lname', 'surname'].includes(cleanHeader)) targetField = 'lastName';
+            else if (['email', 'emailaddress', 'mail'].includes(cleanHeader)) targetField = 'email';
+            else if (['phone', 'phonenumber', 'mobile', 'cell'].includes(cleanHeader)) targetField = 'phone';
+            else if (['company', 'companyname', 'organization'].includes(cleanHeader)) targetField = 'company';
+            else if (['jobtitle', 'title', 'role', 'position'].includes(cleanHeader)) targetField = 'jobTitle';
+            else if (['linkedin', 'linkedinurl', 'profile'].includes(cleanHeader)) targetField = 'linkedinUrl';
+            else if (['notes', 'comment', 'description'].includes(cleanHeader)) targetField = 'notes';
+            else if (['city', 'country', 'region', 'location'].includes(cleanHeader)) targetField = 'region';
 
-      const headers = rows[0]
-      const dataRows = rows.slice(1)
-
-      // Transform rows using column mapping
-      const transformedLeads: any[] = []
-      const errors: Array<{ row: number; errors: string[] }> = []
-
-      dataRows.forEach((row, index) => {
-        const rowNumber = index + 2
-        const lead: any = {}
-
-        // Apply column mapping
-        if (Object.keys(columnMapping).length > 0) {
-          headers.forEach((header, colIndex) => {
-            const targetField = columnMapping[header]
-            if (targetField && row[colIndex]) {
-              lead[targetField] = row[colIndex].trim()
-            }
-          })
-        } else {
-          // Legacy/Auto mode: fuzzy match headers
-          headers.forEach((header, colIndex) => {
-            if (row[colIndex]) {
-              const cleanHeader = header.toLowerCase().replace(/[^a-z0-9]/g, '');
-              let targetField = header; // default to exact match
-
-              // Common mappings
-              if (['firstname', 'first', 'fname'].includes(cleanHeader)) targetField = 'firstName';
-              else if (['lastname', 'last', 'lname', 'surname'].includes(cleanHeader)) targetField = 'lastName';
-              else if (['email', 'emailaddress', 'mail'].includes(cleanHeader)) targetField = 'email';
-              else if (['phone', 'phonenumber', 'mobile', 'cell'].includes(cleanHeader)) targetField = 'phone';
-              else if (['company', 'companyname', 'organization'].includes(cleanHeader)) targetField = 'company';
-              else if (['jobtitle', 'title', 'role', 'position'].includes(cleanHeader)) targetField = 'jobTitle';
-              else if (['linkedin', 'linkedinurl', 'profile'].includes(cleanHeader)) targetField = 'linkedinUrl';
-              else if (['notes', 'comment', 'description'].includes(cleanHeader)) targetField = 'notes';
-              else if (['city', 'country', 'region', 'location'].includes(cleanHeader)) targetField = 'region';
-
-              lead[targetField] = row[colIndex].trim()
-            }
-          })
-        }
-
-        // Validate required fields
-        const rowErrors: string[] = []
-        if (!lead.firstName) rowErrors.push(`firstName required (found keys: ${Object.keys(lead).join(', ')})`)
-        if (!lead.lastName) rowErrors.push('lastName required')
-        if (!lead.phone && !lead.email) rowErrors.push('phone or email required')
-
-        if (rowErrors.length > 0) {
-          errors.push({ row: rowNumber, errors: rowErrors })
-        } else {
-          transformedLeads.push(lead)
-        }
-      })
-
-      console.log(`[Import] Transformed ${transformedLeads.length} valid leads. Errors: ${errors.length}`)
-      if (errors.length > 0) console.log(`[Import] First error: ${JSON.stringify(errors[0])}`)
-
-      if (transformedLeads.length === 0) {
-        console.log('[Import] No valid leads found after validation')
-        return NextResponse.json(
-          {
-            error: 'No valid leads found',
-            details: errors.slice(0, 10),
-            debug: {
-              headers,
-              mappingKeys: Object.keys(columnMapping),
-              sampleRow: dataRows[0],
-              validationErrors: errors.slice(0, 5)
-            }
-          },
-          { status: 400 }
-        )
-      }
-
-      // Deduplication
-      const emails = transformedLeads.filter(l => l.email).map(l => l.email.toLowerCase())
-      const phones = transformedLeads.filter(l => l.phone).map(l => l.phone.replace(/\D/g, ''))
-
-      console.log(`[Import] Checking duplicates for ${emails.length} emails, ${phones.length} phones`)
-
-      const existing = await prisma.lead.findMany({
-        where: {
-          userId: currentUser.userId,
-          OR: [
-            ...(emails.length > 0 ? [{ email: { in: emails, mode: 'insensitive' as const } }] : []),
-            ...(phones.length > 0 ? [{ phone: { in: phones } }] : []),
-          ],
-        },
-        select: { email: true, phone: true },
-      })
-
-      console.log(`[Import] Found ${existing.length} existing matches in DB`)
-
-      const existingEmails = new Set(existing.map(l => l.email?.toLowerCase()))
-      const existingPhones = new Set(existing.map(l => l.phone?.replace(/\D/g, '')))
-
-      const newLeads = transformedLeads.filter(lead => {
-        const emailDup = lead.email && existingEmails.has(lead.email.toLowerCase())
-        const phoneDup = lead.phone && existingPhones.has(lead.phone.replace(/\D/g, ''))
-        return !emailDup && !phoneDup
-      })
-
-      console.log(`[Import] New unique leads to insert: ${newLeads.length}`)
-
-      const duplicateCount = transformedLeads.length - newLeads.length
-
-      if (newLeads.length === 0) {
-        console.log('[Import] All leads were duplicates')
-        return NextResponse.json({
-          success: true,
-          count: 0,
-          duplicateCount,
-          message: `All ${duplicateCount} leads already exist`,
+            lead[targetField] = row[colIndex].trim()
+          }
         })
       }
 
-      // Insert leads
-      console.log('[Import] Inserting leads into DB...')
-      const created = await prisma.lead.createMany({
-        // ... existing data mapping
-        data: newLeads.map((lead) => ({
-          userId: currentUser.userId,
-          firstName: lead.firstName,
-          lastName: lead.lastName,
-          phone: lead.phone || '',
-          email: lead.email || null,
-          company: lead.company || null,
-          jobTitle: lead.jobTitle || null,
-          linkedinUrl: lead.linkedinUrl || null,
-          notes: lead.notes || null,
-          status: 'pending',
-          region: lead.region || lead.country || null,
-          linkedinEnriched: false,
-        })),
-        skipDuplicates: true,
-      })
-      console.log(`[Import] DB Insert Result: ${created.count}`)
+      // Validate required fields
+      const rowErrors: string[] = []
+      if (!lead.firstName) rowErrors.push(`firstName required (found keys: ${Object.keys(lead).join(', ')})`)
+      if (!lead.lastName) rowErrors.push('lastName required')
+      if (!lead.phone && !lead.email) rowErrors.push('phone or email required')
 
-      // Auto-enrich
-      let enrichmentStarted = 0
-      if (autoEnrich && created.count > 0) {
-        const toEnrich = await prisma.lead.findMany({
-          where: {
-            userId: currentUser.userId,
-            linkedinUrl: { not: null },
-            linkedinEnriched: false,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: created.count,
-        })
-        enrichmentStarted = toEnrich.length
-        console.log(`[Import] Auto-enriching ${enrichmentStarted} leads`)
-
-        Promise.all(
-          toEnrich.map(async (lead) => {
-            try {
-              await enrichLead(lead.id, currentUser.userId)
-              console.log(`[Enrich] ✅ ${lead.firstName}`)
-            } catch (e) {
-              console.error(`[Enrich] ❌ ${lead.firstName}`)
-            }
-          })
-        ).catch(console.error)
+      if (rowErrors.length > 0) {
+        errors.push({ row: rowNumber, errors: rowErrors })
+      } else {
+        transformedLeads.push(lead)
       }
+    })
 
-      return NextResponse.json({
-        success: true,
-        count: created.count,
-        duplicateCount,
-        enrichmentStarted,
-        message: `Imported ${created.count} leads${duplicateCount > 0 ? ` (${duplicateCount} duplicates skipped)` : ''}`,
-      })
-    } catch (error) {
-      console.error('Import error:', error)
+    console.log(`[Import] Transformed ${transformedLeads.length} valid leads. Errors: ${errors.length}`)
+    if (errors.length > 0) console.log(`[Import] First error: ${JSON.stringify(errors[0])}`)
+
+    if (transformedLeads.length === 0) {
+      console.log('[Import] No valid leads found after validation')
       return NextResponse.json(
-        { error: 'Failed to import', details: error instanceof Error ? error.message : 'Unknown' },
-        { status: 500 }
+        {
+          error: 'No valid leads found',
+          details: errors.slice(0, 10),
+          debug: {
+            headers,
+            mappingKeys: Object.keys(columnMapping),
+            sampleRow: dataRows[0],
+            validationErrors: errors.slice(0, 5)
+          }
+        },
+        { status: 400 }
       )
     }
+
+    // Deduplication
+    const emails = transformedLeads.filter(l => l.email).map(l => l.email.toLowerCase())
+    const phones = transformedLeads.filter(l => l.phone).map(l => l.phone.replace(/\D/g, ''))
+
+    console.log(`[Import] Checking duplicates for ${emails.length} emails, ${phones.length} phones`)
+
+    const existing = await prisma.lead.findMany({
+      where: {
+        userId: currentUser.userId,
+        OR: [
+          ...(emails.length > 0 ? [{ email: { in: emails, mode: 'insensitive' as const } }] : []),
+          ...(phones.length > 0 ? [{ phone: { in: phones } }] : []),
+        ],
+      },
+      select: { email: true, phone: true },
+    })
+
+    console.log(`[Import] Found ${existing.length} existing matches in DB`)
+
+    const existingEmails = new Set(existing.map(l => l.email?.toLowerCase()))
+    const existingPhones = new Set(existing.map(l => l.phone?.replace(/\D/g, '')))
+
+    const newLeads = transformedLeads.filter(lead => {
+      const emailDup = lead.email && existingEmails.has(lead.email.toLowerCase())
+      const phoneDup = lead.phone && existingPhones.has(lead.phone.replace(/\D/g, ''))
+      return !emailDup && !phoneDup
+    })
+
+    console.log(`[Import] New unique leads to insert: ${newLeads.length}`)
+
+    const duplicateCount = transformedLeads.length - newLeads.length
+
+    if (newLeads.length === 0) {
+      console.log('[Import] All leads were duplicates')
+      return NextResponse.json({
+        success: true,
+        count: 0,
+        duplicateCount,
+        message: `All ${duplicateCount} leads already exist`,
+      })
+    }
+
+    // Insert leads
+    console.log('[Import] Inserting leads into DB...')
+    const created = await prisma.lead.createMany({
+      // ... existing data mapping
+      data: newLeads.map((lead) => ({
+        userId: currentUser.userId,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        phone: lead.phone || '',
+        email: lead.email || null,
+        company: lead.company || null,
+        jobTitle: lead.jobTitle || null,
+        linkedinUrl: lead.linkedinUrl || null,
+        notes: lead.notes || null,
+        status: 'pending',
+        region: lead.region || lead.country || null,
+        linkedinEnriched: false,
+      })),
+      skipDuplicates: true,
+    })
+    console.log(`[Import] DB Insert Result: ${created.count}`)
+
+    // Auto-enrich
+    let enrichmentStarted = 0
+    if (autoEnrich && created.count > 0) {
+      const toEnrich = await prisma.lead.findMany({
+        where: {
+          userId: currentUser.userId,
+          linkedinUrl: { not: null },
+          linkedinEnriched: false,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: created.count,
+      })
+      enrichmentStarted = toEnrich.length
+      console.log(`[Import] Auto-enriching ${enrichmentStarted} leads`)
+
+      Promise.all(
+        toEnrich.map(async (lead) => {
+          try {
+            await enrichLead(lead.id, currentUser.userId)
+            console.log(`[Enrich] ✅ ${lead.firstName}`)
+          } catch (e) {
+            console.error(`[Enrich] ❌ ${lead.firstName}`)
+          }
+        })
+      ).catch(console.error)
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: created.count,
+      duplicateCount,
+      enrichmentStarted,
+      message: `Imported ${created.count} leads${duplicateCount > 0 ? ` (${duplicateCount} duplicates skipped)` : ''}`,
+    })
+  } catch (error) {
+    console.error('Import error:', error)
+    return NextResponse.json(
+      { error: 'Failed to import', details: error instanceof Error ? error.message : 'Unknown' },
+      { status: 500 }
+    )
   }
+}
