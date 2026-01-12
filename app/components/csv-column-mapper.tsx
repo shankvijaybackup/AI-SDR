@@ -37,6 +37,7 @@ export function CsvColumnMapper({ onSuccess }: CsvColumnMapperProps) {
         count?: number
         duplicateCount?: number
         enrichmentStarted?: number
+        debug?: any
     } | null>(null)
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +124,7 @@ export function CsvColumnMapper({ onSuccess }: CsvColumnMapperProps) {
                 count: data.count,
                 duplicateCount: data.duplicateCount,
                 enrichmentStarted: data.enrichmentStarted,
+                debug: data.debug,
             })
 
             if (response.ok) {
@@ -299,6 +301,13 @@ export function CsvColumnMapper({ onSuccess }: CsvColumnMapperProps) {
                                 <p className="text-sm mt-1 text-purple-600">
                                     ✨ Auto-enriching {result.enrichmentStarted} leads...
                                 </p>
+                            )}
+                            {/* DEBUG: Show detailed error info if available */}
+                            {result.debug && (
+                                <div className="mt-4 p-2 bg-slate-100 rounded text-xs font-mono overflow-auto max-h-40">
+                                    <p className="font-semibold text-slate-700 mb-1">Debug Info:</p>
+                                    <pre>{JSON.stringify(result.debug, null, 2)}</pre>
+                                </div>
                             )}
                         </AlertDescription>
                     </Alert>
