@@ -83,7 +83,7 @@ services:
     region: oregon
     plan: free
     rootDir: technographic-service
-    dockerfilePath: technographic-service/Dockerfile
+    dockerfilePath: Dockerfile
     envVars:
       - key: PORT
         value: 10000
