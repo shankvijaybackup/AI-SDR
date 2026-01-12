@@ -15,30 +15,17 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized: Admin only' }, { status: 403 })
         }
 
-        // Find leads with no companyId for this user
-        const ghostLeads = await prisma.lead.count({
-            where: {
-                userId: currentUser.userId,
-                companyId: null
-            }
-        })
-
-        if (ghostLeads === 0) {
-            return NextResponse.json({ message: 'No ghost leads found to clean up.' })
-        }
-
-        // Delete them
+        // Aggressive cleanup: Delete ALL leads for this user to allow a fresh start
+        // This is necessary because some leads might have been created with inconsistent states during debugging.
         const deleted = await prisma.lead.deleteMany({
             where: {
-                userId: currentUser.userId,
-                companyId: null
+                userId: currentUser.userId
             }
         })
 
         return NextResponse.json({
             success: true,
-            message: `Cleaned up ${deleted.count} ghost leads (missing companyId).`,
-            previousCount: ghostLeads
+            message: `AGGRESSIVE CLEANUP: Deleted ${deleted.count} leads. You can now re-import safely.`,
         })
 
     } catch (error) {
