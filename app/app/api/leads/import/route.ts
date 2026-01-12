@@ -158,16 +158,25 @@ export async function POST(request: NextRequest) {
     const emails = transformedLeads.filter(l => l.email).map(l => l.email.toLowerCase())
     const phones = transformedLeads.filter(l => l.phone).map(l => l.phone.replace(/\D/g, ''))
 
+    // Deduplication scope: Match the GET route visibility logic
+    // If user has companyId, check duplicates within the company. Otherwise check user's own leads.
+    const duplicateWhere: any = {
+      OR: [
+        ...(emails.length > 0 ? [{ email: { in: emails, mode: 'insensitive' as const } }] : []),
+        ...(phones.length > 0 ? [{ phone: { in: phones } }] : []),
+      ],
+    }
+
+    if (currentUser.companyId) {
+      duplicateWhere.companyId = currentUser.companyId
+    } else {
+      duplicateWhere.userId = currentUser.userId
+    }
+
     console.log(`[Import] Checking duplicates for ${emails.length} emails, ${phones.length} phones`)
 
     const existing = await prisma.lead.findMany({
-      where: {
-        userId: currentUser.userId,
-        OR: [
-          ...(emails.length > 0 ? [{ email: { in: emails, mode: 'insensitive' as const } }] : []),
-          ...(phones.length > 0 ? [{ phone: { in: phones } }] : []),
-        ],
-      },
+      where: duplicateWhere,
       select: { email: true, phone: true },
     })
 
@@ -202,6 +211,7 @@ export async function POST(request: NextRequest) {
       // ... existing data mapping
       data: newLeads.map((lead) => ({
         userId: currentUser.userId,
+        companyId: currentUser.companyId, // Fix: Add companyId for multi-tenancy visibility
         firstName: lead.firstName,
         lastName: lead.lastName,
         phone: lead.phone || '',
