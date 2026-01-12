@@ -98,17 +98,31 @@ export async function POST(request: NextRequest) {
           }
         })
       } else {
-        // Legacy mode: expect exact column names
+        // Legacy/Auto mode: fuzzy match headers
         headers.forEach((header, colIndex) => {
           if (row[colIndex]) {
-            lead[header] = row[colIndex].trim()
+            const cleanHeader = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+            let targetField = header; // default to exact match
+
+            // Common mappings
+            if (['firstname', 'first', 'fname'].includes(cleanHeader)) targetField = 'firstName';
+            else if (['lastname', 'last', 'lname', 'surname'].includes(cleanHeader)) targetField = 'lastName';
+            else if (['email', 'emailaddress', 'mail'].includes(cleanHeader)) targetField = 'email';
+            else if (['phone', 'phonenumber', 'mobile', 'cell'].includes(cleanHeader)) targetField = 'phone';
+            else if (['company', 'companyname', 'organization'].includes(cleanHeader)) targetField = 'company';
+            else if (['jobtitle', 'title', 'role', 'position'].includes(cleanHeader)) targetField = 'jobTitle';
+            else if (['linkedin', 'linkedinurl', 'profile'].includes(cleanHeader)) targetField = 'linkedinUrl';
+            else if (['notes', 'comment', 'description'].includes(cleanHeader)) targetField = 'notes';
+            else if (['city', 'country', 'region', 'location'].includes(cleanHeader)) targetField = 'region';
+
+            lead[targetField] = row[colIndex].trim()
           }
         })
       }
 
       // Validate required fields
       const rowErrors: string[] = []
-      if (!lead.firstName) rowErrors.push('firstName required')
+      if (!lead.firstName) rowErrors.push(`firstName required (found keys: ${Object.keys(lead).join(', ')})`)
       if (!lead.lastName) rowErrors.push('lastName required')
       if (!lead.phone && !lead.email) rowErrors.push('phone or email required')
 
