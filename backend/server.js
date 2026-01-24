@@ -1,12 +1,13 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Explicitly load .env from app directory
+// Load .env from app directory (shared config location)
 dotenv.config({ path: path.resolve(process.cwd(), 'app/.env') });
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import twilio from "twilio";
+import helmet from "helmet";
 
 import fs from "fs";
 import { randomUUID } from "crypto";
@@ -46,6 +47,10 @@ import { synthesizeWithDeepgram, healthCheck as deepgramHealth } from "./deepgra
 import { getCachedResponse, needsAI } from "./responseCache.js";
 import { addFillerToResponse, getFillerPhrase } from "./fillerWords.js";
 
+// ========== SCALABILITY: Import Sentry and Rate Limiting ==========
+import { initSentry, sentryErrorHandler } from "./config/sentry.js";
+import { apiLimiter, strictLimiter, readLimiter } from "./middleware/rateLimiter.js";
+
 const app = express();
 
 const PORT = process.env.PORT || 4000;
@@ -59,31 +64,26 @@ const CHATTERBOX_VOICE_MALE = process.env.CHATTERBOX_VOICE_MALE || "alex";
 const CHATTERBOX_VOICE_FEMALE = process.env.CHATTERBOX_VOICE_FEMALE || "sarah";
 const TTS_DIR = path.join(process.cwd(), "tts_files");
 
-// Voice selection: use voice from call metadata (set during initiation)
-const callVoiceMap = new Map();
+// Voice selection: use Redis-based voice mapping for distributed state
+import { setVoiceForCall as setVoiceRedis, getVoiceForCall as getVoiceRedis } from './voiceMap.js';
 
-function getVoiceIdForCall(callSid) {
-  // First check if voice was set in call metadata
-  if (callVoiceMap.has(callSid)) {
-    return callVoiceMap.get(callSid);
+async function getVoiceIdForCall(callSid) {
+  // First check if voice was set in Redis
+  const voiceId = await getVoiceRedis(callSid);
+  if (voiceId) {
+    return voiceId;
   }
 
-  // Fallback to legacy alternating logic (shouldn't happen with new system)
+  // Fallback to default voice (shouldn't happen with new system)
   console.warn(`[Voice] No voice found for callSid ${callSid}, using fallback`);
-  const useFemaleVoice = callVoiceMap.size % 2 === 0;
-  let voiceId;
-  if (USE_CHATTERBOX) {
-    voiceId = useFemaleVoice ? CHATTERBOX_VOICE_FEMALE : CHATTERBOX_VOICE_MALE;
-  } else {
-    voiceId = useFemaleVoice ? ELEVEN_VOICE_ID_FEMALE : ELEVEN_VOICE_ID_MALE;
-  }
-  callVoiceMap.set(callSid, voiceId);
-  return voiceId;
+  const defaultVoice = USE_CHATTERBOX ? CHATTERBOX_VOICE_FEMALE : ELEVEN_VOICE_ID_FEMALE;
+  await setVoiceRedis(callSid, defaultVoice);
+  return defaultVoice;
 }
 
 // Export function to set voice for a call (called from initiate-call.js)
-export function setVoiceForCall(callSid, voiceId) {
-  callVoiceMap.set(callSid, voiceId);
+export async function setVoiceForCall(callSid, voiceId) {
+  await setVoiceRedis(callSid, voiceId);
   console.log(`[Voice] Set voice ${voiceId} for call ${callSid}`);
 }
 
@@ -91,6 +91,30 @@ if (!fs.existsSync(TTS_DIR)) {
   fs.mkdirSync(TTS_DIR, { recursive: true });
   console.log("✅ Created TTS directory:", TTS_DIR);
 }
+
+// ========== SCALABILITY: Initialize Sentry Error Monitoring ==========
+initSentry(app);
+
+// ========== SCALABILITY: Security Headers with Helmet ==========
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "wss:", "https:"],
+    }
+  },
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  xssFilter: true
+}));
 
 // Middlewares
 app.use(cors({
@@ -109,11 +133,21 @@ app.use("/api/twilio", bodyParser.urlencoded({ extended: false }));
 // Frontend sends JSON
 app.use(bodyParser.json());
 
+// ========== SCALABILITY: Apply Rate Limiting ==========
+// Global rate limiting for all API routes
+app.use('/api/', apiLimiter);
+
 import twilioWebhookRouter from "./routes/twilio-webhooks.js";
 app.use("/api/twilio", twilioWebhookRouter);
 
 // Serve synthesized TTS files so Twilio can <Play> them
 app.use("/tts", express.static(TTS_DIR));
+
+// ========== SCALABILITY: Health Check Endpoints ==========
+import { healthCheck, readinessCheck, livenessCheck } from "./routes/health.js";
+app.get("/health", healthCheck);
+app.get("/ready", readinessCheck);
+app.get("/live", livenessCheck);
 
 // Import Persona Service
 import { generateCompanyPersona } from "./services/personaService.js";
@@ -324,7 +358,8 @@ function getScript(scriptId) {
 
 // ---------- Public API: start outbound calls ----------
 
-app.post("/api/calls/start", async (req, res) => {
+// Apply strict rate limiting to call endpoints (10 calls/min)
+app.post("/api/calls/start", strictLimiter, async (req, res) => {
   try {
     const { numbers, script, leadName, companyName } = req.body || {};
 
@@ -1118,6 +1153,18 @@ app.post("/api/bulk-calls/control", async (req, res) => {
     console.error('[BulkCall] Control error:', error);
     res.status(500).json({ error: 'Failed to control campaign' });
   }
+});
+
+// ========== SCALABILITY: Sentry Error Handler (must be after all routes) ==========
+app.use(sentryErrorHandler());
+
+// Generic error handler
+app.use((err, req, res, next) => {
+  console.error('[Error]', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
 // ---------- Start server ----------

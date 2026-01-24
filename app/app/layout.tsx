@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "AI-powered Outbound Sales Development Representative",
 };
 
+import { Toaster } from 'sonner';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -48,6 +50,7 @@ export default function RootLayout({
           themes={['light', 'dark', 'midnight', 'ocean', 'sunset', 'forest', 'neon', 'royal']}
         >
           {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

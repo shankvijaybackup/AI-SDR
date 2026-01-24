@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Phone, Users, FileText, Calendar, Settings, LogOut, BarChart3, BookOpen, PhoneCall, User, PanelLeftClose, PanelLeft, Building2, GraduationCap, Swords } from 'lucide-react'
+import { Phone, Users, FileText, Calendar, Settings, LogOut, BarChart3, BookOpen, PhoneCall, User, PanelLeftClose, PanelLeft, Building2, GraduationCap, Swords, Radar } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
   DropdownMenu,
@@ -88,6 +88,7 @@ export default function ProtectedLayout({
     { name: 'Scripts', href: '/scripts', icon: FileText },
     { name: 'Calling', href: '/bulk-calling', icon: PhoneCall },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Signals', href: '/signals', icon: Radar },
     { name: 'Enablement', href: '/dashboard/enablement', icon: GraduationCap },
     { name: 'Follow-ups', href: '/follow-ups', icon: Calendar },
     { name: 'Settings', href: '/settings', icon: Settings },

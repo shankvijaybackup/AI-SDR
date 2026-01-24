@@ -48,7 +48,8 @@ model Company {
   learningPaths       LearningPath[]
   battlecards         Battlecard[]
   pitchTemplates      PitchTemplate[]
-
+  topics              MarketingTopic[]
+  
   @@index([slug])
 }
 
@@ -217,6 +218,7 @@ model Lead {
   hubspotId        String?   @unique
   amplemarketId    String?   @unique
   
+
   calls            Call[]
   emailLogs        EmailLog[]
   companyRelation  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -275,6 +277,7 @@ model Account {
   @@index([amplemarketId])
   
   researchNotes   ResearchNote[]
+  signals         MarketSignal[]
 }
 
 model ResearchNote {
@@ -289,6 +292,43 @@ model ResearchNote {
   createdAt       DateTime @default(now())
   
   account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId])
+}
+
+
+
+model MarketingTopic {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  keyword   String   // The search term e.g., "Atomicwork", "ServiceNow"
+  type      String   // "MY_BRAND", "COMPETITOR", "INDUSTRY"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  signals   MarketSignal[]
+  
+  @@index([companyId])
+}
+
+model MarketSignal {
+  id        String   @id @default(uuid())
+  topicId   String?
+  topic     MarketingTopic? @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id])
+
+  type      String   // "MENTION", "INTENT", "POST"
+  source    String   // "LINKEDIN", "REDDIT", "X"
+  content   String
+  url       String
+  author    String?
+  sentiment String?  // "POSITIVE", "NEGATIVE", "NEUTRAL"
+  
+  createdAt DateTime @default(now())
+
+  @@index([topicId])
   @@index([accountId])
 }
 

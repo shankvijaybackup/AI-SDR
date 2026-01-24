@@ -11,6 +11,7 @@ interface ModuleHeaderProps {
         label: string
     }
     scoreIcon?: LucideIcon
+    iconNode?: React.ReactNode // Validation Fix: Allow passing rendered icon to avoid serialization error
     children?: React.ReactNode  // For action buttons
 }
 
@@ -19,6 +20,7 @@ export function ModuleHeader({
     subtitle,
     score,
     scoreIcon: ScoreIcon = Target,
+    iconNode,
     children
 }: ModuleHeaderProps) {
     return (
@@ -45,7 +47,7 @@ export function ModuleHeader({
                             <p className="text-2xl font-bold text-green-600">{score.value}%</p>
                         </div>
                         <div className="h-14 w-14 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/25">
-                            <ScoreIcon className="h-7 w-7 text-white" />
+                            {iconNode ? iconNode : <ScoreIcon className="h-7 w-7 text-white" />}
                         </div>
                     </div>
                 )}
