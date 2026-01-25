@@ -47,6 +47,9 @@ services:
         value: production
       - key: PORT
         value: 10000
+      # Disable rate limiting until Redis is configured
+      - key: ENABLE_RATE_LIMITING
+        value: false
       - key: FRONTEND_ORIGIN
         sync: false  # Set after deploy: https://ai-sdr-app.onrender.com
       - key: PUBLIC_BASE_URL
@@ -74,6 +77,11 @@ services:
         sync: false
       # Legacy voice IDs (backward compatibility)
       - key: ELEVEN_VOICE_ID_FEMALE
+        sync: false
+      # Redis (optional but recommended)
+      # Sign up at https://upstash.com (free tier: 10K commands/day)
+      # Format: rediss://default:password@host:port
+      - key: REDIS_URL
         sync: false
 
   # Technographic Enrichment Service (Python)
