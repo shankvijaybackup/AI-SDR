@@ -16,7 +16,7 @@ const ENABLE_RATE_LIMITING = process.env.ENABLE_RATE_LIMITING === 'true' || proc
  */
 export const apiLimiter = rateLimit({
     store: new RedisStore({
-        client: redis,
+        sendCommand: (...args) => redis.call(...args),
         prefix: 'rl:api:'
     }),
     windowMs: 60 * 1000, // 1 minute
@@ -44,7 +44,7 @@ export const apiLimiter = rateLimit({
  */
 export const strictLimiter = rateLimit({
     store: new RedisStore({
-        client: redis,
+        sendCommand: (...args) => redis.call(...args),
         prefix: 'rl:strict:'
     }),
     windowMs: 60 * 1000,
@@ -69,7 +69,7 @@ export const strictLimiter = rateLimit({
  */
 export const readLimiter = rateLimit({
     store: new RedisStore({
-        client: redis,
+        sendCommand: (...args) => redis.call(...args),
         prefix: 'rl:read:'
     }),
     windowMs: 60 * 1000,
