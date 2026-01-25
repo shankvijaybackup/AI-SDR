@@ -71,6 +71,11 @@ export function initSentry(app) {
  * Error handler middleware (must be added after all routes)
  */
 export function sentryErrorHandler() {
+    // Return no-op middleware if Sentry not initialized
+    if (!process.env.SENTRY_DSN) {
+        return (err, req, res, next) => next(err);
+    }
+
     return Sentry.Handlers.errorHandler({
         shouldHandleError(error) {
             // Capture all errors with status code >= 500
@@ -87,6 +92,8 @@ export function sentryErrorHandler() {
  * Manually capture an exception
  */
 export function captureException(error, context = {}) {
+    if (!process.env.SENTRY_DSN) return;
+
     Sentry.captureException(error, {
         extra: context
     });
@@ -96,6 +103,8 @@ export function captureException(error, context = {}) {
  * Capture a message
  */
 export function captureMessage(message, level = 'info', context = {}) {
+    if (!process.env.SENTRY_DSN) return;
+
     Sentry.captureMessage(message, {
         level,
         extra: context
@@ -106,6 +115,8 @@ export function captureMessage(message, level = 'info', context = {}) {
  * Add breadcrumb for debugging
  */
 export function addBreadcrumb(message, category = 'custom', data = {}) {
+    if (!process.env.SENTRY_DSN) return;
+
     Sentry.addBreadcrumb({
         message,
         category,

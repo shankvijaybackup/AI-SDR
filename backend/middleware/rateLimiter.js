@@ -42,9 +42,9 @@ export const apiLimiter = rateLimit({
     standardHeaders: true, // Return rate limit info in headers
     legacyHeaders: false,
     skip: () => !ENABLE_RATE_LIMITING, // Skip if disabled
-    keyGenerator: (req) => {
-        // Use user ID if authenticated, otherwise IP
-        return req.user?.id || req.ip;
+    keyGenerator: (req, res) => {
+        // Use user ID if authenticated, falls back to IP automatically
+        return req.user?.id;
     },
     handler: (req, res) => {
         console.warn(`[RateLimit] API limit exceeded for ${req.user?.id || req.ip}`);
@@ -67,7 +67,10 @@ export const strictLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     skip: () => !ENABLE_RATE_LIMITING,
-    keyGenerator: (req) => req.user?.id || req.ip,
+    keyGenerator: (req, res) => {
+        // Use user ID if authenticated, falls back to IP automatically
+        return req.user?.id;
+    },
     handler: (req, res) => {
         console.warn(`[RateLimit] Strict limit exceeded for ${req.user?.id || req.ip}`);
         res.status(429).json({
@@ -89,7 +92,10 @@ export const readLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     skip: () => !ENABLE_RATE_LIMITING,
-    keyGenerator: (req) => req.user?.id || req.ip
+    keyGenerator: (req, res) => {
+        // Use user ID if authenticated, falls back to IP automatically
+        return req.user?.id;
+    }
 });
 
 console.log(`[RateLimit] Rate limiting ${ENABLE_RATE_LIMITING ? 'ENABLED' : 'DISABLED'}`);
