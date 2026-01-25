@@ -5,20 +5,38 @@
 
 import rateLimit from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
-import redis from '../config/redis.js';
+import redis, { isRedisAvailable } from '../config/redis.js';
 
 // Check if rate limiting is enabled
 const ENABLE_RATE_LIMITING = process.env.ENABLE_RATE_LIMITING === 'true' || process.env.NODE_ENV === 'production';
+
+/**
+ * Create Redis store safely with fallback to memory store
+ */
+function createStore(prefix) {
+    try {
+        // Only use Redis if connection is available
+        if (redis && redis.status === 'ready') {
+            return new RedisStore({
+                sendCommand: (...args) => redis.call(...args),
+                prefix
+            });
+        }
+    } catch (err) {
+        console.warn(`[RateLimit] Failed to create Redis store: ${err.message}`);
+    }
+
+    // Fallback to memory store (express-rate-limit default)
+    console.log(`[RateLimit] Using in-memory store for ${prefix}`);
+    return undefined;
+}
 
 /**
  * Global API rate limiter
  * 100 requests per minute per IP/user
  */
 export const apiLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args) => redis.call(...args),
-        prefix: 'rl:api:'
-    }),
+    store: createStore('rl:api:'),
     windowMs: 60 * 1000, // 1 minute
     max: 100, // 100 requests per minute
     standardHeaders: true, // Return rate limit info in headers
@@ -43,10 +61,7 @@ export const apiLimiter = rateLimit({
  * 10 requests per minute per user
  */
 export const strictLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args) => redis.call(...args),
-        prefix: 'rl:strict:'
-    }),
+    store: createStore('rl:strict:'),
     windowMs: 60 * 1000,
     max: 10, // 10 requests per minute
     standardHeaders: true,
@@ -68,10 +83,7 @@ export const strictLimiter = rateLimit({
  * 200 requests per minute per user
  */
 export const readLimiter = rateLimit({
-    store: new RedisStore({
-        sendCommand: (...args) => redis.call(...args),
-        prefix: 'rl:read:'
-    }),
+    store: createStore('rl:read:'),
     windowMs: 60 * 1000,
     max: 200,
     standardHeaders: true,
