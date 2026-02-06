@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser, hashPassword } from '@/lib/auth'
+import { getCurrentUserFromRequest, hashPassword } from '@/lib/auth'
 
 // POST - Reset password for a user (authenticated users only)
 export async function POST(request: NextRequest) {
