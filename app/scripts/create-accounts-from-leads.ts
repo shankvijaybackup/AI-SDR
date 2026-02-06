@@ -15,8 +15,9 @@ async function createAccountsFromLeads() {
   const leadsWithoutAccounts = await prisma.lead.findMany({
     where: {
       company: {
-        not: null,
-        not: '',
+        not: {
+          in: [null, ''],
+        },
       },
       accountId: null,
     },

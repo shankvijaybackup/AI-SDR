@@ -20,8 +20,9 @@ export async function POST(request: NextRequest) {
     // Build where clause based on user's tenant
     const whereClause: any = {
       company: {
-        not: null,
-        not: '',
+        not: {
+          in: [null, ''],
+        },
       },
       accountId: null,
     }
