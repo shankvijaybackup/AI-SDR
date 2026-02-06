@@ -10,7 +10,7 @@ const updateOrgSchema = z.object({
 })
 
 // GET - Fetch organization details
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {

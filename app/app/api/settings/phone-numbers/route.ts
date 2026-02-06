@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUserFromRequest } from '@/lib/auth'
 
 // GET - List user's regional phone numbers
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {

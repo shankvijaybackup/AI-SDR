@@ -14,7 +14,7 @@ const updateApiKeysSchema = z.object({
 })
 
 // GET - Fetch API keys (masked)
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
