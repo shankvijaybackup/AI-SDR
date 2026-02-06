@@ -14,6 +14,8 @@ import { ModuleHeader } from '@/components/ui/module-header'
 import { StatCard, STAT_COLORS } from '@/components/ui/stat-card'
 import { Search, Plus, Phone, Mail, Linkedin, Upload as UploadIcon, Trash2, Sparkles, Eye, RefreshCw, ExternalLink, Users, Flame, Clock, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
+import { SignalsList } from '@/components/signals-list'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface Lead {
   id: string
@@ -31,6 +33,7 @@ interface Lead {
   linkedinEnriched: boolean
   linkedinData?: any
   calls: any[]
+  signals: any[]
 }
 
 export default function LeadsPage() {
@@ -379,7 +382,10 @@ export default function LeadsPage() {
                         <div>
                           <Link
                             href={`/leads/${lead.id}`}
-                            className="font-medium text-slate-900 hover:text-primary hover:underline"
+                            className="font-medium text-slate-900 hover:text-primary hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                            }}
                           >
                             {lead.firstName} {lead.lastName}
                           </Link>
@@ -527,28 +533,53 @@ export default function LeadsPage() {
                 )}
               </div>
 
-              {/* Persona Display */}
-              {selectedLead?.linkedinEnriched && selectedLead?.linkedinData ? (
-                <LeadPersonaDisplay linkedinData={selectedLead.linkedinData} />
-              ) : (
-                <div className="text-center py-8 text-slate-400">
-                  <Sparkles className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No persona data available</p>
-                  {selectedLead?.linkedinUrl ? (
-                    <Button
-                      className="mt-4"
-                      onClick={() => selectedLead && handleEnrichLead(selectedLead.id)}
-                      disabled={enrichingLeads.has(selectedLead?.id || '')}
-                    >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      {enrichingLeads.has(selectedLead?.id || '') ? 'Enriching...' : 'Enrich with LinkedIn'}
-                    </Button>
-                  ) : (
-                    <p className="text-sm mt-2">Add a LinkedIn URL to generate persona</p>
-                  )}
-                </div>
-              )}
             </div>
+
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="w-full">
+                <TabsTrigger value="details" className="flex-1">Persona & Details</TabsTrigger>
+                <TabsTrigger value="signals" className="flex-1">Intent Signals</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="details" className="mt-4">
+                {/* Persona Display */}
+                {selectedLead?.linkedinEnriched && selectedLead?.linkedinData ? (
+                  <LeadPersonaDisplay linkedinData={selectedLead.linkedinData} />
+                ) : (
+                  <div className="text-center py-8 text-slate-400">
+                    <Sparkles className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No persona data available</p>
+                    {selectedLead?.linkedinUrl ? (
+                      <Button
+                        className="mt-4"
+                        onClick={() => selectedLead && handleEnrichLead(selectedLead.id)}
+                        disabled={enrichingLeads.has(selectedLead?.id || '')}
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        {enrichingLeads.has(selectedLead?.id || '') ? 'Enriching...' : 'Enrich with LinkedIn'}
+                      </Button>
+                    ) : (
+                      <p className="text-sm mt-2">Add a LinkedIn URL to generate persona</p>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="signals" className="mt-4">
+                {selectedLead?.accountId ? (
+                  <SignalsList
+                    accountId={selectedLead.accountId}
+                    signals={selectedLead.signals || []}
+                    onRefresh={fetchLeads}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-slate-500">
+                    <p>Lead is not associated with an account.</p>
+                    <p className="text-xs">Signals are tracked at the account level.</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </DialogContent>
       </Dialog>
