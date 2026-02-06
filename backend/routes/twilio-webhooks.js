@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { getActiveCall, activeCalls } from './initiate-call.js';
+import { getCall as getCallFromRedis } from '../callState.js';
 import { summarizeCall } from '../openaiClient.js';
 import { handleCallComplete as handleBulkCallComplete } from '../services/bulkCallManager.js';
 
@@ -21,9 +22,17 @@ router.post('/status', async (req, res) => {
     res.sendStatus(200);
 
     try {
-        // 1. Get InMemory Call State
-        // Call might be indexed by CallSid or CallId
-        let activeCall = getActiveCall(CallSid) || (callId ? getActiveCall(callId) : null);
+        // 1. Get InMemory Call State + Redis Call State
+        // CRITICAL FIX: Check Redis first since that's where transcripts are stored
+        let activeCall = await getCallFromRedis(CallSid);
+
+        // Fallback to old activeCalls Map if not in Redis
+        if (!activeCall) {
+            activeCall = getActiveCall(CallSid) || (callId ? getActiveCall(callId) : null);
+            console.log(`[Twilio Webhook] Using activeCalls Map for ${CallSid} (Redis lookup returned null)`);
+        } else {
+            console.log(`[Twilio Webhook] ✅ Retrieved call from Redis with ${activeCall.transcript?.length || 0} transcript entries`);
+        }
 
         // 2. Determine Outcome
         let outcome = 'unknown';
