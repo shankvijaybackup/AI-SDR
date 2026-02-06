@@ -41,12 +41,13 @@ export function DialogHeader({ children }: DialogHeaderProps) {
   return <div className="mb-4">{children}</div>
 }
 
-interface DialogTitleProps {
+export interface DialogTitleProps {
   children: React.ReactNode
+  className?: string
 }
 
-export function DialogTitle({ children }: DialogTitleProps) {
-  return <h2 className="text-xl font-semibold text-slate-900">{children}</h2>
+export function DialogTitle({ children, className }: DialogTitleProps) {
+  return <h2 className={`text-xl font-semibold text-slate-900 ${className || ''}`}>{children}</h2>
 }
 
 interface DialogDescriptionProps {
@@ -64,5 +65,30 @@ interface DialogFooterProps {
 
 export function DialogFooter({ children, className }: DialogFooterProps) {
   return <div className={`flex justify-end space-x-2 mt-6 ${className || ''}`}>{children}</div>
+}
+
+interface DialogTriggerProps {
+  children: React.ReactNode
+  onClick?: () => void
+  className?: string
+  asChild?: boolean
+}
+
+export function DialogTrigger({ children, onClick, className, asChild }: DialogTriggerProps) {
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<any>, {
+      onClick: (e: React.MouseEvent) => {
+        onClick?.()
+        const childProps = (children as React.ReactElement<any>).props
+        childProps?.onClick?.(e)
+      }
+    })
+  }
+
+  return (
+    <button onClick={onClick} className={className}>
+      {children}
+    </button>
+  )
 }
 
