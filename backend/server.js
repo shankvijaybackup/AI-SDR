@@ -212,6 +212,60 @@ app.get("/api/twilio-numbers/search", searchAvailableNumbers);
 app.post("/api/twilio-numbers/purchase", purchaseNumber);
 app.delete("/api/twilio-numbers/release", releaseNumber);
 
+// ---------- TWILIO CALL SYNC ROUTES ----------
+import { syncTwilioCalls, getTwilioUsage, fetchTwilioCalls } from "./services/twilioSync.js";
+
+// Sync historical call data from Twilio API to database
+app.post("/api/twilio/sync-history", async (req, res) => {
+  try {
+    const { startDate, endDate, limit } = req.body;
+    const options = {
+      limit: limit || 100
+    };
+    if (startDate) options.startDate = new Date(startDate);
+    if (endDate) options.endDate = new Date(endDate);
+
+    console.log("[API] Starting Twilio call sync...");
+    const results = await syncTwilioCalls(options);
+    res.json({ success: true, ...results });
+  } catch (err) {
+    console.error("[API] Twilio sync failed:", err);
+    res.status(500).json({ error: "Failed to sync Twilio calls", details: err.message });
+  }
+});
+
+// Get Twilio usage summary (calls this month, duration, etc.)
+app.get("/api/twilio/usage", async (req, res) => {
+  try {
+    console.log("[API] Fetching Twilio usage...");
+    const usage = await getTwilioUsage();
+    res.json({ success: true, usage });
+  } catch (err) {
+    console.error("[API] Twilio usage fetch failed:", err);
+    res.status(500).json({ error: "Failed to fetch Twilio usage", details: err.message });
+  }
+});
+
+// Get raw Twilio call logs (without syncing to DB)
+app.get("/api/twilio/calls", async (req, res) => {
+  try {
+    const { startDate, endDate, status, limit } = req.query;
+    const options = {
+      limit: parseInt(limit) || 50
+    };
+    if (startDate) options.startDate = new Date(startDate);
+    if (endDate) options.endDate = new Date(endDate);
+    if (status) options.status = status;
+
+    console.log("[API] Fetching Twilio calls...");
+    const calls = await fetchTwilioCalls(options);
+    res.json({ success: true, count: calls.length, calls });
+  } catch (err) {
+    console.error("[API] Twilio calls fetch failed:", err);
+    res.status(500).json({ error: "Failed to fetch Twilio calls", details: err.message });
+  }
+});
+
 
 // ---------- ElevenLabs TTS Helper ----------
 
