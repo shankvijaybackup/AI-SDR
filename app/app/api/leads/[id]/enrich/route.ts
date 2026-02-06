@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUserFromRequest } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
 
@@ -14,6 +15,48 @@ export async function POST(
     }
 
     const { id: leadId } = await params
+
+    // Fetch the lead to check for company
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { company: true, userId: true, companyId: true, accountId: true }
+    })
+
+    if (!lead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    // Auto-create/link account if lead has a company but no account
+    if (lead.company && !lead.accountId) {
+      console.log(`[Auto-Account] Lead has company "${lead.company}" but no account. Creating/linking...`)
+
+      // Check if account already exists for this company
+      let account = await prisma.account.findFirst({
+        where: {
+          name: { equals: lead.company, mode: 'insensitive' },
+          ...(lead.companyId ? { companyId: lead.companyId } : { userId: lead.userId })
+        }
+      })
+
+      // Create account if it doesn't exist
+      if (!account) {
+        console.log(`[Auto-Account] Creating new account for "${lead.company}"`)
+        account = await prisma.account.create({
+          data: {
+            name: lead.company,
+            ...(lead.companyId ? { companyId: lead.companyId } : { userId: lead.userId })
+          }
+        })
+      }
+
+      // Link lead to account
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: { accountId: account.id }
+      })
+
+      console.log(`[Auto-Account] ✅ Linked lead to account ${account.id}`)
+    }
 
     // Call backend enrichment API (has multi-model synthesis)
     console.log(`[Frontend Enrich] Proxying to backend: ${BACKEND_URL}/api/leads/${leadId}/enrich`)
