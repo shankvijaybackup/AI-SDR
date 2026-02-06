@@ -206,6 +206,10 @@ model Lead {
   notes            String?
   linkedinEnriched Boolean   @default(false)
   linkedinData     Json?
+  generatedScript  Json?      // Auto-generated call script
+  scriptStatus     String?    // pending_review, approved, edited
+  scriptApprovedAt DateTime?  // When admin approved
+  scriptApprovalNotes String? // Admin notes
   status           String    @default("pending")
   interestLevel    String?
   region           String?   // India, UK, Australia, US
