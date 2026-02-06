@@ -33,6 +33,7 @@ interface LegacyAnalyticsData {
     leadName: string
     company: string
     interestLevel: string
+    status: string
     createdAt: string
   }>
 }
@@ -251,23 +252,50 @@ export default function AnalyticsPage() {
             <p className="text-sm text-slate-500">No calls yet</p>
           ) : (
             <div className="space-y-2">
-              {legacy.recentCalls.map((call) => (
-                <div key={call.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium">{call.leadName}</p>
-                    <p className="text-xs text-slate-500">{call.company}</p>
+              {legacy.recentCalls.map((call) => {
+                // Determine what to display and styling
+                const displayLabel = call.interestLevel || call.status || 'pending'
+                const isInterestLevel = !!call.interestLevel
+
+                // Status-based styling (when no interest level)
+                const statusColors: Record<string, string> = {
+                  'completed': 'bg-green-100 text-green-800',
+                  'in-progress': 'bg-blue-100 text-blue-800',
+                  'busy': 'bg-orange-100 text-orange-800',
+                  'no-answer': 'bg-yellow-100 text-yellow-800',
+                  'failed': 'bg-red-100 text-red-800',
+                  'canceled': 'bg-gray-100 text-gray-800',
+                  'pending': 'bg-slate-100 text-slate-600',
+                  'initiated': 'bg-purple-100 text-purple-800',
+                  'ringing': 'bg-cyan-100 text-cyan-800',
+                }
+
+                // Interest level styling 
+                const interestColors: Record<string, string> = {
+                  'high': 'bg-green-100 text-green-800',
+                  'medium': 'bg-yellow-100 text-yellow-800',
+                  'low': 'bg-orange-100 text-orange-800',
+                  'not_interested': 'bg-red-100 text-red-800',
+                }
+
+                const colorClass = isInterestLevel
+                  ? interestColors[call.interestLevel] || 'bg-slate-100 text-slate-600'
+                  : statusColors[call.status] || statusColors['pending']
+
+                return (
+                  <div key={call.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">{call.leadName}</p>
+                      <p className="text-xs text-slate-500">{call.company}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+                        {displayLabel}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${call.interestLevel === 'high' ? 'bg-green-100 text-green-800' :
-                      call.interestLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                        call.interestLevel === 'low' ? 'bg-orange-100 text-orange-800' :
-                          'bg-red-100 text-red-800'
-                      }`}>
-                      {call.interestLevel || 'pending'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

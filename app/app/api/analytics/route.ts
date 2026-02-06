@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
       leadName: `${call.lead.firstName} ${call.lead.lastName}`,
       company: call.lead.company || 'Unknown',
       interestLevel: call.interestLevel,
+      status: call.status,
       createdAt: call.createdAt,
     }))
 
