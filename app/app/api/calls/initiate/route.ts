@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
         region: true,
         linkedinEnriched: true,
         linkedinData: true,
+        generatedScript: true, // Include generated script
       },
     })
 
@@ -45,20 +46,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
-    // Fetch script - allow user's own scripts OR shared scripts
-    const script = await prisma.script.findFirst({
-      where: {
+    // Check if using personalized generated script
+    let script: any
+    if (validatedData.scriptId.startsWith('lead-')) {
+      // Use lead's generated personalized script
+      if (!lead.generatedScript) {
+        return NextResponse.json(
+          { error: 'No personalized script generated for this lead. Please generate a script first.' },
+          { status: 404 }
+        )
+      }
+      // Create a virtual script object from the generated script
+      script = {
         id: validatedData.scriptId,
-        OR: [
-          { userId: currentUser.userId },
-          { isShared: true },
-          { userId: null }, // Scripts without owner (default/seeded scripts)
-        ],
-      },
-    })
+        name: `Personalized Script for ${lead.firstName} ${lead.lastName}`,
+        content: JSON.stringify(lead.generatedScript), // Store as JSON string
+        userId: currentUser.userId,
+      }
+    } else {
+      // Fetch script from Scripts table - allow user's own scripts OR shared scripts
+      script = await prisma.script.findFirst({
+        where: {
+          id: validatedData.scriptId,
+          OR: [
+            { userId: currentUser.userId },
+            { isShared: true },
+            { userId: null }, // Scripts without owner (default/seeded scripts)
+          ],
+        },
+      })
 
-    if (!script) {
-      return NextResponse.json({ error: 'Script not found' }, { status: 404 })
+      if (!script) {
+        return NextResponse.json({ error: 'Script not found' }, { status: 404 })
+      }
     }
 
     // Fetch user's knowledge sources for context
@@ -73,11 +93,12 @@ export async function POST(request: NextRequest) {
     })
 
     // Create call record (voicePersona will be set by backend)
+    // For personalized scripts, don't set scriptId (foreign key constraint)
     const call = await prisma.call.create({
       data: {
         userId: currentUser.userId,
         leadId: lead.id,
-        scriptId: script.id,
+        scriptId: validatedData.scriptId.startsWith('lead-') ? null : script.id,
         voicePersona: 'auto', // Backend auto-selects from voice pool
         status: 'initiated',
         transcript: [],
@@ -85,12 +106,59 @@ export async function POST(request: NextRequest) {
     })
 
     // Prepare script with variables replaced
-    let personalizedScript = script.content
-      .replace(/\{\{firstName\}\}/g, lead.firstName)
-      .replace(/\{\{lastName\}\}/g, lead.lastName)
-      .replace(/\{\{company\}\}/g, lead.company || '')
-      .replace(/\{\{jobTitle\}\}/g, lead.jobTitle || '')
+    let personalizedScript: string
+
+    // Check if this is a personalized generated script (JSON format)
+    if (validatedData.scriptId.startsWith('lead-')) {
+      // Parse the generated script JSON and format it for AI
+      try {
+        const generatedScript = JSON.parse(script.content)
+
+        // Format the generated script into a conversational guide for AI
+        personalizedScript = `
+=== HYPER-PERSONALIZED CALL GUIDE FOR ${lead.firstName} ${lead.lastName} ===
+
+OPENING:
+${generatedScript.opening?.iceBreaker || ''}
+${generatedScript.opening?.credibilityStatement || ''}
+${generatedScript.opening?.purposeStatement || ''}
+
+KEY TALKING POINTS:
+${generatedScript.valueProposition?.keyMessages?.map((msg: string, i: number) => `${i + 1}. ${msg}`).join('\n') || ''}
+
+DISCOVERY QUESTIONS:
+${generatedScript.discovery?.questions?.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n') || ''}
+
+OBJECTION HANDLING:
+${Object.entries(generatedScript.objectionHandling || {}).map(([key, value]: [string, any]) =>
+  `- ${value.objection}: ${value.response}`
+).join('\n')}
+
+CLOSING:
+${generatedScript.closing?.directAsk || ''}
+
+TONE INSTRUCTIONS:
+${generatedScript.agentToneInstructions?.toneGuidance || ''}
+DISC Profile: ${generatedScript.agentToneInstructions?.discProfile || 'Unknown'}
+Communication Style: ${generatedScript.agentToneInstructions?.communicationStyle || 'Professional'}
+`
+      } catch (e) {
+        console.error('[Call] Failed to parse generated script:', e)
+        personalizedScript = script.content
+      }
+    } else {
+      // Standard script from Scripts table - replace template variables
+      personalizedScript = script.content
+        .replace(/\{\{firstName\}\}/g, lead.firstName)
+        .replace(/\{\{lastName\}\}/g, lead.lastName)
+        .replace(/\{\{company\}\}/g, lead.company || '')
+        .replace(/\{\{jobTitle\}\}/g, lead.jobTitle || '')
+    }
+
+    // Replace {{repName}} and {{companyName}} for ALL scripts
+    personalizedScript = personalizedScript
       .replace(/\{\{repName\}\}/g, 'Alex')
+      .replace(/\{\{companyName\}\}/g, 'Atomicwork')
 
     // Build contextual script using LinkedIn enriched data if available
     if (lead.linkedinEnriched && lead.linkedinData) {

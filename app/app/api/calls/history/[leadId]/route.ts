@@ -24,6 +24,12 @@ export async function GET(
             name: true,
           },
         },
+        lead: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',

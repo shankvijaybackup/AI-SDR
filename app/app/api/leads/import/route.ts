@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { parseCSV } from '@/lib/csv-parser'
-import { enrichLead } from '@/lib/linkedin-enrichment'
+
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
 
 interface ColumnMapping {
   [csvColumn: string]: string | null
@@ -35,14 +36,13 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const autoEnrich = formData.get('autoEnrich') === 'true'
     const columnMappingStr = formData.get('columnMapping') as string
 
     auditLog(requestId, 'FORM_DATA', {
       hasFile: !!file,
       fileName: file?.name,
       fileSize: file?.size,
-      autoEnrich,
+      autoEnrich: true, // Always auto-enrich with backend
       hasColumnMapping: !!columnMappingStr
     })
 
@@ -228,28 +228,57 @@ export async function POST(request: NextRequest) {
     })
     console.log(`[Import] DB Insert Result: ${created.count}`)
 
-    // Auto-enrich
+    // Auto-enrich with backend (always enabled)
     let enrichmentStarted = 0
-    if (autoEnrich && created.count > 0) {
+    if (created.count > 0) {
+      // Get the newly created leads that have LinkedIn URLs
       const toEnrich = await prisma.lead.findMany({
         where: {
-          userId: currentUser.userId,
+          ...(currentUser.companyId
+            ? { companyId: currentUser.companyId }
+            : { userId: currentUser.userId }
+          ),
           linkedinUrl: { not: null },
           linkedinEnriched: false,
         },
         orderBy: { createdAt: 'desc' },
         take: created.count,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          linkedinUrl: true,
+        },
       })
-      enrichmentStarted = toEnrich.length
-      console.log(`[Import] Auto-enriching ${enrichmentStarted} leads`)
 
+      enrichmentStarted = toEnrich.length
+      console.log(`[Import] Starting backend enrichment for ${enrichmentStarted} leads with LinkedIn URLs`)
+
+      // Get auth token for backend requests
+      const token = request.cookies.get('auth-token')?.value
+
+      // Trigger backend enrichment for each lead (in background)
       Promise.all(
         toEnrich.map(async (lead) => {
           try {
-            await enrichLead(lead.id, currentUser.userId)
-            console.log(`[Enrich] ✅ ${lead.firstName}`)
+            console.log(`[Enrich] Starting: ${lead.firstName} ${lead.lastName}`)
+            const response = await fetch(`${BACKEND_URL}/api/leads/${lead.id}/enrich`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'Cookie': `auth-token=${token}`,
+              },
+            })
+
+            if (response.ok) {
+              console.log(`[Enrich] ✅ ${lead.firstName} ${lead.lastName}`)
+            } else {
+              const error = await response.json()
+              console.error(`[Enrich] ❌ ${lead.firstName} ${lead.lastName}: ${error.error}`)
+            }
           } catch (e) {
-            console.error(`[Enrich] ❌ ${lead.firstName}`)
+            console.error(`[Enrich] ❌ ${lead.firstName} ${lead.lastName}: ${e}`)
           }
         })
       ).catch(console.error)

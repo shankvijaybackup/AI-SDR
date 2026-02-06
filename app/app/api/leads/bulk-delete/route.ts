@@ -23,13 +23,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await prisma.lead.deleteMany({
-      where: {
-        id: {
-          in: leadIds,
-        },
-        userId: currentUser.userId,
+    // Build where clause with multi-tenancy support
+    const where: any = {
+      id: {
+        in: leadIds,
       },
+    };
+
+    // Multi-tenancy: filter by companyId if present, otherwise by userId
+    if (currentUser.companyId) {
+      where.companyId = currentUser.companyId;
+    } else {
+      where.userId = currentUser.userId;
+    }
+
+    const result = await prisma.lead.deleteMany({
+      where,
     });
 
     return NextResponse.json({

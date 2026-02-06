@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { enrichLead } from '@/lib/linkedin-enrichment'
+
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
 
 export async function POST(
   request: NextRequest,
@@ -13,16 +14,26 @@ export async function POST(
     }
 
     const { id: leadId } = await params
-    const success = await enrichLead(leadId, currentUser.userId)
 
-    if (!success) {
+    // Call backend enrichment API (has multi-model synthesis)
+    console.log(`[Frontend Enrich] Proxying to backend: ${BACKEND_URL}/api/leads/${leadId}/enrich`)
+    const response = await fetch(`${BACKEND_URL}/api/leads/${leadId}/enrich`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Enrichment failed' }))
       return NextResponse.json(
-        { error: 'Failed to enrich lead. Make sure LinkedIn session is configured and lead has a LinkedIn URL.' },
-        { status: 400 }
+        { error: error.error || error.message || 'Failed to enrich lead' },
+        { status: response.status }
       )
     }
 
-    return NextResponse.json({ success: true })
+    const data = await response.json()
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Enrich lead error:', error)
     return NextResponse.json(

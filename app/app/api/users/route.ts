@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,37 +10,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Get all users (for team view)
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        company: true,
-        role: true,
-        isActive: true,
-        isEmailVerified: true,
-        lastLoginAt: true,
-        createdAt: true,
-        _count: {
-          select: {
-            leads: true,
-            calls: true,
-          },
-        },
+    // Only account owners can list users
+    if (currentUser.role !== 'account_owner' && currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Only account owners can view users' }, { status: 403 })
+    }
+
+    // Get auth token from cookie
+    const token = request.cookies.get('auth-token')?.value
+
+    // Forward request to backend
+    const response = await fetch(`${BACKEND_URL}/api/users`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Cookie': `auth-token=${token}`,
       },
-      orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json({ users })
+    const data = await response.json()
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status })
+    }
+
+    return NextResponse.json(data)
   } catch (error) {
-    console.error('Get users error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('List users error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
-// Activate/Deactivate user
+// Update user (role, isActive)
 export async function PATCH(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -47,26 +51,39 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
+    // Only account owners can update users
+    if (currentUser.role !== 'account_owner' && currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Only account owners can update users' }, { status: 403 })
+    }
+
     const body = await request.json()
-    const { userId, isActive } = body
+    const { userId } = body
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: { isActive },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        isActive: true,
+    // Get auth token from cookie
+    const token = request.cookies.get('auth-token')?.value
+
+    // Forward request to backend
+    const response = await fetch(`${BACKEND_URL}/api/users/${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Cookie': `auth-token=${token}`,
       },
+      body: JSON.stringify(body),
     })
 
-    return NextResponse.json({ user })
+    const data = await response.json()
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status })
+    }
+
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Update user error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
