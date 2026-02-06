@@ -96,8 +96,15 @@ export async function syncTwilioCalls(options = {}) {
                 });
 
                 if (existingCall) {
-                    // Update existing call if status changed
-                    if (existingCall.status !== twilioCall.status || !existingCall.duration) {
+                    // ALWAYS update the call status from Twilio (the source of truth)
+                    // This ensures 'pending' calls get updated to 'completed', 'busy', etc.
+                    const needsUpdate = existingCall.status !== twilioCall.status ||
+                        !existingCall.duration ||
+                        existingCall.status === 'pending' ||
+                        existingCall.status === 'initiated' ||
+                        existingCall.status === 'ringing';
+
+                    if (needsUpdate) {
                         await prisma.call.update({
                             where: { id: existingCall.id },
                             data: {
@@ -106,7 +113,7 @@ export async function syncTwilioCalls(options = {}) {
                             }
                         });
                         results.updated++;
-                        console.log(`[Twilio Sync] Updated call ${existingCall.id} (${twilioCall.sid})`);
+                        console.log(`[Twilio Sync] Updated call ${existingCall.id}: ${existingCall.status} -> ${twilioCall.status}`);
                     } else {
                         results.matched++;
                     }
