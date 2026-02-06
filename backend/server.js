@@ -1,16 +1,19 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from "fs";
+import { randomUUID } from "crypto";
 
-// Load .env from app directory (shared config location)
-dotenv.config({ path: path.resolve(process.cwd(), 'app/.env') });
+// Load .env - try app directory first, then current directory
+const envPath = fs.existsSync(path.resolve(process.cwd(), 'app/.env'))
+  ? path.resolve(process.cwd(), 'app/.env')
+  : path.resolve(process.cwd(), '.env');
+dotenv.config({ path: envPath });
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import twilio from "twilio";
 import helmet from "helmet";
-
-import fs from "fs";
-import { randomUUID } from "crypto";
+import cookieParser from "cookie-parser";
 
 // ========== GLOBAL ERROR HANDLERS - PREVENT CRASHES ==========
 process.on('uncaughtException', (err) => {
@@ -119,19 +122,47 @@ app.use(helmet({
 // Middlewares
 app.use(cors({
   origin: [FRONTEND_ORIGIN, "http://localhost:3000", "https://ai-sdr-web.onrender.com"],
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   credentials: true
 }));
 
+// Parse cookies
+app.use(cookieParser());
+
+// Parse JSON bodies (must come before routes)
+app.use(bodyParser.json());
+
 app.use('/api/integrations', integrationsRouter);
 app.use('/api/accounts', accountsRouter);
+
+// Import and register leads routes
+import leadsRouter from "./routes/leads.js";
+app.use('/api/leads', leadsRouter);
+
+// Import and register scripts routes
+import scriptsRouter from "./routes/scripts.js";
+app.use('/api/scripts', scriptsRouter);
+
+// Import and register users routes
+import usersRouter from "./routes/users.js";
+app.use('/api/users', usersRouter);
+
+// Import and register signal routes
+import signalsRouter from "./routes/signals.js";
+app.use('/api/signals', signalsRouter);
+
+// Import and register AI generator routes
+import generatorsRouter from "./routes/generators.js";
+app.use('/api/generate', generatorsRouter);
+
+// Import and register lead scripts routes
+import leadScriptsRouter from "./routes/lead-scripts.js";
+app.use('/api/leads', leadScriptsRouter);
 
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // Twilio sends x-www-form-urlencoded to webhooks
 app.use("/api/twilio", bodyParser.urlencoded({ extended: false }));
-// Frontend sends JSON
-app.use(bodyParser.json());
 
 // ========== SCALABILITY: Apply Rate Limiting ==========
 // Global rate limiting for all API routes
@@ -216,7 +247,7 @@ export async function synthesizeWithElevenLabs(text, callSid, voiceId = null) {
   const truncatedText = truncateForTTS(text, 150); // Reduced from 180 for faster TTS
 
   // Use provided voiceId, or fall back to call mapping, or default
-  const finalVoiceId = voiceId || getVoiceIdForCall(callSid) || ELEVEN_VOICE_ID_FEMALE;
+  const finalVoiceId = voiceId || getVoiceIdForCall(callSid) || ELEVEN_VOICE_ID_MALE || 'ii4A6dlr1lY1vmNfjQlX';
   const voiceType = finalVoiceId === ELEVEN_VOICE_ID_FEMALE ? "Female" : (finalVoiceId === ELEVEN_VOICE_ID_MALE ? "Male" : "Regional");
   console.log(`[ElevenLabs] Synthesizing (${voiceType}) with voice ${finalVoiceId.substring(0, 8)}... for ${callSid}:`, truncatedText.substring(0, 50) + '...');
 
@@ -238,9 +269,12 @@ export async function synthesizeWithElevenLabs(text, callSid, voiceId = null) {
         text: truncatedText,
         model_id: "eleven_turbo_v2_5", // Faster model
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75
-        }
+          stability: 0.9,            // MAXIMUM stability for loud consistent voice
+          similarity_boost: 1.0,     // MAXIMUM clarity
+          style: 0.0,
+          use_speaker_boost: true
+        },
+        output_format: "mp3_44100_128"  // Higher bitrate = louder, clearer audio
       }),
       signal: controller.signal
     });
@@ -418,7 +452,7 @@ app.get("/api/twilio/voice", async (req, res) => {
 
   // Simple test response
   const { script, voicePersona } = req.query;
-  const greeting = script ? script.replace(/\{\{repName\}\}/g, voicePersona || 'Arabella') : `Hello, this is ${voicePersona || 'Arabella'} from Keka HR.`;
+  const greeting = script ? script.replace(/\{\{repName\}\}/g, voicePersona || 'Alex') : `Hello, this is ${voicePersona || 'Alex'} from Atomicwork.`;
 
   try {
     const audioUrl = await synthesizeTTS(greeting, 'test-call-sid');
@@ -436,6 +470,32 @@ app.get("/api/twilio/voice", async (req, res) => {
   res.send(twiml.toString());
 });
 
+// Realtime Voice TwiML - connects to OpenAI Realtime API via WebSocket
+app.post("/api/twilio/voice-realtime", async (req, res) => {
+  const callSid = req.body.CallSid;
+  console.log(`[Realtime TwiML] Call ${callSid} connecting to realtime voice`);
+
+  // Use PUBLIC_BASE_URL for WebSocket connection
+  const publicUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:4000';
+  const publicHost = publicUrl.replace('http://', '').replace('https://', '');
+
+  // Use ws:// for http and wss:// for https
+  const wsProtocol = publicUrl.startsWith('https://') ? 'wss' : 'ws';
+  const wsUrl = `${wsProtocol}://${publicHost}/ws-realtime-voice`;
+
+  console.log(`[Realtime TwiML] WebSocket URL: ${wsUrl}`);
+
+  const twiml = new twilio.twiml.VoiceResponse();
+  const connect = twiml.connect();
+  const stream = connect.stream({
+    url: wsUrl,
+  });
+
+  res.type("text/xml");
+  res.send(twiml.toString());
+  console.log(`[Realtime TwiML] Sent TwiML for call ${callSid}`);
+});
+
 app.post("/api/twilio/voice", async (req, res) => {
   console.log(
     "➡️  /api/twilio/voice hit. CallSid:",
@@ -448,29 +508,27 @@ app.post("/api/twilio/voice", async (req, res) => {
   const callSid = req.body.CallSid;
   const callId = req.query.callId;
   const customScript = req.query.script ? decodeURIComponent(req.query.script) : null;
-  const voicePersona = req.query.voicePersona || 'Arabella'; // Default to a real name
+  const voicePersona = req.query.voicePersona || 'Alex'; // Default rep name
 
   // Bridge metadata from the initiation request into call state (lead email, userId, region)
   const activeCall = callId ? getActiveCall(callId) : null;
 
-  // Get company name from activeCall (set during initiation from lead data)
-  // Priority: activeCall.companyName > query param > lead company > default
-  let companyName = 'Atomicwork'; // Default fallback
-  if (activeCall && activeCall.companyName) {
-    companyName = activeCall.companyName;
-  } else if (req.query.companyName) {
-    companyName = decodeURIComponent(req.query.companyName);
-  } else if (activeCall && activeCall.leadCompany) {
-    companyName = activeCall.leadCompany;
-  }
+  // CRITICAL: Always use Atomicwork as the company name for all calls
+  // This platform is built for Atomicwork - all AI agents introduce as "XYZ from Atomicwork"
+  const companyName = 'Atomicwork';
 
   // Extract first line/sentence from script as opening greeting
-  // Use voicePersona name instead of hardcoded "Alex"
-  let openingScript = `Hi, this is ${voicePersona} from ${companyName}. How are you doing today?`;
+  // Use the voice persona name from activeCall - this comes from voice-rotation.js
+  // which has proper gender-matched names (male voice = male name, female voice = female name)
+  // The voicePersona from activeCall is set during call initiation with the correct gendered name
+  const voiceName = (activeCall && activeCall.voicePersona) ? activeCall.voicePersona : null;
+  // Fallback to query param voicePersona, or use 'Alex' as default (gender-neutral)
+  const repName = voiceName || voicePersona || 'Alex';
+  let openingScript = `Hi, this is ${repName} from ${companyName}. How are you doing today?`;
   if (customScript) {
     // Replace BOTH placeholders with actual values
     let processedScript = customScript
-      .replace(/\{\{repName\}\}/gi, voicePersona)
+      .replace(/\{\{repName\}\}/gi, repName)
       .replace(/\{\{companyName\}\}/gi, companyName);
 
     // Take the first TWO sentences to ensure we get the "How are you?" part
@@ -491,9 +549,10 @@ app.post("/api/twilio/voice", async (req, res) => {
   initCall(callSid, {
     script: (activeCall && activeCall.script) ? activeCall.script : (customScript || "Default sales script"),
     leadName: (activeCall && activeCall.leadName) ? activeCall.leadName : (req.query.leadName || "there"),
-    companyName: (activeCall && activeCall.companyName) ? activeCall.companyName : "Keka",
+    companyName: "Atomicwork", // ALWAYS Atomicwork - this platform is for Atomicwork
     userId: (activeCall && activeCall.userId) ? activeCall.userId : null,
-    voicePersona: voicePersona // Store voice persona name in call state
+    voicePersona: (activeCall && activeCall.voicePersona) ? activeCall.voicePersona : voicePersona, // Use voice persona from initiation (gender-matched name)
+    voiceId: (activeCall && activeCall.voiceId) ? String(activeCall.voiceId || '') : '' // CRITICAL FIX: Convert to string to prevent .substring() error
   });
   updateCall(callSid, { status: "in-progress" });
 
@@ -552,19 +611,35 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
     const speechResult = req.body.SpeechResult || "";
     const confidence = req.body.Confidence;
 
-    console.log(
-      "➡️  /api/twilio/handle-speech hit. CallSid:",
-      callSid,
-      "Speech:",
-      speechResult.substring(0, 50),
-      "Confidence:",
-      confidence
-    );
+    console.log("========================================");
+    console.log("[handle-speech] NEW REQUEST");
+    console.log("[handle-speech] CallSid:", callSid);
+    console.log("[handle-speech] Speech:", speechResult.substring(0, 100));
+    console.log("[handle-speech] Confidence:", confidence);
 
-    const call = getCall(callSid);
+    const call = await getCall(callSid); // Await is safer given async getCall
     if (!call) {
-      console.error("[handle-speech] Call not found:", callSid);
+      console.error("[handle-speech] ❌ Call not found:", callSid);
       twiml.say({ voice: "Polly.Joanna" }, "Sorry, let me call you back. Bye!");
+      twiml.hangup();
+      res.type("text/xml");
+      return res.send(twiml.toString());
+    }
+
+    // NEW LOGGING
+    console.log("[handle-speech] ✅ Call found:", {
+      hasScript: !!call.script,
+      hasUserId: !!call.userId,
+      hasVoiceId: !!call.voiceId,
+      voiceId: call.voiceId ? call.voiceId.substring(0, 8) + '...' : 'MISSING',
+      transcriptLength: call.transcript?.length || 0,
+      leadRegion: call.leadRegion
+    });
+
+    // Defensive check: Ensure critical fields exist
+    if (!call.script) {
+      console.error("[handle-speech] ❌ Call missing script field!");
+      twiml.say({ voice: "Polly.Joanna" }, "I apologize, let me call you back in a moment. Thanks!");
       twiml.hangup();
       res.type("text/xml");
       return res.send(twiml.toString());
@@ -622,10 +697,14 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
     const isNotInterested =
       /\b(not interested|no thanks|no thank you|not a fit|not for me|not now|no i'?m not|no, i'?m not|i'?m not interested)\b/i.test(normalizedSpeech);
 
-    // Only hard-close for explicit opt-outs (do not call list requests)
-    if (isOptOut) {
-      const closingLine = "Understood — I'll take you off our list. Sorry for the interruption.";
+    // CRITICAL FIX: End call immediately when prospect says "not interested"
+    // User feedback: AI kept talking after 3x "not interested" - absolutely unacceptable
+    if (isOptOut || isNotInterested) {
+      const closingLine = isOptOut
+        ? "Understood — I'll take you off our list. Sorry for the interruption."
+        : "I appreciate your time. Thanks for letting me know!";
       addTranscript(callSid, { speaker: "agent", text: closingLine });
+      console.log(`[Objection Detected] ${isOptOut ? 'Opt-out' : 'Not interested'} - ending call immediately`);
       try {
         const audioUrl = await synthesizeTTS(closingLine, callSid);
         console.log(`[AI Reply] Playing: ${audioUrl}`);
@@ -638,7 +717,6 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
       res.type("text/xml");
       return res.send(twiml.toString());
     }
-    // NOTE: "not interested" is now handled by AI, which will offer State of AI report as fallback
 
     // If we just asked to VERIFY an email on file, handle the response deterministically.
     if (call.leadEmail) {
@@ -772,34 +850,53 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     // Get AI reply with timeout protection (handled inside getAiSdrReply)
     // ========== PHASE 2: Pass knowledge context to AI ==========
-    const reply = await getAiSdrReply({
-      script: call.script,
-      transcript: call.transcript,
-      latestUserText: speechResult,
-      sttConfidence: Number(confidence || 0),
-      userId: call.userId,
-      leadEmail: call.leadEmail,
-      leadRegion: call.leadRegion,
-      voicePersona: call.voicePersona,
-      companyName: call.companyName,
-      // Pass knowledge context if available
-      leadContext: call.leadContext || null,
-      relevantKnowledge: call.relevantKnowledge || [],
-      industry: call.industry || null,
-      role: call.role || null
-    });
+    let reply;
+    try {
+      console.log("[AI] Requesting reply from OpenAI...");
+      reply = await getAiSdrReply({
+        script: call.script,
+        transcript: call.transcript,
+        latestUserText: speechResult,
+        sttConfidence: Number(confidence || 0),
+        userId: call.userId,
+        leadEmail: call.leadEmail,
+        leadRegion: call.leadRegion,
+        voicePersona: call.voicePersona,
+        companyName: call.companyName,
+        // Pass knowledge context if available
+        leadContext: call.leadContext || null,
+        relevantKnowledge: call.relevantKnowledge || [],
+        industry: call.industry || null,
+        role: call.role || null
+      });
+      console.log("[AI] ✅ Reply received:", reply.substring(0, 100));
+    } catch (aiError) {
+      console.error("[AI] ❌ Error getting reply:", aiError.message);
+      console.error("[AI] Stack:", aiError.stack);
+      // Graceful fallback instead of technical difficulties
+      reply = "I apologize, could you repeat that? I want to make sure I understand you correctly.";
+      console.log("[AI] Using fallback reply");
+    }
     // ========== END PHASE 2 ==========
 
     addTranscript(callSid, { speaker: "agent", text: reply });
 
     // Play AI reply with TTS (ElevenLabs with Polly fallback)
     // Pass region and voice ID for proper regional voice
+    console.log("[TTS] Synthesizing with:", {
+      voicePersona: call.voicePersona,
+      voiceId: call.voiceId,
+      region: call.leadRegion
+    });
+
     try {
       const audioUrl = await synthesizeTTS(reply, callSid, call.voicePersona, call.leadRegion, call.voiceId);
-      console.log(`[AI Reply] Playing: ${audioUrl}`);
+      console.log(`[TTS] ✅ Audio generated: ${audioUrl.substring(0, 80)}`);
       twiml.play(audioUrl);
-    } catch (err) {
-      console.error("[AI Reply] TTS failed, using Polly:", err.message);
+    } catch (ttsError) {
+      console.error("[TTS] ❌ Synthesis failed:", ttsError.message);
+      console.error("[TTS] Stack:", ttsError.stack);
+      console.log("[TTS] Falling back to Polly.Joanna");
       twiml.say({ voice: "Polly.Joanna" }, reply);
     }
 
@@ -842,12 +939,32 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
     res.type("text/xml");
     res.send(twiml.toString());
   } catch (err) {
-    console.error("[Error] handle-speech failed:", err.message);
-    console.error("[Error] Stack:", err.stack);
+    console.error("========================================");
+    console.error("[ERROR] ❌ handle-speech CRITICAL FAILURE");
+    console.error("[ERROR] Message:", err.message);
+    console.error("[ERROR] Stack:", err.stack);
+    console.error("[ERROR] CallSid:", req.body.CallSid);
+    console.error("========================================");
 
-    // More graceful error message
-    twiml.say("I apologize, I'm having a technical issue on my end. I'll follow up with you via email shortly. Thanks for your time!");
-    twiml.pause({ length: 1 });
+    // Graceful error recovery - don't mention "technical difficulties"
+    twiml.say({ voice: "Polly.Joanna" }, "I apologize, could you repeat that one more time? I want to make sure I heard you correctly.");
+    twiml.pause({ length: 0.5 });
+
+    // Try to continue the conversation instead of hanging up
+    twiml.gather({
+      input: "speech",
+      action: "/api/twilio/handle-speech",
+      method: "POST",
+      timeout: 10,
+      speechTimeout: "auto",
+      speechModel: "phone_call",
+      enhanced: true,
+      profanityFilter: false,
+      language: "en-US"
+    });
+
+    // If still failing, then end gracefully
+    twiml.say({ voice: "Polly.Joanna" }, "Thanks for your time. I'll follow up via email.");
     twiml.hangup();
 
     res.type("text/xml");
@@ -1174,5 +1291,5 @@ const server = app.listen(PORT, () => {
 });
 
 // Attach WebSocket servers
-attachMediaStreamServer(server);
 attachRealtimeVoiceServer(server);
+attachMediaStreamServer(server);
