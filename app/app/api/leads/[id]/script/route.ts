@@ -3,23 +3,21 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
 
-export async function GET(request: NextRequest) {
+// GET /api/leads/[id]/script - Get generated script
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Only account owners can list users
-    if (currentUser.role !== 'account_owner' && currentUser.role !== 'admin') {
-      return NextResponse.json({ error: 'Only account owners can view users' }, { status: 403 })
-    }
-
-    // Get auth token from cookie
+    const { id } = await params
     const token = request.cookies.get('auth-token')?.value
 
-    // Forward request to backend
-    const response = await fetch(`${BACKEND_URL}/api/users`, {
+    const response = await fetch(`${BACKEND_URL}/api/leads/${id}/script`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -35,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('List users error:', error)
+    console.error('Get script error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -43,31 +41,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Update user (role, isActive)
-export async function PATCH(request: NextRequest) {
+// PATCH /api/leads/[id]/script - Update script
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Only account owners can update users
-    if (currentUser.role !== 'account_owner' && currentUser.role !== 'admin') {
-      return NextResponse.json({ error: 'Only account owners can update users' }, { status: 403 })
-    }
-
+    const { id } = await params
     const body = await request.json()
-    const { userId } = body
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
-    }
-
-    // Get auth token from cookie
     const token = request.cookies.get('auth-token')?.value
 
-    // Forward request to backend
-    const response = await fetch(`${BACKEND_URL}/api/users/${userId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/leads/${id}/script`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -85,7 +74,10 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Update user error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Update script error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

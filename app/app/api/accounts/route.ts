@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
 const accountSchema = z.object({
@@ -16,7 +16,7 @@ const accountSchema = z.object({
 
 export async function GET(req: NextRequest) {
     try {
-        const user = await getCurrentUser()
+        const user = getCurrentUserFromRequest(request)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { searchParams } = new URL(req.url)
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        const user = await getCurrentUser()
+        const user = getCurrentUserFromRequest(request)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const body = await req.json()

@@ -5,7 +5,7 @@ import { getCurrentUser, hashPassword } from '@/lib/auth'
 // POST - Reset password for a user (authenticated users only)
 export async function POST(request: NextRequest) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

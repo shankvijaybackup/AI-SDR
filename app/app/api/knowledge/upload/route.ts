@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   extractTextFromPDF,
@@ -15,7 +15,7 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }

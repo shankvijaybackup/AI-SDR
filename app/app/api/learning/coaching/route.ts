@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserFromRequest } from '@/lib/auth';
 import { COACHING_METRICS, BUYER_PERSONAS } from '@/lib/learning/constants';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +31,7 @@ interface CoachingFeedback {
 // POST /api/learning/coaching - Get AI coaching feedback on a response
 export async function POST(request: NextRequest) {
     try {
-        const user = await getCurrentUser();
+        const user = getCurrentUserFromRequest(request);
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }

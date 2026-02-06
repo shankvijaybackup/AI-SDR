@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { parseCSV } from '@/lib/csv-parser'
 
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     auditLog(requestId, 'START', { url: request.url })
 
-    let currentUser = await getCurrentUser()
+    let currentUser = getCurrentUserFromRequest(request)
 
     if (!currentUser) {
       auditLog(requestId, 'AUTH_FAIL', { error: 'Not authenticated' })

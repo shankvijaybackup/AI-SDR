@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { enrichLead } from '@/lib/linkedin-enrichment'
 
 export async function POST(
@@ -7,7 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }

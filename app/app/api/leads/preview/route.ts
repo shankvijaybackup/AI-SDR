@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { parseCSV } from '@/lib/csv-parser'
 
 // Lead field definitions for mapping
@@ -94,7 +94,7 @@ function suggestMapping(csvColumn: string): string | null {
 
 export async function POST(request: NextRequest) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }

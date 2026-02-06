@@ -3,7 +3,8 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
 
-export async function POST(
+// PATCH /api/leads/[id]/script/approve - Approve call script
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -13,29 +14,29 @@ export async function POST(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { id: leadId } = await params
+    const { id } = await params
+    const body = await request.json()
+    const token = request.cookies.get('auth-token')?.value
 
-    // Call backend enrichment API (has multi-model synthesis)
-    console.log(`[Frontend Enrich] Proxying to backend: ${BACKEND_URL}/api/leads/${leadId}/enrich`)
-    const response = await fetch(`${BACKEND_URL}/api/leads/${leadId}/enrich`, {
-      method: 'POST',
+    const response = await fetch(`${BACKEND_URL}/api/leads/${id}/script/approve`, {
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Cookie': `auth-token=${token}`,
       },
+      body: JSON.stringify(body),
     })
 
+    const data = await response.json()
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Enrichment failed' }))
-      return NextResponse.json(
-        { error: error.error || error.message || 'Failed to enrich lead' },
-        { status: response.status }
-      )
+      return NextResponse.json(data, { status: response.status })
     }
 
-    const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Enrich lead error:', error)
+    console.error('Approve script error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

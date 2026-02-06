@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { analyzeCall } from '@/lib/call-analysis'
 
 export async function POST(
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ callId: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }

@@ -1,11 +1,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const user = await getCurrentUser()
+        const user = getCurrentUserFromRequest(request)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { id } = await params

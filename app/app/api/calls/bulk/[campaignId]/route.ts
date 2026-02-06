@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
 // GET /api/calls/bulk/[campaignId] - Get campaign status and all call results
@@ -9,7 +9,7 @@ export async function GET(
     { params }: { params: Promise<{ campaignId: string }> }
 ) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }
@@ -100,7 +100,7 @@ export async function PATCH(
     { params }: { params: Promise<{ campaignId: string }> }
 ) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }
@@ -207,7 +207,7 @@ export async function DELETE(
     { params }: { params: Promise<{ campaignId: string }> }
 ) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }

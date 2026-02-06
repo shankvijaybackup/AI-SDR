@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 
 // Get current user's profile
 export async function GET(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 // Update current user's profile
 export async function PATCH(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }

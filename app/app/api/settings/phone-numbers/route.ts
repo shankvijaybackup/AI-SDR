@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 
 // GET - List user's regional phone numbers
 export async function GET() {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }
@@ -25,7 +25,7 @@ export async function GET() {
 // POST - Add or update a regional phone number
 export async function POST(request: NextRequest) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 // DELETE - Remove a regional phone number
 export async function DELETE(request: NextRequest) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }

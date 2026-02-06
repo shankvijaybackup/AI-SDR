@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
 const createCampaignSchema = z.object({
@@ -13,7 +13,7 @@ const createCampaignSchema = z.object({
 // POST /api/calls/bulk - Create and start a bulk calling campaign
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 // GET /api/calls/bulk - List all campaigns for current user
 export async function GET(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }

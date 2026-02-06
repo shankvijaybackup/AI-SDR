@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { linkedInSearch } from '@/lib/linkedin-search'
 import { redditClient } from '@/lib/reddit-client'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 
 // POST: Trigger a scan for signals
 export async function POST(req: NextRequest) {
     try {
-        const user = await getCurrentUser()
+        const user = getCurrentUserFromRequest(request)
         if (!user || !user.companyId) {
             return new NextResponse("Unauthorized", { status: 401 })
         }

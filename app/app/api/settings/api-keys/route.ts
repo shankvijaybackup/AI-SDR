@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUserFromRequest } from '@/lib/auth'
 import { isAdmin } from '@/lib/permissions'
 import { z } from 'zod'
 
@@ -16,7 +16,7 @@ const updateApiKeysSchema = z.object({
 // GET - Fetch API keys (masked)
 export async function GET() {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }
@@ -82,7 +82,7 @@ export async function GET() {
 // PATCH - Update API keys (admin only)
 export async function PATCH(request: NextRequest) {
     try {
-        const currentUser = await getCurrentUser()
+        const currentUser = getCurrentUserFromRequest(request)
         if (!currentUser) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }

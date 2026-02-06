@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUserFromRequest } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/learning/pitches - List all pitch templates
 export async function GET(request: NextRequest) {
     try {
-        const user = await getCurrentUser();
+        const user = getCurrentUserFromRequest(request);
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 // POST /api/learning/pitches - Create a new pitch template
 export async function POST(request: NextRequest) {
     try {
-        const user = await getCurrentUser();
+        const user = getCurrentUserFromRequest(request);
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
