@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser, getCurrentUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
+
 const createLeadSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
@@ -91,7 +93,45 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ lead })
+    // Trigger automatic enrichment pipeline in background
+    // This includes: account mapping, LinkedIn enrichment, script generation, and deep research
+    if (lead.linkedinUrl || lead.company) {
+      console.log(`[Auto-Enrich] Triggering background enrichment for lead ${lead.id}`)
+
+      // Enrichment endpoint handles:
+      // 1. Auto-create/link account if company exists
+      // 2. LinkedIn profile enrichment
+      // 3. Multi-model AI synthesis for persona
+      fetch(`${BACKEND_URL}/api/leads/${lead.id}/enrich`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }).catch(err => {
+        console.error(`[Auto-Enrich] Background enrichment failed for lead ${lead.id}:`, err)
+      })
+
+      // Generate personalized call script
+      fetch(`${BACKEND_URL}/api/leads/${lead.id}/script/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }).catch(err => {
+        console.error(`[Auto-Enrich] Script generation failed for lead ${lead.id}:`, err)
+      })
+
+      console.log(`[Auto-Enrich] Background jobs triggered. Data will be available in a few minutes.`)
+    } else {
+      console.log(`[Auto-Enrich] Skipping enrichment - no LinkedIn URL or company provided`)
+    }
+
+    return NextResponse.json({
+      lead,
+      message: lead.linkedinUrl || lead.company
+        ? 'Lead created successfully. Enrichment and script generation in progress (may take a few minutes).'
+        : 'Lead created successfully.'
+    })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
+const FRONTEND_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
 const accountSchema = z.object({
     name: z.string().min(1),
     domain: z.string().optional(),
@@ -95,7 +97,36 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        return NextResponse.json(account)
+        // Trigger automatic enrichment and deep research in background
+        if (domain || linkedinUrl) {
+            console.log(`[Auto-Enrich] Triggering background enrichment for account ${account.id}`)
+
+            // Account enrichment includes:
+            // 1. Website content analysis
+            // 2. Company information extraction
+            // 3. Deep research with Google Grounding
+            // 4. Technographic enrichment
+            fetch(`${FRONTEND_URL}/api/accounts/${account.id}/enrich`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cookie': req.headers.get('cookie') || '',
+                },
+            }).catch(err => {
+                console.error(`[Auto-Enrich] Background enrichment failed for account ${account.id}:`, err)
+            })
+
+            console.log(`[Auto-Enrich] Background enrichment triggered. Data will be available in a few minutes.`)
+        } else {
+            console.log(`[Auto-Enrich] Skipping enrichment - no domain or LinkedIn URL provided`)
+        }
+
+        return NextResponse.json({
+            ...account,
+            message: domain || linkedinUrl
+                ? 'Account created successfully. Enrichment and deep research in progress (may take a few minutes).'
+                : 'Account created successfully.'
+        })
     } catch (error) {
         console.error('Error creating account:', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
