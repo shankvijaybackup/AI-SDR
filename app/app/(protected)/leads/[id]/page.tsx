@@ -18,10 +18,23 @@ import {
     Voicemail,
     PhoneOff,
     MessageSquare,
-    TrendingUp
+    TrendingUp,
+    Sparkles,
+    User,
+    X,
+    Edit,
+    Save,
+    Loader2
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { CallDetailDialog } from '@/components/call-detail-dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { format } from 'date-fns'
+import LeadPersonaDisplay from '@/components/lead-persona-display'
+import CallScriptPreview from '@/components/call-script-preview'
 
 interface Lead {
     id: string
@@ -64,9 +77,23 @@ interface Call {
     interestLevel: string | null
     outcome?: string
     createdAt: string
+    updatedAt: string
+    twilioCallSid?: string
+    voicePersona?: string
+    fromNumber?: string
+    companyName?: string
+    engagementScore?: number
+    sentimentScore?: number
+    callQualityScore?: number
+    objections?: string[]
+    nextSteps?: string
     script: {
         name: string
     } | null
+    lead?: {
+        firstName: string
+        lastName: string
+    }
 }
 
 export default function LeadDetailPage() {
@@ -78,6 +105,21 @@ export default function LeadDetailPage() {
     const [calls, setCalls] = useState<Call[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedCall, setSelectedCall] = useState<Call | null>(null)
+    const [enriching, setEnriching] = useState(false)
+    const [editDialogOpen, setEditDialogOpen] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [callDetailDialogOpen, setCallDetailDialogOpen] = useState(false)
+    const [selectedCallForDetail, setSelectedCallForDetail] = useState<any>(null)
+    const [editForm, setEditForm] = useState({
+        firstName: '',
+        lastName: '',
+        phone: '',
+        email: '',
+        company: '',
+        jobTitle: '',
+        linkedinUrl: '',
+        notes: '',
+    })
 
     useEffect(() => {
         if (leadId) {
@@ -112,6 +154,72 @@ export default function LeadDetailPage() {
             console.error('Failed to fetch call history:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleEditLead = () => {
+        if (!lead) return
+        setEditForm({
+            firstName: lead.firstName || '',
+            lastName: lead.lastName || '',
+            phone: lead.phone || '',
+            email: lead.email || '',
+            company: lead.company || '',
+            jobTitle: lead.jobTitle || '',
+            linkedinUrl: lead.linkedinUrl || '',
+            notes: lead.notes || '',
+        })
+        setEditDialogOpen(true)
+    }
+
+    const handleSaveLead = async () => {
+        if (!lead) return
+        setSaving(true)
+
+        try {
+            const response = await fetch(`/api/leads/${lead.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editForm),
+            })
+
+            if (response.ok) {
+                await fetchLeadData() // Refresh data
+                setEditDialogOpen(false)
+                alert('Lead updated successfully!')
+            } else {
+                const error = await response.json()
+                alert(`Failed to update lead: ${error.error}`)
+            }
+        } catch (error) {
+            console.error('Update error:', error)
+            alert('Failed to update lead')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleEnrichLead = async () => {
+        if (!lead) return
+        setEnriching(true)
+
+        try {
+            const response = await fetch(`/api/leads/${lead.id}/enrich`, {
+                method: 'POST',
+            })
+
+            if (response.ok) {
+                await fetchLeadData() // Refresh data
+                alert('Lead enriched successfully with LinkedIn data!')
+            } else {
+                const error = await response.json()
+                alert(`Enrichment failed: ${error.error}`)
+            }
+        } catch (error) {
+            console.error('Enrich error:', error)
+            alert('Failed to enrich lead')
+        } finally {
+            setEnriching(false)
         }
     }
 
@@ -173,7 +281,18 @@ export default function LeadDetailPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
+            {/* Close button in top-right corner */}
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/leads')}
+                className="absolute top-0 right-0 z-10 hover:bg-slate-100"
+                title="Close"
+            >
+                <X className="w-5 h-5" />
+            </Button>
+
             {/* Header - Unchanged */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
@@ -197,6 +316,17 @@ export default function LeadDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
+                    {lead.linkedinUrl && (
+                        <Button
+                            variant="outline"
+                            onClick={handleEnrichLead}
+                            disabled={enriching}
+                            className={lead.linkedinEnriched ? "text-green-600 hover:text-green-700 bg-green-50" : ""}
+                        >
+                            <Sparkles className={`w-4 h-4 mr-2 ${enriching ? 'animate-spin' : ''}`} />
+                            {enriching ? 'Enriching...' : lead.linkedinEnriched ? 'Re-Enrich' : 'Enrich Lead'}
+                        </Button>
+                    )}
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${lead.status === 'qualified' ? 'bg-green-100 text-green-800' :
                         lead.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
                             lead.status === 'not_interested' ? 'bg-red-100 text-red-800' :
@@ -204,6 +334,10 @@ export default function LeadDetailPage() {
                         }`}>
                         {lead.status}
                     </span>
+                    <Button variant="outline" onClick={handleEditLead}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                    </Button>
                     <Button onClick={() => router.push('/calling')}>
                         <Phone className="w-4 h-4 mr-2" />
                         Call
@@ -279,10 +413,38 @@ export default function LeadDetailPage() {
                 {/* Right Column: Tabs for Activity & Research */}
                 <div className="lg:col-span-2">
                     <Tabs defaultValue="activity" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
+                        <TabsList className="w-full inline-flex justify-start overflow-x-auto">
                             <TabsTrigger value="activity">Activity & Calls</TabsTrigger>
+                            <TabsTrigger value="persona">Persona</TabsTrigger>
+                            <TabsTrigger value="script">Call Script</TabsTrigger>
                             <TabsTrigger value="research">Deep Research</TabsTrigger>
                         </TabsList>
+
+                        <TabsContent value="persona">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center">
+                                        <User className="w-5 h-5 mr-2" />
+                                        Persona & Insights
+                                    </CardTitle>
+                                    <CardDescription>
+                                        AI-generated personality profile and talking points based on LinkedIn data
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <LeadPersonaDisplay linkedinData={lead.linkedinData} />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="script">
+                            <CallScriptPreview
+                                leadId={lead.id}
+                                leadName={`${lead.firstName} ${lead.lastName}`}
+                                company={lead.company || ''}
+                                jobTitle={lead.jobTitle || ''}
+                            />
+                        </TabsContent>
 
                         {/* ACTIVITY TAB (Original Content) */}
                         <TabsContent value="activity">
@@ -336,12 +498,29 @@ export default function LeadDetailPage() {
                                                     {/* Expanded Details */}
                                                     {selectedCall?.id === call.id && (
                                                         <div className="mt-4 pt-4 border-t space-y-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className="text-xs text-slate-500">
+                                                                    Call ID: <code className="bg-slate-100 px-2 py-0.5 rounded text-xs">{call.id}</code>
+                                                                </p>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        setSelectedCallForDetail(call)
+                                                                        setCallDetailDialogOpen(true)
+                                                                    }}
+                                                                    className="h-8"
+                                                                >
+                                                                    <MessageSquare className="w-3 h-3 mr-1" />
+                                                                    View Full Logs
+                                                                </Button>
+                                                            </div>
                                                             {call.aiSummary && (
                                                                 <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded">
                                                                     {call.aiSummary}
                                                                 </p>
                                                             )}
-                                                            {call.transcript && call.transcript.length > 0 && (
+                                                            {call.transcript && call.transcript.length > 0 ? (
                                                                 <div className="space-y-2 bg-slate-50 p-3 rounded max-h-64 overflow-y-auto">
                                                                     {call.transcript.map((entry: any, idx: number) => (
                                                                         <div key={idx} className="text-sm">
@@ -352,6 +531,8 @@ export default function LeadDetailPage() {
                                                                         </div>
                                                                     ))}
                                                                 </div>
+                                                            ) : (
+                                                                <p className="text-xs text-slate-400 italic">No transcript available - click "View Full Logs" for all call details</p>
                                                             )}
                                                         </div>
                                                     )}
@@ -491,6 +672,140 @@ export default function LeadDetailPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Edit Lead Dialog */}
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Edit Lead</DialogTitle>
+                        <DialogDescription>
+                            Update lead information including phone number for testing calls
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="firstName">First Name *</Label>
+                                <Input
+                                    id="firstName"
+                                    value={editForm.firstName}
+                                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                                    placeholder="John"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="lastName">Last Name *</Label>
+                                <Input
+                                    id="lastName"
+                                    value={editForm.lastName}
+                                    onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                                    placeholder="Doe"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Phone Number *</Label>
+                            <Input
+                                id="phone"
+                                type="tel"
+                                value={editForm.phone}
+                                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                placeholder="+1234567890"
+                            />
+                            <p className="text-xs text-slate-500">
+                                💡 Add your own number to test the calling experience
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={editForm.email}
+                                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                placeholder="john.doe@example.com"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="company">Company</Label>
+                                <Input
+                                    id="company"
+                                    value={editForm.company}
+                                    onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                                    placeholder="Acme Inc"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="jobTitle">Job Title</Label>
+                                <Input
+                                    id="jobTitle"
+                                    value={editForm.jobTitle}
+                                    onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
+                                    placeholder="VP of Sales"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="linkedinUrl">LinkedIn URL</Label>
+                            <Input
+                                id="linkedinUrl"
+                                value={editForm.linkedinUrl}
+                                onChange={(e) => setEditForm({ ...editForm, linkedinUrl: e.target.value })}
+                                placeholder="https://linkedin.com/in/johndoe"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="notes">Notes</Label>
+                            <Textarea
+                                id="notes"
+                                value={editForm.notes}
+                                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                placeholder="Add any notes about this lead..."
+                                rows={3}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => setEditDialogOpen(false)}
+                            disabled={saving}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSaveLead}
+                            disabled={saving || !editForm.firstName || !editForm.lastName || !editForm.phone}
+                        >
+                            {saving ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    Save Changes
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Call Detail Dialog */}
+            <CallDetailDialog
+                call={selectedCallForDetail}
+                open={callDetailDialogOpen}
+                onOpenChange={setCallDetailDialogOpen}
+            />
         </div>
     )
 }
