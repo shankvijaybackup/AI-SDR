@@ -42,6 +42,19 @@ router.post('/status', async (req, res) => {
 
         // 4. If Completed, Generate Summary & Notes
         if (CallStatus === 'completed' && activeCall && activeCall.transcript && activeCall.transcript.length > 0) {
+            console.log(`\n[Twilio Webhook] 📝 SAVING TRANSCRIPT FOR CALL ${CallSid}`);
+            console.log(`[Twilio Webhook] Transcript Array Length: ${activeCall.transcript.length} entries`);
+
+            // Log every single entry for verification
+            console.log(`[Twilio Webhook] COMPLETE TRANSCRIPT DUMP:`);
+            activeCall.transcript.forEach((entry, idx) => {
+                console.log(`  Entry ${idx + 1}/${activeCall.transcript.length}:`);
+                console.log(`    Speaker: ${entry.speaker}`);
+                console.log(`    Text: "${entry.text}"`);
+                console.log(`    Characters: ${entry.text?.length || 0}`);
+                console.log(`    Timestamp: ${entry.timestamp || 'N/A'}`);
+            });
+
             console.log(`[Twilio Webhook] Generating summary for call ${CallSid}...`);
             try {
                 const summary = await summarizeCall({ transcript: activeCall.transcript });
@@ -53,13 +66,17 @@ router.post('/status', async (req, res) => {
                 // Simple sentiment inference (placeholder)
                 updateData.sentimentScore = 0.5;
 
-                console.log(`[Twilio Webhook] Summary generated: ${summary.substring(0, 50)}...`);
+                console.log(`[Twilio Webhook] ✅ Summary generated: ${summary.substring(0, 50)}...`);
+                console.log(`[Twilio Webhook] ✅ Transcript will be saved to database (${activeCall.transcript.length} entries)`);
             } catch (err) {
-                console.error(`[Twilio Webhook] Summary generation failed:`, err);
+                console.error(`[Twilio Webhook] ❌ Summary generation failed:`, err);
             }
         } else if (activeCall?.transcript) {
             // Save transcript even if not completed successfully (e.g. failed mid-call)
+            console.log(`[Twilio Webhook] ⚠️ Call ${CallSid} not completed but has ${activeCall.transcript.length} transcript entries - saving anyway`);
             updateData.transcript = activeCall.transcript;
+        } else {
+            console.warn(`[Twilio Webhook] ⚠️ No transcript found for call ${CallSid} (Status: ${CallStatus})`);
         }
 
         // 5. Update Database
@@ -74,13 +91,39 @@ router.post('/status', async (req, res) => {
         });
 
         if (dbCall) {
+            console.log(`[Twilio Webhook] 💾 WRITING TO DATABASE - Call ${dbCall.id}`);
+            if (updateData.transcript) {
+                console.log(`[Twilio Webhook] Database write includes ${updateData.transcript.length} transcript entries`);
+            }
+
             await prisma.call.update({
                 where: { id: dbCall.id },
                 data: updateData
             });
-            console.log(`[Twilio Webhook] DB Updated for Call ${dbCall.id}`);
+
+            console.log(`[Twilio Webhook] ✅ DATABASE WRITE SUCCESSFUL for Call ${dbCall.id}`);
+
+            // Verify the write by reading back
+            const verifyCall = await prisma.call.findUnique({
+                where: { id: dbCall.id },
+                select: {
+                    id: true,
+                    transcript: true,
+                    status: true,
+                    duration: true
+                }
+            });
+
+            if (verifyCall) {
+                const transcriptLength = Array.isArray(verifyCall.transcript) ? verifyCall.transcript.length : 0;
+                console.log(`[Twilio Webhook] ✅ VERIFICATION: Database now shows ${transcriptLength} transcript entries for call ${dbCall.id}`);
+
+                if (updateData.transcript && transcriptLength !== updateData.transcript.length) {
+                    console.error(`[Twilio Webhook] ❌ CRITICAL: Transcript length mismatch! Tried to save ${updateData.transcript.length} but database has ${transcriptLength}`);
+                }
+            }
         } else {
-            console.warn(`[Twilio Webhook] Call record not found in DB for SID ${CallSid}`);
+            console.warn(`[Twilio Webhook] ⚠️ Call record not found in DB for SID ${CallSid}`);
         }
 
         // 6. Handle Campaign Logic

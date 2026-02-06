@@ -80,7 +80,7 @@ export async function updateCall(callSid, updater) {
 export async function addTranscript(callSid, entry) {
   const call = await getCall(callSid);
   if (!call) {
-    console.warn(`[CallState] Call ${callSid} not found for transcript`);
+    console.error(`[CallState TRANSCRIPT] ❌ CRITICAL: Call ${callSid} not found for transcript! Entry lost:`, entry);
     return;
   }
 
@@ -89,16 +89,40 @@ export async function addTranscript(callSid, entry) {
     ...entry
   };
 
+  // COMPREHENSIVE LOGGING - Log every single word captured
+  console.log(`[CallState TRANSCRIPT] ✅ CAPTURED for ${callSid}:`);
+  console.log(`  Speaker: ${transcriptEntry.speaker}`);
+  console.log(`  Text: "${transcriptEntry.text}"`);
+  console.log(`  Text Length: ${transcriptEntry.text?.length || 0} characters`);
+  console.log(`  Timestamp: ${transcriptEntry.timestamp}`);
+  console.log(`  Word Count: ${transcriptEntry.text?.split(/\s+/).length || 0} words`);
+
+  // Add to transcript array
+  const previousLength = call.transcript.length;
   call.transcript.push(transcriptEntry);
+  const newLength = call.transcript.length;
+
+  console.log(`  Transcript Array: ${previousLength} → ${newLength} entries (CONFIRMED PUSH)`);
   call.updatedAt = new Date().toISOString();
 
   // Try Redis first
   if (await isRedisAvailable()) {
-    await setJSON(`call:${callSid}`, call, CALL_TTL);
+    const success = await setJSON(`call:${callSid}`, call, CALL_TTL);
+    if (success) {
+      console.log(`  Storage: ✅ SAVED TO REDIS (${newLength} total entries)`);
+    } else {
+      console.error(`  Storage: ❌ REDIS SAVE FAILED! Falling back to memory`);
+      memoryFallback.set(callSid, call);
+      console.log(`  Storage: ✅ SAVED TO MEMORY (fallback)`);
+    }
   } else {
     // Fallback to in-memory
     memoryFallback.set(callSid, call);
+    console.log(`  Storage: ✅ SAVED TO MEMORY (${newLength} total entries)`);
   }
+
+  // Final verification
+  console.log(`[CallState TRANSCRIPT] 📊 Call ${callSid} now has ${call.transcript.length} total transcript entries\n`);
 }
 
 /**
