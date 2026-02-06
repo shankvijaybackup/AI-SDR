@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, getCurrentUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
 const createLeadSchema = z.object({
@@ -17,8 +17,10 @@ const createLeadSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
+    // Use request-based auth for production reliability
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
+      console.error('[Leads API GET] Authentication failed')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
@@ -67,10 +69,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
+    // Use request-based auth for production reliability
+    const currentUser = getCurrentUserFromRequest(request)
     if (!currentUser) {
+      console.error('[Leads API] Authentication failed - no valid user from request')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+
+    console.log('[Leads API] Authenticated user:', currentUser.email, 'Role:', currentUser.role)
 
     const body = await request.json()
     const validatedData = createLeadSchema.parse(body)

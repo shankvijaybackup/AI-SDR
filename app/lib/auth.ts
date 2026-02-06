@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
+import { NextRequest } from 'next/server'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key'
 if (process.env.JWT_SECRET) {
@@ -42,7 +43,7 @@ export async function setAuthCookie(token: string) {
   const cookieStore = await cookies()
   cookieStore.set(TOKEN_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // TODO: Enable when HTTPS is configured
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: '/',
@@ -62,6 +63,31 @@ export async function removeAuthCookie() {
 
 export async function getCurrentUser(): Promise<JWTPayload | null> {
   const token = await getAuthToken()
-  if (!token) return null
-  return verifyToken(token)
+  console.log('[Auth] getCurrentUser - Token present:', !!token)
+  if (!token) {
+    console.log('[Auth] No token found in cookies')
+    return null
+  }
+  const verified = verifyToken(token)
+  console.log('[Auth] Token verification:', verified ? 'SUCCESS' : 'FAILED')
+  return verified
+}
+
+// NEW: Version that works with NextRequest for API routes (production-safe)
+export function getCurrentUserFromRequest(request: NextRequest): JWTPayload | null {
+  // Try to get token from cookie
+  const token = request.cookies.get(TOKEN_NAME)?.value
+  console.log('[Auth] getCurrentUserFromRequest - Token present:', !!token)
+
+  if (!token) {
+    console.log('[Auth] No token found in request cookies')
+    return null
+  }
+
+  const verified = verifyToken(token)
+  console.log('[Auth] Request token verification:', verified ? 'SUCCESS' : 'FAILED')
+  if (!verified) {
+    console.error('[Auth] Token verification failed - check JWT_SECRET matches')
+  }
+  return verified
 }
