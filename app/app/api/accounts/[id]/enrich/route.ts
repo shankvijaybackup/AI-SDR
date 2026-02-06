@@ -5,7 +5,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const user = getCurrentUserFromRequest(request)
+        const user = getCurrentUserFromRequest(req)
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { id } = await params

@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     if (userIdHeader) {
       userId = userIdHeader
     } else {
-      const currentUser = getCurrentUserFromRequest(request)
+      const currentUser = getCurrentUserFromRequest(req)
       if (!currentUser) {
         return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
       }

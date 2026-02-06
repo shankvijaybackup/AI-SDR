@@ -5,7 +5,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
     try {
-        const user = getCurrentUserFromRequest(request)
+        const user = getCurrentUserFromRequest(req)
         if (!user || !user.companyId) {
             return new NextResponse("Unauthorized", { status: 401 })
         }

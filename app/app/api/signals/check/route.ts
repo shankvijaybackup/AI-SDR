@@ -8,7 +8,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 // POST: Trigger a scan for signals
 export async function POST(req: NextRequest) {
     try {
-        const user = getCurrentUserFromRequest(request)
+        const user = getCurrentUserFromRequest(req)
         if (!user || !user.companyId) {
             return new NextResponse("Unauthorized", { status: 401 })
         }

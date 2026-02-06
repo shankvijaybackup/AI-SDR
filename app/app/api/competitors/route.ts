@@ -7,7 +7,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 // GET: List topics
 export async function GET(req: NextRequest) {
     try {
-        const user = getCurrentUserFromRequest(request)
+        const user = getCurrentUserFromRequest(req)
         if (!user || !user.companyId) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 // POST: Add topic
 export async function POST(req: NextRequest) {
     try {
-        const user = getCurrentUserFromRequest(request)
+        const user = getCurrentUserFromRequest(req)
         if (!user || !user.companyId) {
             return new NextResponse("Unauthorized", { status: 401 })
         }
