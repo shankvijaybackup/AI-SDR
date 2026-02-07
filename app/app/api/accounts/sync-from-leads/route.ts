@@ -19,12 +19,21 @@ export async function POST(request: NextRequest) {
 
     // Build where clause based on user's tenant
     const whereClause: any = {
-      company: {
-        not: {
-          in: [null, ''],
+      AND: [
+        {
+          company: {
+            not: null,
+          },
         },
-      },
-      accountId: null,
+        {
+          company: {
+            not: '',
+          },
+        },
+        {
+          accountId: null,
+        },
+      ],
     }
 
     if (currentUser.companyId) {
@@ -72,7 +81,7 @@ export async function POST(request: NextRequest) {
     const errors: string[] = []
 
     // Create accounts and link leads
-    for (const [key, leads] of companiesMap.entries()) {
+    for (const [key, leads] of Array.from(companiesMap.entries())) {
       const firstLead = leads[0]
       const companyName = firstLead.company!
 

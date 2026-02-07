@@ -14,12 +14,21 @@ async function createAccountsFromLeads() {
   // Find all leads that have a company but no accountId
   const leadsWithoutAccounts = await prisma.lead.findMany({
     where: {
-      company: {
-        not: {
-          in: [null, ''],
+      AND: [
+        {
+          company: {
+            not: null,
+          },
         },
-      },
-      accountId: null,
+        {
+          company: {
+            not: '',
+          },
+        },
+        {
+          accountId: null,
+        },
+      ],
     },
     select: {
       id: true,
@@ -52,7 +61,7 @@ async function createAccountsFromLeads() {
   let leadsLinked = 0
 
   // Create accounts and link leads
-  for (const [key, leads] of companiesMap.entries()) {
+  for (const [key, leads] of Array.from(companiesMap.entries())) {
     const firstLead = leads[0]
     const companyName = firstLead.company!
 
