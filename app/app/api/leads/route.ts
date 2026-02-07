@@ -4,6 +4,7 @@ import { getCurrentUser, getCurrentUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
+const FRONTEND_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 const createLeadSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -98,24 +99,29 @@ export async function POST(request: NextRequest) {
     if (lead.linkedinUrl || lead.company) {
       console.log(`[Auto-Enrich] Triggering background enrichment for lead ${lead.id}`)
 
+      // Get auth token to pass to backend
+      const authToken = request.cookies.get('auth-token')?.value
+
       // Enrichment endpoint handles:
       // 1. Auto-create/link account if company exists
       // 2. LinkedIn profile enrichment
       // 3. Multi-model AI synthesis for persona
-      fetch(`${BACKEND_URL}/api/leads/${lead.id}/enrich`, {
+      fetch(`${FRONTEND_URL}/api/leads/${lead.id}/enrich`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cookie': authToken ? `auth-token=${authToken}` : '',
         },
       }).catch(err => {
         console.error(`[Auto-Enrich] Background enrichment failed for lead ${lead.id}:`, err)
       })
 
       // Generate personalized call script
-      fetch(`${BACKEND_URL}/api/leads/${lead.id}/script/generate`, {
+      fetch(`${FRONTEND_URL}/api/leads/${lead.id}/script/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cookie': authToken ? `auth-token=${authToken}` : '',
         },
       }).catch(err => {
         console.error(`[Auto-Enrich] Script generation failed for lead ${lead.id}:`, err)

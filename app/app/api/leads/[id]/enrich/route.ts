@@ -60,10 +60,15 @@ export async function POST(
 
     // Call backend enrichment API (has multi-model synthesis)
     console.log(`[Frontend Enrich] Proxying to backend: ${BACKEND_URL}/api/leads/${leadId}/enrich`)
+
+    // Get auth token from request cookies to pass to backend
+    const authToken = request.cookies.get('auth-token')?.value
+
     const response = await fetch(`${BACKEND_URL}/api/leads/${leadId}/enrich`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Cookie': authToken ? `auth-token=${authToken}` : '',
       },
     })
 
