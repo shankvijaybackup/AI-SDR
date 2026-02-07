@@ -99,37 +99,42 @@ export async function POST(request: NextRequest) {
     if (lead.linkedinUrl || lead.company) {
       console.log(`[Auto-Enrich] Triggering background enrichment for lead ${lead.id}`)
 
-      // Get auth token to pass to backend
+      // Get auth token to pass through the request chain
       const authToken = request.cookies.get('auth-token')?.value
 
-      // Enrichment endpoint handles:
-      // 1. Auto-create/link account if company exists
-      // 2. LinkedIn profile enrichment
-      // 3. Multi-model AI synthesis for persona
-      fetch(`${FRONTEND_URL}/api/leads/${lead.id}/enrich`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': authToken ? `auth-token=${authToken}` : '',
-        },
-      }).catch(err => {
-        console.error(`[Auto-Enrich] Background enrichment failed for lead ${lead.id}:`, err)
-      })
+      if (authToken) {
+        // Call frontend enrich route which will:
+        // 1. Auto-create/link account if company exists
+        // 2. Proxy to backend with proper auth for LinkedIn enrichment
+        fetch(`${FRONTEND_URL}/api/leads/${lead.id}/enrich`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'Cookie': `auth-token=${authToken}`,
+          },
+        }).catch(err => {
+          console.error(`[Auto-Enrich] Background enrichment failed for lead ${lead.id}:`, err)
+        })
 
-      // Generate personalized call script
-      fetch(`${FRONTEND_URL}/api/leads/${lead.id}/script/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': authToken ? `auth-token=${authToken}` : '',
-        },
-      }).catch(err => {
-        console.error(`[Auto-Enrich] Script generation failed for lead ${lead.id}:`, err)
-      })
+        // Call frontend script generation route
+        fetch(`${FRONTEND_URL}/api/leads/${lead.id}/script/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'Cookie': `auth-token=${authToken}`,
+          },
+        }).catch(err => {
+          console.error(`[Auto-Enrich] Script generation failed for lead ${lead.id}:`, err)
+        })
 
-      console.log(`[Auto-Enrich] Background jobs triggered. Data will be available in a few minutes.`)
+        console.log(`[Auto-Enrich] Background jobs triggered for lead ${lead.id}`)
+      } else {
+        console.warn(`[Auto-Enrich] No auth token available - skipping automatic enrichment`)
+      }
     } else {
-      console.log(`[Auto-Enrich] Skipping enrichment - no LinkedIn URL or company provided`)
+      console.log(`[Auto-Enrich] Lead ${lead.id} has no LinkedIn URL or company - skipping enrichment`)
     }
 
     return NextResponse.json({

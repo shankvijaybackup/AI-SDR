@@ -64,11 +64,16 @@ export async function POST(
     // Get auth token from request cookies to pass to backend
     const authToken = request.cookies.get('auth-token')?.value
 
+    if (!authToken) {
+      return NextResponse.json({ error: 'Authentication token missing' }, { status: 401 })
+    }
+
     const response = await fetch(`${BACKEND_URL}/api/leads/${leadId}/enrich`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': authToken ? `auth-token=${authToken}` : '',
+        'Authorization': `Bearer ${authToken}`,
+        'Cookie': `auth-token=${authToken}`,
       },
     })
 
