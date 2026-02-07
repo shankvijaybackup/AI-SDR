@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import { getCompanies, getContacts, refreshAccessToken, getContactsInList } from '../hubspotClient.js';
 import { enrichAccount } from './enrichment.js';
 
-const prisma = new PrismaClient();
 
 export const syncHubSpotAccount = async (companyId) => {
     console.log(`[HubSpot Sync] Starting sync for company ${companyId}`);

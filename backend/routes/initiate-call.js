@@ -1,5 +1,5 @@
 import twilio from 'twilio';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import { getVoiceByLocation } from '../utils/voice-rotation.js';
 import { researchCompany, formatCompanyKnowledge } from '../services/companyResearch.js';
 
@@ -14,7 +14,6 @@ if (!publicBaseUrl) {
 const BASE_URL = publicBaseUrl || 'http://localhost:4000'; // Default to localhost for local dev
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-const prisma = new PrismaClient();
 
 // Fallback phone numbers from env (used if DB lookup fails)
 const FALLBACK_PHONES = {
@@ -178,11 +177,10 @@ async function initiateCall(req, res) {
       // Research lead and get context - PASS SELLER THEMES AND PRISMA
       leadContext = await researchLead(lead, sellerDescription, sellerThemes, prisma);
 
-      // Use personalized script if generated
-      if (leadContext.personalizedScript) {
-        personalizedScript = leadContext.personalizedScript;
-        console.log(`[Knowledge Research] Using personalized script: ${personalizedScript.substring(0, 80)}...`);
-      }
+      // DON'T overwrite the frontend's script - it already has variables replaced!
+      // The frontend sends a properly formatted script with all template variables replaced
+      // We keep the script from frontend and use leadContext only for enrichment
+      console.log(`[Knowledge Research] Using frontend script (variables already replaced)`);
 
       relevantKnowledge = leadContext.relevantKnowledge || [];
       console.log(`[Knowledge Research] Found ${relevantKnowledge.length} relevant knowledge sources`);
@@ -218,7 +216,7 @@ async function initiateCall(req, res) {
           select: { company: true } // Assuming 'company' field exists on User
         });
         if (user && user.company) {
-          companyName = user.company;
+          companyName = typeof user.company === 'string' ? user.company : (user.company?.name || 'Atomicwork');
           console.log(`[Initiate Call] Found user company: ${companyName}`);
         }
       }
@@ -257,20 +255,14 @@ async function initiateCall(req, res) {
       ],
     });
 
-    // Initiate Twilio call using traditional voice (WORKING - Media Stream has issues)
+    // Initiate Twilio call using TRADITIONAL VOICE (ElevenLabs TTS + OpenAI)
     const call = await client.calls.create({
-      url: `${BASE_URL}/api/twilio/voice?callId=${callId}&voicePersona=${voicePersona}&companyName=${encodeURIComponent(leadCompany || 'our company')}`,
+      url: `${BASE_URL}/api/twilio/voice?callId=${callId}`,
       to: phoneNumber,
       from: fromNumber, // Use region-specific phone number
       statusCallback: `${BASE_URL}/api/twilio/status?callId=${callId}`,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'canceled', 'failed'],
       timeout: region === 'in' ? 45 : 30, // Longer timeout for international calls
-      machineDetection: 'DetectMessageEnd', // Detect voicemail/answering machines
-      asyncAmd: true, // Don't block on AMD detection
-      asyncAmdStatusCallback: `${BASE_URL}/api/twilio/amd-status?callId=${callId}`, // AMD callback
-      machineDetectionSpeechThreshold: 3000, // Increase to reduce false positives
-      machineDetectionSpeechEndThreshold: 3000, // Increase to reduce false positives
-      machineDetectionSilenceTimeout: 5000, // Wait longer for silence
       record: true,
       // Add international calling settings
       ...(region === 'in' && {

@@ -1,10 +1,9 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import { getAuthUrl, exchangeCodeForTokens, getLists, refreshAccessToken } from '../hubspotClient.js';
 import { importFromList } from '../services/hubspotSync.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Redirect to HubSpot Auth
 router.get('/hubspot/auth', (req, res) => {

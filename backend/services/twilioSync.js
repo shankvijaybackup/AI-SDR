@@ -2,9 +2,8 @@
 // Sync historical call data from Twilio API to database
 
 import twilio from 'twilio';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 // Initialize Twilio client
 const twilioClient = twilio(

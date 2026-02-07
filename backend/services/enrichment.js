@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import fetch from 'node-fetch'; // Backend might need node-fetch if Node < 18
 
-const prisma = new PrismaClient();
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
 export async function enrichAccount(accountId) {

@@ -1,12 +1,11 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import { getActiveCall, activeCalls } from './initiate-call.js';
 import { getCall as getCallFromRedis } from '../callState.js';
 import { summarizeCall } from '../openaiClient.js';
 import { handleCallComplete as handleBulkCallComplete } from '../services/bulkCallManager.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Handle Twilio Status Callbacks (Completed, Busy, No Answer, etc.)
 router.post('/status', async (req, res) => {

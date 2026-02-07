@@ -4,10 +4,9 @@
  */
 
 // Import Prisma client (installed in backend's node_modules)
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 
 // Initialize Prisma client for backend
-const prisma = new PrismaClient();
 
 // Store active campaign states
 const activeCampaigns = new Map();

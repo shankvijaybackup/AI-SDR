@@ -1,10 +1,9 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import { syncHubSpotAccount } from '../services/hubspotSync.js';
 import { enrichAccount } from '../services/enrichment.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // List Accounts
 router.get('/', async (req, res) => {

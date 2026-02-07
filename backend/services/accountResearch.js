@@ -10,7 +10,6 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
 const { getAiResponse } = require('../openaiClient');
 
 // Mock Search Service - In production, replace with Perplexity/Exa API client

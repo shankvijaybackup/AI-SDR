@@ -4,9 +4,8 @@
  */
 
 import redis, { isRedisAvailable } from '../config/redis.js';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 /**
  * Health check endpoint - returns 200 if all systems operational
