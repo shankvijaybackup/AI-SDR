@@ -1,10 +1,7 @@
-# Render Blueprint - Deploy both services with one click
-# https://render.com/docs/blueprint-spec
-
 services:
-  # Next.js Frontend
+  # Next.js Frontend (Deploy this to Render)
   - type: web
-    name: ai-sdr-app
+    name: ai-sdr-frontend
     runtime: node
     region: oregon
     plan: free
@@ -14,90 +11,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        sync: false  # Set manually in Render dashboard
-      - key: DIRECT_DATABASE_URL
-        sync: false  # Set to direct Neon connection (non-pooler)
-      - key: JWT_SECRET
-        generateValue: true
-      - key: NEXT_PUBLIC_APP_URL
-        sync: false  # Set after deploy: https://ai-sdr-app.onrender.com
-      - key: NEXT_PUBLIC_BACKEND_URL
-        sync: false  # Set after deploy: https://ai-sdr-backend.onrender.com
       - key: BACKEND_API_URL
-        sync: false  # Set after deploy: https://ai-sdr-backend.onrender.com
-      - key: SENDGRID_API_KEY
-        sync: false
-      - key: FROM_EMAIL
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-
-  # Express Backend
-  - type: web
-    name: ai-sdr-backend
-    runtime: node
-    region: oregon
-    plan: free
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: node server.js
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 10000
-      # Disable rate limiting until Redis is configured
-      - key: ENABLE_RATE_LIMITING
-        value: false
-      - key: FRONTEND_ORIGIN
-        sync: false  # Set after deploy: https://ai-sdr-app.onrender.com
-      - key: PUBLIC_BASE_URL
-        sync: false  # Set after deploy: https://ai-sdr-backend.onrender.com
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_PHONE_NUMBER
-        sync: false
-      - key: ELEVEN_API_KEY
-        sync: false
-      # Voice Pool (rotated randomly for each call)
-      - key: ELEVEN_VOICE_ARABELLA
-        sync: false
-      - key: ELEVEN_VOICE_ANIKA
-        sync: false
-      - key: ELEVEN_VOICE_BRANDON
-        sync: false
-      - key: ELEVEN_VOICE_ADAM
-        sync: false
-      - key: ELEVEN_VOICE_JANE
-        sync: false
-      # Legacy voice IDs (backward compatibility)
-      - key: ELEVEN_VOICE_ID_FEMALE
-        sync: false
-      # Redis (optional but recommended)
-      # Sign up at https://upstash.com (free tier: 10K commands/day)
-      # Format: rediss://default:password@host:port
-      - key: REDIS_URL
-        sync: false
-
-  # Technographic Enrichment Service (Python)
-  - type: web
-    name: ai-sdr-technographic
-    runtime: docker
-    region: oregon
-    plan: free
-    rootDir: technographic-service
-    dockerfilePath: Dockerfile
-    envVars:
-      - key: PORT
-        value: 10000
-      - key: CPU_ONLY
-        value: "true" 
-      - key: GOOGLE_API_KEY
-        sync: false
-      - key: GOOGLE_CSE_ID
-        sync: false
+        value: http://44.200.156.6:4000
+      - key: NEXT_PUBLIC_API_URL
+        value: http://44.200.156.6:4000/api
+      - key: JWT_SECRET
+        sync: false # You must manually enter this in the Render Dashboard
