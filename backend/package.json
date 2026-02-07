@@ -1,24 +1,29 @@
 {
   "name": "ai-sdr-outbound-backend",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "node index.js",
     "build": "npx prisma generate",
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.1",
+    "@aws-sdk/client-ses": "^3.982.0",
     "@deepgram/sdk": "^4.11.2",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
+    "@sendgrid/mail": "^8.1.6",
     "@sentry/node": "^10.36.0",
     "assemblyai": "^4.21.0",
     "asterisk-ami-client": "^1.1.5",
     "axios": "^1.13.2",
+    "bcrypt": "^6.0.0",
     "body-parser": "^1.20.3",
     "bullmq": "^5.66.6",
     "cheerio": "^1.1.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
