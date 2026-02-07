@@ -1,5 +1,7 @@
 services:
-  # Next.js Frontend (Deploy this to Render)
+  # ---------------------------------------------------
+  # 1. Frontend: Next.js App
+  # ---------------------------------------------------
   - type: web
     name: ai-sdr-frontend
     runtime: node
@@ -11,9 +13,59 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Automatically link to the Backend Service URL
       - key: BACKEND_API_URL
-        value: http://44.200.156.6:4000
+        fromService: ai-sdr-backend
+        property: url
       - key: NEXT_PUBLIC_API_URL
-        value: http://44.200.156.6:4000/api
+        fromService: ai-sdr-backend
+        property: url
+      # Manual Sync Required (Secrets)
       - key: JWT_SECRET
-        sync: false # You must manually enter this in the Render Dashboard
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+
+  # ---------------------------------------------------
+  # 2. Backend: Express API
+  # ---------------------------------------------------
+  - type: web
+    name: ai-sdr-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Automatically link to the Redis Service
+      - key: REDIS_URL
+        fromService: ai-sdr-redis
+        property: connectionString
+      # Manual Sync Required (Secrets)
+      - key: JWT_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: PUBLIC_BASE_URL
+        generate { type: render-service-url }
+
+  # ---------------------------------------------------
+  # 3. Redis: Cache & Queues (Free Tier)
+  # ---------------------------------------------------
+  - type: redis
+    name: ai-sdr-redis
+    region: oregon
+    plan: free
+    ipAllowList: [] # Only allow internal connections from other services
+    maxmemoryPolicy: allkeys-lru
