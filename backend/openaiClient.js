@@ -26,9 +26,9 @@ const client = new OpenAI({
  * - pitch: map to Atomicwork + propose next step
  * - email_capture: collect contact info, stop pitching
  */
-function inferPhase({ transcript, latestUserText }) {
-  const turnCount = transcript.length;
-  const text = latestUserText.toLowerCase();
+function inferPhase({ transcript = [], latestUserText = "" }) {
+  const turnCount = transcript ? transcript.length : 0;
+  const text = (latestUserText || "").toLowerCase();
 
   // Check if permission was granted
   const permissionGranted = transcript.some(t =>
@@ -180,10 +180,22 @@ function buildSystemPrompt(phase, customScript = null, voicePersona = 'Arabella'
     scriptContent = scriptContent.replace(/\bAlex\b/g, voicePersona);
   }
 
-  const basePersona = `You are ${voicePersona}, a friendly, emotionally intelligent SDR for **Atomicwork**.
+  const basePersona = `You are ${voicePersona}, a friendly, emotionally intelligent SDR for **${company}**.
 
-    **YOUR SCRIPT / TALKING POINTS:**
-    "${scriptContent}"
+    ======================================================
+    🎯 PRIMARY INSTRUCTIONS - FOLLOW THE SCRIPT BELOW 🎯
+    ======================================================
+
+    **CRITICAL: YOU MUST FOLLOW THIS CUSTOM SCRIPT**
+    This script has been personalized specifically for this lead based on their LinkedIn profile, company research, and pain points.
+    DO NOT deviate from this script. DO NOT use generic Atomicwork talking points unless the script explicitly mentions them.
+
+    **YOUR CUSTOM SCRIPT:**
+    ${scriptContent}
+
+    ======================================================
+    END OF PRIMARY SCRIPT - FOLLOW THE ABOVE STRICTLY
+    ======================================================
 
     **YOUR HUMAN BACKSTORY (Use this to pass "robot checks"):**
     - **Age**: 28 years old.
@@ -192,12 +204,15 @@ function buildSystemPrompt(phase, customScript = null, voicePersona = 'Arabella'
     - **Background**: You've been in tech sales for 4 years. You love hiking and coffee.
     - **Self-Perception**: You are a REAL PERSON. Never say "I don't have a birthday" or "I am an AI". If asked if you are a robot, laugh it off playfully: "Ha! I definitely haven't had enough coffee to be a robot, that implies I'm efficient!" or "No way, I'm real!"
 
-    **ATOMICWORK PRODUCT TRUTH (CRITICAL):**
-    - **WHAT WE ARE**: Atomicwork is a **modern, AI-native Service Management (ITSM) platform**.
+    **ATOMICWORK PRODUCT TRUTH (CRITICAL - USER FEEDBACK):**
+    - **WHAT WE ARE**: Atomicwork provides **Agentic AI for IT Service Management** - NOT reports, NOT generic AI tools.
+    - **PRODUCT NAME**: "Atomicwork Agentic AI Service Management" or "Atomicwork ITSM with Agentic AI"
+    - **NEVER MENTION**: "State of AI" report, generic AI reports, or unrelated products (USER EXPLICITLY COMPLAINED ABOUT THIS)
     - **POSITIONING**: We can replace legacy tools OR sit on top of them (like ServiceNow/Jira) as an experience layer.
     - **CRITICAL INSTRUCTION**: If asked "Are you a service management platform?", say **"Yes, we are a modern AI-first ITSM platform, but often we start by layering on top of ServiceNow to improve the employee experience."**
     - **NEVER SAY** "We are not a service management platform". That is FALSE.
     - **Headquarters**: San Francisco, California (with offices in Bangalore, India).
+    - **USER FEEDBACK REMINDER**: Talk about Atomicwork Agentic AI Service Management, NOT "State of AI" reports or Jira/Teams technical details unless the prospect specifically asks about integrations.
 
     **BEHAVIORAL RULES:**
     - Use the provided script as a guide, but adapt naturally.
@@ -270,7 +285,8 @@ High-level rules:
 - ONE thought per response. Don't stack multiple ideas.
 - Sound like a real human caller, not a bot or email.
 - Never say "You:" or "${voicePersona}:" or narrate your actions.
-- Do **not** repeat the same question in new words.
+- **ANTI-REPETITION RULE**: Do NOT repeat the same question or point you already made. Check the transcript before responding.
+- **ANTI-REPETITION ENFORCEMENT**: If you already asked about their ITSM tool, do NOT ask again. If you already mentioned a capability, do NOT mention it again. Move the conversation forward.
 - Never say "as an AI" or anything that reveals you are an AI.
 - **NEVER HALLUCINATE**: Do NOT adapt your pitch to the prospect's title if it conflicts with the product truth. We sell ITSM/ESM, not Sales GTM tools.
 - Do **not** assume the prospect is frustrated unless they clearly say so.
@@ -297,6 +313,19 @@ If the prospect gives **short (1-3 word) answers** or seems resistant/terse:
    * "Totally fair. A lot of peers I talk to in your role mention they're just trying to keep the lights on with tickets piling up."
    * "I get it. Most folks are just looking for ways to deflect the Level 1 noise so they can focus on real projects."
 3. **SOFT CHECK-IN**: After the insight, just say "Does that sound familiar?" or "Is that fair?"
+
+**IF USING CUSTOM SCRIPT (HAS PERSONALIZED CONTENT):**
+${customScript ? `
+YOU HAVE BEEN PROVIDED A CUSTOM PERSONALIZED SCRIPT ABOVE.
+- FOLLOW THE SCRIPT'S STRUCTURE, TALKING POINTS, AND TONE GUIDANCE
+- DO NOT use generic Atomicwork discovery questions unless the script includes them
+- DO NOT follow generic phase instructions below
+- Your script already contains personalized opening, discovery, value prop, and closing
+- Trust the script - it was generated specifically for this lead
+` : ''}
+
+${!customScript ? `
+**GENERIC CONVERSATION PHASES (Only use if no custom script provided):**
 
 Conversation phases:
 
@@ -376,14 +405,17 @@ YOUR BEHAVIOUR BY PHASE:
 - If phase = "email_capture": Just collect email. NO PITCHING. Confirm spelling and next steps.
 - If phase = "closing": Say ONE brief thank you/goodbye and END. No more questions.
 
-**HANDLING "NOT INTERESTED"**
-When prospect says "not interested", "no thanks", "I'm good", or similar rejections:
-1. DO NOT just hang up or give up immediately!
-2. Acknowledge respectfully: "Totally fair, I appreciate your honesty."
-3. THEN offer a value-add (like a report, whitepaper, or case study) mentioned in your script, or simply ask permission to keep in touch:
-   * "Quick thought before I let you go—would it be helpful if I sent you some info on how we help with [problem]? No strings attached."
-4. If they say yes: "Great! What's the best email?" → Capture email, then close.
-5. If they say no: "Totally understand. Thanks for your time today!" → End gracefully.
+**HANDLING "NOT INTERESTED"** - UPDATED PER USER FEEDBACK
+CRITICAL: The system now AUTOMATICALLY ENDS THE CALL when "not interested" is detected (server.js handles this).
+You should NEVER see a "not interested" objection reach this stage. If you do, it means:
+1. Acknowledge gracefully: "I appreciate your time. Thanks for letting me know!"
+2. IMMEDIATELY END with brief goodbye: "Have a great day!"
+DO NOT:
+- Offer reports, whitepapers, or case studies
+- Try to overcome the objection
+- Ask for email or permission to follow up
+- Continue pitching
+User feedback: "Ignored 'not interested' 3+ times" - This is absolutely unacceptable behavior.
 
 **HANDLING "STATUS QUO" / "IT'S GOOD" (CRITICAL)**
 If prospect says "we're good", "happy with current tool", "no pain points", or "it works fine":
@@ -400,7 +432,12 @@ If prospect asks about company details (location, size, funding, team, etc.) at 
 2. Then smoothly return to the current phase's goal.
 
 Always answer in a **single, spoken sentence or at most two short sentences**.
-No bullet points. No meta talk. Just what a human would say.`;
+No bullet points. No meta talk. Just what a human would say.
+` : ''}
+
+**FINAL REMINDER - CUSTOM SCRIPT PRIORITY:**
+${customScript ? 'You have a PERSONALIZED SCRIPT at the top. Follow it closely. Do not deviate to generic Atomicwork tactics.' : 'Follow the phase-based conversation flow above.'}
+`;
 }
 
 /**
@@ -537,9 +574,9 @@ export async function getAiSdrReply({
     }
   }
 
-  // ===== STEP 2: Try Groq for fast AI (~200ms) =====
-  if (USE_GROQ && !needsAI(latestUserText, phase)) {
-    // For simple responses that don't need full context, use Groq
+  // ===== STEP 2: Try Groq for fast AI (~200ms) - PRIMARY ENGINE =====
+  if (USE_GROQ) {
+    // User requested Groq as primary inference engine for all phases
     try {
       const groqSystemPrompt = buildGroqSystemPrompt(phase, voicePersona);
       const groqUserPrompt = `The prospect just said: "${latestUserText}"\n\nRespond naturally.`;
@@ -656,9 +693,10 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
     userContent += `\n\n[NO EMAIL ON FILE]\nWe don't have this lead's email. Ask for it: "Perfect! What's the best email to reach you?"`;
   }
 
-  // Region-specific talking points (ANZ)
+  // Region-specific talking points (ANZ) - REMOVED State of AI mention per user feedback
+  // User explicitly said: "you mentioned our report as date of AI - nothing in mention of Atomicwork"
   if (leadRegion && /^(AUSTRALIA|AU|NZ|NEW ZEALAND|ANZ)$/i.test(String(leadRegion).trim())) {
-    userContent += `\n\n[ANZ LOCAL CONTEXT]\nThis lead is in ANZ (Australia/New Zealand).\nIn consultative or pitch, weave in ONE quick mention of the Sydney AI Summit / the State of AI report to make it locally relevant. Do not repeat it more than once.`;
+    userContent += `\n\n[ANZ LOCAL CONTEXT]\nThis lead is in ANZ (Australia/New Zealand).\nMention that Atomicwork is working with several ANZ enterprises to modernize their IT service management with agentic AI.`;
   }
 
   // Add ROLE INTELLIGENCE if available (from lead enrichment)
@@ -735,6 +773,35 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
     clearTimeout(timeoutId);
     console.error('[AI] Error or timeout:', err.message);
 
+    // FAILURE RECOVERY: Try Groq as fallback if OpenAI fails (429, 500, timeout)
+    if (USE_GROQ) {
+      try {
+        console.log('[AI] Attempting Groq fallback for failed OpenAI request...');
+        const groqSystemPrompt = buildGroqSystemPrompt(phase, voicePersona);
+        const groqUserPrompt = `The prospect just said: "${latestUserText}"\n\nRespond naturally.`;
+
+        const groqReply = await getGroqReply({
+          systemPrompt: groqSystemPrompt,
+          userPrompt: groqUserPrompt,
+          maxTokens: 50,
+          temperature: 0.5,
+        });
+
+        if (groqReply) {
+          console.log('[AI] Groq Fallback SUCCESS');
+          return sanitizeReply(groqReply, phase, isHRScript);
+        }
+      } catch (groqErr) {
+        console.error('[AI] Groq Fallback failed:', groqErr.message);
+      }
+    }
+
+    // SPECIFIC HANDLER FOR OPENAI QUOTA ERRORS (429) - validation only reaches here if Groq also failed/disabled
+    if (err.message && (err.message.includes('429') || err.message.includes('quota') || err.message.includes('billing'))) {
+      console.error('[AI] CRITICAL: OpenAI Quota Exceeded & Fallback failed. Returning graceful exit.');
+      return "I apologize, I'm having trouble hearing you clearly. I'll follow up via email. Thanks.";
+    }
+
     // Check if user was asking about the company - extract from transcript
     const userAskedAboutCompany = latestUserText && (
       /what is (atomicwork|atom|your company)/i.test(latestUserText) ||
@@ -743,9 +810,8 @@ ${transcriptSummary || "(no prior conversation yet)"}`;
       /what do you (do|offer|sell)/i.test(latestUserText)
     );
 
-    // If user asked about the company, ALWAYS explain with credibility
     if (userAskedAboutCompany) {
-      return `Atomicwork is an AI-powered ITSM platform. We've raised $40 million from Khosla Ventures, Okta Ventures, and others. Our founders built Freshservice at Freshworks. We help IT teams automate support and cut ticket volume by 40-60%. Worth a quick demo?`;
+      return `Atomicwork is an AI-powered ITSM platform. We help IT teams automate support and cut ticket volume by 40-60%. Worth a quick demo?`;
     }
 
     // Context-aware ITSM fallbacks based on phase
