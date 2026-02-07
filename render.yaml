@@ -13,7 +13,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Automatically link to the Backend Service URL
+      # Internal networking: Frontend talks to Backend via private Render URL
       - key: BACKEND_API_URL
         fromService: ai-sdr-backend
         property: url
@@ -42,7 +42,7 @@ services:
         value: production
       - key: PORT
         value: 10000
-      # Automatically link to the Redis Service
+      # Internal networking: Backend talks to Redis
       - key: REDIS_URL
         fromService: ai-sdr-redis
         property: connectionString
@@ -58,14 +58,14 @@ services:
       - key: TWILIO_PHONE_NUMBER
         sync: false
       - key: PUBLIC_BASE_URL
-        generate { type: render-service-url }
+        sync: false # Set this to your Render URL after deploy
 
   # ---------------------------------------------------
-  # 3. Redis: Cache & Queues (Free Tier)
+  # 3. Redis: Cache & Queues
   # ---------------------------------------------------
   - type: redis
     name: ai-sdr-redis
     region: oregon
     plan: free
-    ipAllowList: [] # Only allow internal connections from other services
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: [] # Allows internal connections
