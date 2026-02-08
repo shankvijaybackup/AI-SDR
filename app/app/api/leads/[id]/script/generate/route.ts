@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUserFromRequest } from '@/lib/auth'
 
-const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:4000'
+// Fallback to multiple potential env vars, prioritizing the one we know is correct in .env
+const getBackendUrl = () => {
+  let url = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+  // Safety check: Block the old AWS IP if it somehow persists
+  if (url.includes('44.200.156.6')) {
+    console.warn('[Frontend API] Detected old AWS IP, switching to Render URL');
+    url = 'https://ai-sdr-backend-5d5q.onrender.com';
+  }
+  return url;
+}
+
+const BACKEND_URL = getBackendUrl();
 
 // POST /api/leads/[id]/script/generate - Generate call script
 export async function POST(
