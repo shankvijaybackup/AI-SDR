@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node index.js",
     "build": "npx prisma generate",
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
