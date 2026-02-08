@@ -8,6 +8,14 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+// ==================== SALES PERSONAS ====================
+
+enum SalesPersona {
+  AE        // Account Executive
+  SC        // Solutions Consultant
+  PARTNER   // Partner/Reseller
+}
+
 // ==================== MULTI-TENANCY ====================
 
 model Company {
@@ -34,7 +42,14 @@ model Company {
   emailTemplates      EmailTemplate[]
   emailLogs           EmailLog[]
   voicemailMessages   VoicemailMessage[]
-
+  
+  // Phase 2: Advanced Enablement
+  roleplayScenarios   RoleplayScenario[]
+  learningPaths       LearningPath[]
+  battlecards         Battlecard[]
+  pitchTemplates      PitchTemplate[]
+  topics              MarketingTopic[]
+  
   @@index([slug])
 }
 
@@ -129,6 +144,18 @@ model User {
   regionalPhoneNumbers  RegionalPhoneNumber[]
   mindMaps              MindMap[]
   flashcards            Flashcard[]
+  quizzes               Quiz[]
+  quizAttempts          QuizAttempt[]
+  notebooks             Notebook[]
+  
+  // Phase 2
+  roleplaySessions      RoleplaySession[]
+  learningProgress      UserLearningProgress[]
+  onboardingMilestones  OnboardingMilestone[]
+  
+  // Sales Enablement
+  salesPersona          SalesPersona?    @default(AE)
+  readinessScore        Int?             @default(0)
 
   @@index([companyId])
   @@index([isActive])
@@ -179,6 +206,10 @@ model Lead {
   notes            String?
   linkedinEnriched Boolean   @default(false)
   linkedinData     Json?
+  generatedScript  Json?      // Auto-generated call script
+  scriptStatus     String?    // pending_review, approved, edited
+  scriptApprovedAt DateTime?  // When admin approved
+  scriptApprovalNotes String? // Admin notes
   status           String    @default("pending")
   interestLevel    String?
   region           String?   // India, UK, Australia, US
@@ -196,6 +227,7 @@ model Lead {
   companyRelation  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   account          Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  signals          IntentSignal[]
 
   @@index([companyId, status])
   @@index([companyId, interestLevel])
@@ -230,6 +262,11 @@ model Account {
   enriched        Boolean   @default(false)
   enrichmentData  Json?     // Store full enrichment payload
   
+  // Technographics
+  technographics      Json?
+  technographicEnriched Boolean @default(false)
+  lastEnrichedAt      DateTime?
+  
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
@@ -243,7 +280,9 @@ model Account {
   @@index([hubspotId])
   @@index([amplemarketId])
   
-  notes           ResearchNote[]
+  researchNotes   ResearchNote[]
+  signals         MarketSignal[]
+  intentSignals   IntentSignal[]
 }
 
 model ResearchNote {
@@ -258,6 +297,63 @@ model ResearchNote {
   createdAt       DateTime @default(now())
   
   account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId])
+}
+
+model IntentSignal {
+  id        String   @id @default(uuid())
+  type      String   // e.g., "hiring", "fundraising", "competitor", "social_post"
+  source    String   // e.g., "reddit", "linkedin", "twitter", "google_search"
+  content   String   // The text snippet or summary
+  url       String?  // Link to the source
+  score     Int      @default(0) // Relevance score
+  metadata  Json?    // Extra data like subreddit, author, etc.
+  createdAt DateTime @default(now())
+
+  // Relations
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([accountId])
+  @@index([type])
+}
+
+
+model MarketingTopic {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  keyword   String   // The search term e.g., "Atomicwork", "ServiceNow"
+  type      String   // "MY_BRAND", "COMPETITOR", "INDUSTRY"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  signals   MarketSignal[]
+  
+  @@index([companyId])
+}
+
+model MarketSignal {
+  id        String   @id @default(uuid())
+  topicId   String?
+  topic     MarketingTopic? @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id])
+
+  type      String   // "MENTION", "INTENT", "POST"
+  source    String   // "LINKEDIN", "REDDIT", "X"
+  content   String
+  url       String
+  author    String?
+  sentiment String?  // "POSITIVE", "NEGATIVE", "NEUTRAL"
+  
+  createdAt DateTime @default(now())
+
+  @@index([topicId])
   @@index([accountId])
 }
 
@@ -409,6 +505,7 @@ model KnowledgeSource {
   
   mindMap         MindMap[]
   flashcards      Flashcard[]
+  quizzes         Quiz[]
 
   @@index([companyId, isActive])
   @@index([userId, isActive])
@@ -486,7 +583,7 @@ model VoicemailMessage {
 model MindMap {
   id              String   @id @default(uuid())
   sourceId        String?  // Optional for global maps
-  userId          String?  // Optional (if specific to a source but user-agnostic? No, RAG is per user usually or per company)
+  userId          String?  // Optional
   data            Json
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -511,5 +608,233 @@ model Flashcard {
   user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([sourceId])
+  @@index([userId])
+}
+
+// ==================== LEARNING & QUIZZES ====================
+
+model Quiz {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  sources         KnowledgeSource[] // Implicit many-to-many
+  userId          String
+  difficulty      String   @default("medium") // easy, medium, hard
+  questions       QuizQuestion[]
+  attempts        QuizAttempt[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model QuizQuestion {
+  id            String   @id @default(uuid())
+  quizId        String
+  question      String
+  type          String   @default("multiple_choice") // multiple_choice, true_false, open
+  options       String[] // Array of strings (e.g. ["A", "B", "C", "D"])
+  correctAnswer String   // The correct answer string
+  explanation   String?
+  
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id        String   @id @default(uuid())
+  quizId    String
+  userId    String
+  score     Float
+  answers   Json     // Store user answers map { questionId: answer }
+  completedAt DateTime @default(now())
+  
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([quizId])
+}
+
+model Notebook {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  notes       Note[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Note {
+  id          String   @id @default(uuid())
+  notebookId  String
+  title       String
+  content     String   // Markdown support
+  sourceId    String?  // Optional link to knowledge source
+  researchNoteId String? // Optional link to ResearchNote (loose coupling)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  notebook    Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
+  @@index([notebookId])
+}
+
+// ==================== ADVANCED ENABLEMENT (PHASE 2) ====================
+
+// --- Roleplay ---
+model RoleplayScenario {
+  id            String   @id @default(uuid())
+  companyId     String?
+  title         String
+  description   String?
+  personaName   String   // e.g. "Skeptical CTO"
+  personaRole   String   // e.g. "CTO"
+  difficulty    String   @default("medium") // easy, medium, hard
+  objectives    String[] // e.g. ["Handle Pricing Objection", "Discover Pain Points"]
+  
+  sessions      RoleplaySession[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  company       Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId])
+}
+
+model RoleplaySession {
+  id            String   @id @default(uuid())
+  scenarioId    String
+  userId        String
+  transcript    Json     // Store full chat history
+  score         Int?     // 0-100
+  feedback      String?  // AI generated feedback
+  duration      Int?     // Seconds
+  completedAt   DateTime @default(now())
+  
+  scenario      RoleplayScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([scenarioId])
+}
+
+// --- Learning Paths (30-60-90) ---
+model LearningPath {
+  id            String   @id @default(uuid())
+  companyId     String?
+  title         String   // e.g. "AE Onboarding - 30 Day"
+  description   String?
+  targetRole    String?  // "AE", "SE", "Partner"
+  
+  modules       LearningModule[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  company       Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId])
+}
+
+model LearningModule {
+  id            String   @id @default(uuid())
+  pathId        String
+  title         String
+  description   String?
+  type          String   // "video", "quiz", "document", "roleplay", "checklist"
+  contentUrl    String?
+  textContent   String?
+  orderIndex    Int      @default(0)
+  
+  // Optional links to other features
+  quizId        String?
+  scenarioId    String? 
+  
+  progress      UserLearningProgress[]
+  
+  path          LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  
+  @@index([pathId])
+}
+
+model UserLearningProgress {
+  id            String   @id @default(uuid())
+  userId        String
+  moduleId      String
+  status        String   @default("pending") // pending, in_progress, completed
+  completedAt   DateTime?
+  
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module        LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, moduleId])
+  @@index([userId])
+}
+
+// --- Just-in-Time (Battlecards - Extended for PRD) ---
+model Battlecard {
+  id                  String   @id @default(uuid())
+  companyId           String?
+  competitorName      String
+  overview            String?
+  strengths           String[]  // Legacy - keep for compatibility
+  weaknesses          String[]  // Legacy - keep for compatibility
+  pricing             String?
+  killPoints          String[]  // Legacy - keep for compatibility
+  
+  // PRD Extensions
+  whenTheyWin         String[]  // Competitor strengths/scenarios
+  whenWeWin           String[]  // Our advantages/scenarios
+  landmines           String[]  // What NOT to say
+  positioning         String[]  // Best angles to position
+  discoveryQuestions  String[]  // Questions to expose their weaknesses
+  whyChange           String?   // Change narrative
+  nextSteps           String[]  // Recommended deal strategy
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  company             Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId])
+}
+
+// --- Pitch Templates (Sales Enablement) ---
+model PitchTemplate {
+  id                String       @id @default(uuid())
+  companyId         String?
+  title             String
+  duration          String       // "30sec" | "2min" | "10min" | "30min" | "45min" | "90min"
+  salesStage        String       // "INTRO" | "DISCOVERY" | "DEMO" | "OBJECTIONS" | "CLOSING" | "COMPETITION"
+  targetPersona     SalesPersona @default(AE)
+  
+  // Structured content as JSON
+  opening           Json?        // { short: string, expanded: string }
+  discovery         Json?        // { questions: string[], flow: string }
+  narrative         Json?        // { core: string, proofPoints: string[] }
+  demo              Json?        // { flow: string[], keyMoments: string[] }
+  closing           Json?        // { questions: string[], nextSteps: string[] }
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  company           Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId])
+}
+
+model OnboardingMilestone {
+  id            String   @id @default(uuid())
+  userId        String
+  title         String   // e.g. "First Call", "First Deal"
+  dateAchieved  DateTime @default(now())
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@index([userId])
 }
