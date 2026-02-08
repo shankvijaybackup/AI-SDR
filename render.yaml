@@ -3,7 +3,7 @@ services:
   # 1. Frontend: Next.js App
   # ---------------------------------------------------
   - type: web
-    name: ai-sdr-frontend
+    name: ai-sdr-app
     runtime: node
     region: oregon
     plan: free
@@ -15,11 +15,15 @@ services:
         value: production
       # Internal networking: Frontend talks to Backend via private Render URL
       - key: BACKEND_API_URL
-        fromService: ai-sdr-backend
-        property: url
+        fromService:
+          type: web
+          name: ai-sdr-backend
+          property: url
       - key: NEXT_PUBLIC_API_URL
-        fromService: ai-sdr-backend
-        property: url
+        fromService:
+          type: web
+          name: ai-sdr-backend
+          property: url
       # Manual Sync Required (Secrets)
       - key: JWT_SECRET
         sync: false
@@ -44,8 +48,10 @@ services:
         value: 10000
       # Internal networking: Backend talks to Redis
       - key: REDIS_URL
-        fromService: ai-sdr-redis
-        property: connectionString
+        fromService:
+          type: redis
+          name: ai-sdr-redis
+          property: connectionString
       # Manual Sync Required (Secrets)
       - key: JWT_SECRET
         sync: false
