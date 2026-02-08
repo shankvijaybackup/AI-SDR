@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+// Force rebuild 2026-02-09
 import path from 'path';
 
 // Force load .env before anything else
