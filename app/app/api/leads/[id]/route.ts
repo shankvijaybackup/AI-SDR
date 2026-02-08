@@ -54,8 +54,12 @@ export async function GET(
 
     return NextResponse.json({ lead })
   } catch (error) {
-    console.error('Get lead error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[API] Get lead error:', error)
+    console.error('[API] Error details:', error instanceof Error ? error.stack : String(error))
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 
