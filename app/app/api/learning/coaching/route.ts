@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateJSON } from '@/lib/claude';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { COACHING_METRICS, BUYER_PERSONAS } from '@/lib/learning/constants';
 
 export const dynamic = 'force-dynamic';
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 interface CoachingRequest {
     userResponse: string;
@@ -64,7 +62,7 @@ ${context ? `- Additional Context: ${context}` : ''}
 2. Structure (0-100): Was there a logical flow and organization of points?
 3. Value Articulation (0-100): Did they effectively communicate business value relevant to Atomicwork?
 
-**Provide your feedback in the following JSON format:**
+Return a JSON object with this exact structure:
 {
   "scores": {
     "clarity": <0-100>,
@@ -79,19 +77,11 @@ ${context ? `- Additional Context: ${context}` : ''}
 
 Be constructive but honest. Focus on actionable feedback.`;
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
-
-        // Parse JSON from response
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            return NextResponse.json({
-                error: 'Failed to parse coaching feedback'
-            }, { status: 500 });
-        }
-
-        const feedback: CoachingFeedback = JSON.parse(jsonMatch[0]);
+        const feedback = await generateJSON<CoachingFeedback>(prompt, {
+            model: 'haiku',
+            maxTokens: 1024,
+            temperature: 0.4,
+        });
 
         // Calculate weighted overall if not provided
         if (!feedback.scores.overall) {

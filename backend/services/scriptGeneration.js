@@ -8,10 +8,8 @@
  * 4. Uploaded documents context
  */
 
-import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 /**
@@ -290,7 +288,7 @@ Make it highly specific to ${context.lead.fullName}'s persona, role, and likely 
 Be conversational and natural - this is for an AI voice agent, not a human reading a script.`;
 
     const message = await anthropic.messages.create({
-        model: "claude-opus-4-5-20251101",
+        model: "claude-sonnet-4-6",
         max_tokens: 6000,
         temperature: 0.7,
         messages: [{ role: "user", content: systemPrompt + "\n\n" + userPrompt }]

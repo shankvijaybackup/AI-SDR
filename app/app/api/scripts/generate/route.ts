@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUserFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import OpenAI from 'openai'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { generateContentSafe } from '@/lib/gemini'
-
-// Initialize both AI clients
-// Initialize both AI clients
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || '', // Don't crash if missing, handle later
-})
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '')
+import { generateContent } from '@/lib/claude'
 
 export async function POST(request: NextRequest) {
     try {
@@ -20,10 +10,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
         }
 
-        // 1. Strict Environment Check
-        const hasGeminiKey = !!(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY)
-        if (!hasGeminiKey) {
-            console.error('[Script Gen] GOOGLE_AI_API_KEY / GEMINI_API_KEY is missing.')
+        // Strict Environment Check
+        if (!process.env.ANTHROPIC_API_KEY) {
+            console.error('[Script Gen] ANTHROPIC_API_KEY is missing.')
             return NextResponse.json({
                 error: 'Service Misconfigured: AI API Key is missing. Please check server settings.'
             }, { status: 503 })
@@ -41,7 +30,7 @@ export async function POST(request: NextRequest) {
                 id: { in: knowledgeSourceIds },
                 OR: [
                     { userId: currentUser.userId },
-                    { createdBy: currentUser.userId }, // Include user-created shared files
+                    { createdBy: currentUser.userId },
                     { isShared: true },
                 ],
             },
@@ -66,9 +55,8 @@ export async function POST(request: NextRequest) {
             if (source.summary) content += `Summary: ${source.summary}\n`
 
             if (source.content) {
-                content += `\nContent:\n${source.content.slice(0, 8000)}` // Increased context for Flash
+                content += `\nContent:\n${source.content.slice(0, 8000)}`
             } else if (source.chunks && Array.isArray(source.chunks)) {
-                // Use more chunks if valid
                 const chunkTexts = (source.chunks as any[]).slice(0, 20).map((c: any) => c.text || c.content || '').join('\n')
                 content += `\nContent:\n${chunkTexts}`
             }
@@ -87,13 +75,12 @@ export async function POST(request: NextRequest) {
 
         const scriptTypeDesc = scriptTypePrompts[scriptType] || 'general sales call script'
 
-        // Build the base prompt
-        const basePrompt = `Based on this knowledge about a product/company, create a professional ${scriptTypeDesc}.
+        const prompt = `Based on this knowledge about a product/company, create a professional ${scriptTypeDesc}.
 
 TARGET PERSONA: ${targetPersona || 'B2B decision makers'}
 
 KNOWLEDGE BASE CONTENT:
-${knowledgeContent.slice(0, 500000)}
+${knowledgeContent.slice(0, 50000)}
 
 REQUIREMENTS:
 - Natural, conversational tone (not robotic)
@@ -102,50 +89,25 @@ REQUIREMENTS:
 - Key value propositions from the knowledge base
 - Clear call-to-action
 - 200-400 words
-${scriptType === 'objection' ? '- Include 3-5 common objections with responses' : ''}`
+${scriptType === 'objection' ? '- Include 3-5 common objections with responses' : ''}
 
-        console.log('[Script Gen] Using AI approach...')
+Generate ONLY the script content, no commentary.`
 
-        let generatedScript = ''
-        let generatedWith = 'gemini-only'
+        console.log('[Script Gen] Generating with Claude Sonnet...')
 
-        // Step 1: Gemini Generation
-        try {
-            const geminiResult = await generateContentSafe(
-                `You are a sales script expert. ${basePrompt}\n\nGenerate ONLY the script content, no commentary.`
-            )
-            generatedScript = geminiResult.response.text()
-            console.log('[Script Gen] ✅ Gemini draft generated')
-        } catch (geminiError) {
-            console.error('[Script Gen] ⚠️ Gemini failed:', geminiError)
-            return NextResponse.json({
-                error: 'AI Service Error: Failed to generate content. Please check quotas or validity of GOOGLE_AI_API_KEY.'
-            }, { status: 502 }) // Bad Gateway / Upstream error
+        const generatedScript = await generateContent(prompt, {
+            model: 'sonnet',
+            system: 'You are an expert sales script writer. Output only the script content, no explanations or commentary.',
+            maxTokens: 1500,
+            temperature: 0.7,
+        })
+
+        if (!generatedScript) {
+            return NextResponse.json({ error: 'Failed to generate script content' }, { status: 502 })
         }
 
-        // Step 2: Optional OpenAI Refinement (Only if key exists and previous step succeeded)
-        // We skip this if OpenAI key is likely busted or missing, to avoid 429
-        if (process.env.OPENAI_API_KEY && generatedScript) {
-            try {
-                const completion = await openai.chat.completions.create({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        { role: 'system', content: 'You are an expert sales script writer. Output only the script.' },
-                        { role: 'user', content: `Refine this script to be more natural:\n\n${generatedScript}` }
-                    ],
-                    temperature: 0.7,
-                    max_tokens: 1500,
-                })
-                generatedScript = completion.choices[0]?.message?.content || generatedScript
-                generatedWith = 'gemini+openai'
-                console.log('[Script Gen] ✅ OpenAI refinement complete')
-            } catch (openaiError: any) {
-                console.warn('[Script Gen] ⚠️ OpenAI refinement skipped (quota/error):', openaiError.status || openaiError.message)
-                // Do not fail the request, just use Gemini output
-            }
-        }
+        console.log('[Script Gen] ✅ Claude Sonnet script generated')
 
-        // Generate a suggested name for the script
         const firstSource = knowledgeSources[0]
         const scriptTypeLabel = scriptType
             ? scriptType.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
@@ -158,7 +120,7 @@ ${scriptType === 'objection' ? '- Include 3-5 common objections with responses' 
                 name: suggestedName,
                 content: generatedScript,
                 sources: knowledgeSources.map((s) => ({ id: s.id, title: s.title })),
-                generatedWith,
+                generatedWith: 'claude-sonnet',
             },
         })
 

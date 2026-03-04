@@ -22,9 +22,9 @@
  * This replaces hardcoded company knowledge.
  */
 
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // In-memory cache to avoid repeated API calls for the same company
 const companyKnowledgeCache = new Map();
@@ -46,70 +46,46 @@ export async function researchCompany(companyName) {
     try {
         const startTime = Date.now();
 
-        const response = await client.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are a business research assistant. Provide accurate, up-to-date information about companies. 
-          If you don't have specific information, provide reasonable placeholders or say "information not available".
-          Focus on facts that build credibility and trust with prospects.`
-                },
-                {
-                    role: 'user',
-                    content: `Research the company "${companyName}" and provide comprehensive information in JSON format:
+        const response = await client.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            system: `You are a business research assistant. Provide accurate information about companies.
+If you don't have specific information, provide reasonable placeholders or say "information not available".
+Focus on facts that build credibility and trust with prospects. Reply ONLY with valid JSON.`,
+            messages: [{
+                role: 'user',
+                content: `Research "${companyName}" and return JSON:
 
 {
   "companyName": "Official company name",
-  "tagline": "One-line description of what they do",
+  "tagline": "One-line description",
   "founded": "Year founded",
   "headquarters": "HQ location",
-  "offices": ["List of office locations"],
-  "founders": [
-    {
-      "name": "Founder name",
-      "role": "CEO/CTO/CPO",
-      "background": "Brief background - previous companies, experience, achievements"
-    }
-  ],
+  "offices": ["office locations"],
+  "founders": [{ "name": "Name", "role": "CEO/CTO", "background": "Brief background" }],
   "funding": {
-    "totalRaised": "Total amount raised (e.g., $40 million)",
-    "rounds": [
-      {
-        "type": "Seed/Series A/etc",
-        "amount": "Amount raised",
-        "date": "Month Year",
-        "leadInvestors": ["Lead investor names"],
-        "otherInvestors": ["Other investor names"]
-      }
-    ],
-    "notableInvestors": ["List of notable investors"]
+    "totalRaised": "Total raised e.g. $40M",
+    "rounds": [{ "type": "Series A", "amount": "$10M", "date": "Jan 2024", "leadInvestors": [], "otherInvestors": [] }],
+    "notableInvestors": []
   },
-  "product": {
-    "category": "Product category (e.g., ITSM, CRM, etc.)",
-    "description": "What the product does",
-    "keyFeatures": ["Key feature 1", "Key feature 2"],
-    "differentiators": ["What makes it unique"],
-    "targetCustomers": "Who uses it"
-  },
-  "mission": "Company mission statement",
-  "keyStats": ["Notable statistics like customers, employees, etc."],
-  "competitors": ["Main competitors"],
-  "whyFounded": "Story of why the company was founded"
+  "product": { "category": "ITSM/CRM/etc", "description": "What it does", "keyFeatures": [], "differentiators": [], "targetCustomers": "Who uses it" },
+  "mission": "Mission statement",
+  "keyStats": [],
+  "competitors": [],
+  "whyFounded": "Origin story"
 }
 
-Be factual and specific. If this is a well-known company, provide real data. If unknown, generate reasonable information based on the name.`
-                }
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.3, // Lower temperature for more factual responses
+Be factual. Use real data for well-known companies.`
+            }],
+            temperature: 0.3,
             max_tokens: 1500
         });
 
         const elapsed = Date.now() - startTime;
         console.log(`[Company Research] Completed in ${elapsed}ms`);
 
-        const knowledge = JSON.parse(response.choices[0].message.content);
+        const rawText = response.content[0].text;
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        const knowledge = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
 
         // Cache the result
         companyKnowledgeCache.set(companyName.toLowerCase(), knowledge);
@@ -273,48 +249,32 @@ export async function researchProspectCompany(prospectCompanyName, sellerCompany
     try {
         const startTime = Date.now();
 
-        const response = await client.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are a sales intelligence researcher. Research companies to help sales reps have better, more contextual conversations.
-Focus on practical information that helps approach the prospect effectively.`
-                },
-                {
-                    role: 'user',
-                    content: `Research "${prospectCompanyName}" for a sales call. The lead's role is: "${leadRole || 'Unknown'}".
-${sellerCompanyDescription ? `We are selling: ${sellerCompanyDescription}` : ''}
+        const response = await client.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            system: `You are a sales intelligence researcher. Research companies to help sales reps have better, more contextual conversations. Reply ONLY with valid JSON.`,
+            messages: [{
+                role: 'user',
+                content: `Research "${prospectCompanyName}" for a sales call. Lead role: "${leadRole || 'Unknown'}".
+${sellerCompanyDescription ? `Selling: ${sellerCompanyDescription}` : ''}
 
-Provide research in JSON format:
-
+Return JSON:
 {
   "companyName": "Official name",
-  "industry": "Primary industry",
-  "size": "Company size (employees, revenue estimate if known)",
-  "whatTheyDo": "1-2 sentence description of their business",
-  "headquarters": "HQ location",
-  "recentNews": ["Any recent news, funding, or notable events"],
-  "techStack": ["Known technologies/tools they use if available"],
-  "potentialPainPoints": [
-    "Pain point 1 based on their industry/size",
-    "Pain point 2 specific to their business"
-  ],
-  "talkingPoints": [
-    "Specific conversation starter about their business",
-    "Question to ask about their challenges"
-  ],
-  "approachStrategy": "How to approach this prospect - what angle to take",
-  "competitorProducts": ["Products they might be using that compete with seller"],
-  "buyingSignals": ["What would indicate they're a good fit"],
-  "objectionsPrepare": ["Common objections from this type of company"],
-  "personalization": "Specific detail to personalize the pitch for this company"
-}
-
-Be practical and sales-focused. If information isn't available, make educated guesses based on company type and industry.`
-                }
-            ],
-            response_format: { type: 'json_object' },
+  "industry": "Industry",
+  "size": "Size/revenue estimate",
+  "whatTheyDo": "1-2 sentence description",
+  "headquarters": "HQ",
+  "recentNews": [],
+  "techStack": [],
+  "potentialPainPoints": [],
+  "talkingPoints": [],
+  "approachStrategy": "How to approach",
+  "competitorProducts": [],
+  "buyingSignals": [],
+  "objectionsPrepare": [],
+  "personalization": "Specific personalisation detail"
+}`
+            }],
             temperature: 0.4,
             max_tokens: 1200
         });
@@ -322,7 +282,9 @@ Be practical and sales-focused. If information isn't available, make educated gu
         const elapsed = Date.now() - startTime;
         console.log(`[Prospect Research] Completed in ${elapsed}ms`);
 
-        const research = JSON.parse(response.choices[0].message.content);
+        const rawText = response.content[0].text;
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        const research = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
 
         // Cache the result
         prospectCompanyCache.set(cacheKey, research);

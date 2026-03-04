@@ -35,12 +35,15 @@ const RAPPORT_RESPONSES = {
 
 /**
  * OBJECTION HANDLING - Quick responses to common objections
+ * NOTE: "Not interested" now triggers immediate call end in server.js (per user feedback)
+ * These cached responses are kept as fallback only
  */
 const OBJECTION_RESPONSES = {
-    // "Not interested"
+    // "Not interested" - DISABLED: Call ends immediately now (Fix #1)
+    // User feedback: "ignored 'not interested' 3+ times" - unacceptable
     notInterested: [
-        "Totally understand. Before I go - we're sending out a free State of AI report. Want me to email it over?",
-        "No worries at all. Quick thing - we have a free report on AI trends. Worth a look?",
+        "I appreciate your time. Thanks for letting me know!",
+        "Totally understand. Thanks for your honesty!",
     ],
 
     // "We're happy with current solution"

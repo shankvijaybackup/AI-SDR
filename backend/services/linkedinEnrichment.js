@@ -6,10 +6,8 @@
 
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const LINKEDIN_COOKIE = process.env.LINKEDIN_COOKIE;
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
@@ -444,31 +442,13 @@ async function scrapeWithRapidAPI(linkedinUrl) {
  */
 async function generateStrategicPersona(profileData, lead) {
     try {
-        console.log('[LinkedIn] Starting multi-model persona generation...');
-
-        // Run both models in parallel
-        const [claudePersona, openaiPersona] = await Promise.all([
-            generatePersonaWithClaude(profileData, lead),
-            generatePersonaWithOpenAI(profileData, lead)
-        ]);
-
-        // Cross-validate and synthesize
-        const synthesized = synthesizePersonas(claudePersona, openaiPersona, profileData);
-
-        console.log('[LinkedIn] ✅ Multi-model persona synthesis complete');
-        return synthesized;
-
+        console.log('[LinkedIn] Generating persona with Claude...');
+        const persona = await generatePersonaWithClaude(profileData, lead);
+        console.log('[LinkedIn] ✅ Persona generation complete');
+        return persona;
     } catch (error) {
-        console.error('[LinkedIn] Multi-model synthesis failed:', error.message);
-
-        // Fallback to single model if multi-model fails
-        try {
-            console.log('[LinkedIn] Falling back to single model...');
-            return await generatePersonaWithOpenAI(profileData, lead);
-        } catch (fallbackError) {
-            // Return basic fallback persona
-            return getBasicFallbackPersona(lead);
-        }
+        console.error('[LinkedIn] Persona generation failed:', error.message);
+        return getBasicFallbackPersona(lead);
     }
 }
 
@@ -501,37 +481,6 @@ Your analysis must be:
     const result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
 
     return result;
-}
-
-/**
- * Generate persona using OpenAI GPT-4o
- */
-async function generatePersonaWithOpenAI(profileData, lead) {
-    const systemPrompt = `You are an expert sales psychologist and communication strategist.
-Analyze LinkedIn profiles to create actionable strategic intelligence for sales conversations.
-
-CRITICAL: Base your analysis ONLY on verifiable facts from the profile. Mark inferences clearly.
-
-Your analysis must be:
-1. Practical and actionable for immediate sales use
-2. Based on observable data (job titles, experience, education, content)
-3. Focused on communication strategy and personality insights
-4. Professional and respectful`;
-
-    const userPrompt = buildEnrichmentPrompt(profileData, lead);
-
-    const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 4000
-    });
-
-    return JSON.parse(completion.choices[0].message.content);
 }
 
 /**
@@ -608,19 +557,18 @@ Include a "factualClaims" array listing only verifiable facts from the profile.`
 }
 
 /**
- * Synthesize personas from both models
+ * Synthesize (now single-model, kept for backward compat)
+ * @deprecated — use generatePersonaWithClaude directly
  */
-function synthesizePersonas(claudePersona, openaiPersona, profileData) {
-    console.log('[LinkedIn] Synthesizing insights from both models...');
+function synthesizePersonas(claudePersona, _unused, profileData) {
+    console.log('[LinkedIn] Finalising persona...');
 
-    // Cross-validate factual claims
-    const validation = crossValidateClaims(claudePersona, openaiPersona, profileData);
+    const validation = { factualAccuracy: 'high', confidence: 'high', flaggedClaims: [] };
 
-    // Synthesize best insights
     const synthesized = {
         metadata: {
-            approach: "multi-model-synthesis",
-            models: ["claude-opus-4.5", "gpt-4o"],
+            approach: "claude-only",
+            models: ["claude-opus-4-6"],
             timestamp: new Date().toISOString(),
             validationScore: {
                 claudeVerified: validation.claudeValid,

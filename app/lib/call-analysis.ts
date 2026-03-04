@@ -1,8 +1,4 @@
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import { generateJSON } from '@/lib/claude'
 
 interface TranscriptEntry {
   speaker: string
@@ -17,7 +13,6 @@ interface CallAnalysis {
   emailCaptured: string | null
   nextSteps: string | null
   scheduledDemo: Date | null
-  // NEW: Enhanced analysis fields
   fullTranscript: TranscriptEntry[]
   toneAnalysis: {
     prospectTone: string
@@ -64,7 +59,6 @@ export async function analyzeCall(
     .map((entry, idx) => `[${idx + 1}] ${entry.speaker === 'agent' ? 'Alex (Agent)' : 'Prospect'}: ${entry.text}`)
     .join('\n')
 
-  // Check if transcript has actual content (not just greetings)
   if (transcriptText.length < 50) {
     console.log('[Call Analysis] Transcript too short, skipping analysis')
     return {
@@ -99,68 +93,34 @@ Analyze this call thoroughly and return a JSON object with these fields:
 
 {
   "aiSummary": "3-4 sentence executive summary of the call - what happened, outcome, and key takeaway",
-  
   "interestLevel": "high" | "medium" | "low" | "not_interested",
-  
   "objections": ["Array of specific objections the prospect raised"],
-  
   "emailCaptured": "email@example.com or null",
-  
   "nextSteps": "What should happen next based on the call outcome",
-  
   "scheduledDemo": "ISO date string if demo scheduled, or null",
-  
   "toneAnalysis": {
-    "prospectTone": "Describe the prospect's tone (e.g., 'Initially skeptical but warmed up', 'Frustrated and dismissive', 'Curious and engaged')",
-    "agentTone": "Describe the agent's tone (e.g., 'Professional and empathetic', 'Rushed and pushy', 'Natural and conversational')",
+    "prospectTone": "Describe the prospect's tone",
+    "agentTone": "Describe the agent's tone",
     "overallSentiment": "positive" | "neutral" | "negative"
   },
-  
-  "whatWentWell": [
-    "Specific things the agent did RIGHT - be concrete (e.g., 'Good use of open-ended questions', 'Effectively handled the pricing objection')"
-  ],
-  
-  "whatWentWrong": [
-    "Specific things that could be improved - be constructive (e.g., 'Jumped to pitch too early without discovery', 'Missed opportunity when prospect mentioned pain point')"
-  ],
-  
-  "coachingFeedback": "2-3 sentences of actionable advice for the agent to improve on future calls. Be specific and encouraging.",
-  
+  "whatWentWell": ["Specific things the agent did RIGHT"],
+  "whatWentWrong": ["Specific things that could be improved"],
+  "coachingFeedback": "2-3 sentences of actionable advice for the agent",
   "callDuration": "Estimate (e.g., '2-3 minutes', '5+ minutes')",
-  
   "keyMoments": [
-    {"timestamp": "Turn 3", "description": "Prospect expressed interest in automation"},
-    {"timestamp": "Turn 7", "description": "Agent effectively handled 'not interested' objection"}
+    {"timestamp": "Turn 3", "description": "Prospect expressed interest in automation"}
   ]
 }
 
-Be honest but constructive. Focus on specific, actionable feedback.
-Return ONLY valid JSON, no markdown or explanations.`
+Be honest but constructive. Focus on specific, actionable feedback.`
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert sales coach and call analyst. Provide detailed, actionable feedback to help SDRs improve their cold calling skills.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+    const analysis = await generateJSON<any>(prompt, {
+      model: 'sonnet',
+      system: 'You are an expert sales coach and call analyst. Provide detailed, actionable feedback to help SDRs improve their cold calling skills.',
+      maxTokens: 1500,
       temperature: 0.4,
-      max_tokens: 1500,
-      response_format: { type: 'json_object' },
     })
-
-    const content = response.choices[0].message.content
-    if (!content) {
-      throw new Error('No response from OpenAI')
-    }
-
-    const analysis = JSON.parse(content)
 
     return {
       aiSummary: analysis.aiSummary || 'Call completed',
@@ -183,7 +143,6 @@ Return ONLY valid JSON, no markdown or explanations.`
     }
   } catch (error) {
     console.error('Call analysis error:', error)
-    // Return default values if analysis fails
     return {
       aiSummary: 'Call completed. Analysis unavailable.',
       interestLevel: 'medium',

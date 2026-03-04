@@ -61,3 +61,42 @@ Thumbs.db
 # Ngrok
 ngrok.exe
 ngrok.zip
+
+# Deployment archives & generated audio
+*.tar.gz
+*.zip
+backend/tts_files/
+
+# Claude Code & dev tool internals
+.claude/
+.fdk/
+
+# Session/debug markdown docs (not source code)
+AUTH_FIX_COMPLETE.md
+BACKEND_CONNECTION_FIX.md
+CALL_QUALITY_FIXES.md
+CALL_SYSTEM_FIXED.md
+CRITICAL_ISSUES.md
+DEPLOYMENT_COMPLETE.md
+DEPLOYMENT_STATUS.md
+DEPLOYMENT_SUCCESS.md
+DEPLOY_CALL_LOGGING_FIX.md
+DEPLOY_NOW.md
+DOMAIN_SETUP.md
+FIX_AUTH_ISSUE.md
+FULL_AWS_DEPLOYMENT_COMPLETE.md
+IMPLEMENTATION_COMPLETE.md
+IMPLEMENTATION_SUMMARY.md
+RENDER_DEPLOYED.md
+RENDER_FIX_DEPLOYED.md
+RESTART_AWS_BACKEND.md
+SCRIPT_GENERATION_FIX.md
+SESSION_SUMMARY.md
+TRANSCRIPT_ISSUE_DIAGNOSIS.md
+URGENT_FIX_REQUIRED.md
+
+# One-off shell scripts
+deploy-*.sh
+fix-*.sh
+deploy_*.sh
+trigger-*.sh

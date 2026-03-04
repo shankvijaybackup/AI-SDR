@@ -4,12 +4,18 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 import { isAdmin } from '@/lib/permissions'
 import { z } from 'zod'
 
+// NOTE: DB columns repurposed after OpenAI/Gemini removal:
+//   openaiApiKey    → anthropicApiKey
+//   googleAiApiKey  → groqApiKey
+//   elevenLabsApiKey → voyageApiKey
+// No migration needed — just renaming semantics at the API layer.
+
 const updateApiKeysSchema = z.object({
     twilioAccountSid: z.string().optional().nullable(),
     twilioAuthToken: z.string().optional().nullable(),
-    openaiApiKey: z.string().optional().nullable(),
-    googleAiApiKey: z.string().optional().nullable(),
-    elevenLabsApiKey: z.string().optional().nullable(),
+    anthropicApiKey: z.string().optional().nullable(),
+    groqApiKey: z.string().optional().nullable(),
+    voyageApiKey: z.string().optional().nullable(),
     deepgramApiKey: z.string().optional().nullable(),
 })
 
@@ -55,17 +61,16 @@ export async function GET(request: NextRequest) {
             apiKeys: {
                 twilioAccountSid: maskKey(settings.twilioAccountSid),
                 twilioAuthToken: maskKey(settings.twilioAuthToken),
-                openaiApiKey: maskKey(settings.openaiApiKey),
-                googleAiApiKey: maskKey(settings.googleAiApiKey),
-                elevenLabsApiKey: maskKey(settings.elevenLabsApiKey),
+                anthropicApiKey: maskKey(settings.openaiApiKey),    // repurposed column
+                groqApiKey: maskKey(settings.googleAiApiKey),        // repurposed column
+                voyageApiKey: maskKey(settings.elevenLabsApiKey),    // repurposed column
                 deepgramApiKey: maskKey(settings.deepgramApiKey),
             },
-            // Indicate which keys are set
             hasKeys: {
                 twilio: !!settings.twilioAccountSid,
-                openai: !!settings.openaiApiKey,
-                googleAi: !!settings.googleAiApiKey,
-                elevenLabs: !!settings.elevenLabsApiKey,
+                anthropic: !!settings.openaiApiKey,
+                groq: !!settings.googleAiApiKey,
+                voyage: !!settings.elevenLabsApiKey,
                 deepgram: !!settings.deepgramApiKey,
             },
             featureFlags: {
@@ -99,32 +104,33 @@ export async function PATCH(request: NextRequest) {
         const body = await request.json()
         const validatedData = updateApiKeysSchema.parse(body)
 
-        // Filter out null values (don't overwrite existing keys with null)
-        const updateData: Record<string, string> = {}
-        for (const [key, value] of Object.entries(validatedData)) {
-            if (value !== null && value !== undefined && value !== '') {
-                updateData[key] = value
-            }
-        }
+        // Map new field names to DB column names
+        const dbData: Record<string, string> = {}
+        if (validatedData.twilioAccountSid) dbData.twilioAccountSid = validatedData.twilioAccountSid
+        if (validatedData.twilioAuthToken) dbData.twilioAuthToken = validatedData.twilioAuthToken
+        if (validatedData.anthropicApiKey) dbData.openaiApiKey = validatedData.anthropicApiKey    // repurposed
+        if (validatedData.groqApiKey) dbData.googleAiApiKey = validatedData.groqApiKey            // repurposed
+        if (validatedData.voyageApiKey) dbData.elevenLabsApiKey = validatedData.voyageApiKey      // repurposed
+        if (validatedData.deepgramApiKey) dbData.deepgramApiKey = validatedData.deepgramApiKey
 
         // Upsert settings
         const settings = await prisma.companySettings.upsert({
             where: { companyId: currentUser.companyId },
             create: {
                 companyId: currentUser.companyId,
-                ...updateData,
+                ...dbData,
                 trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
             },
-            update: updateData,
+            update: dbData,
         })
 
         return NextResponse.json({
             message: 'API keys updated successfully',
             hasKeys: {
                 twilio: !!settings.twilioAccountSid,
-                openai: !!settings.openaiApiKey,
-                googleAi: !!settings.googleAiApiKey,
-                elevenLabs: !!settings.elevenLabsApiKey,
+                anthropic: !!settings.openaiApiKey,
+                groq: !!settings.googleAiApiKey,
+                voyage: !!settings.elevenLabsApiKey,
                 deepgram: !!settings.deepgramApiKey,
             },
         })

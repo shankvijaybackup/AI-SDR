@@ -150,67 +150,34 @@ const DISC_PROFILES: Record<string, { description: string; approach: string; tra
 }
 
 /**
- * Generate a comprehensive persona using AI analysis
+ * Generate a comprehensive persona using AI analysis (Claude Haiku)
  */
 export async function generatePersona(
     profileData: Partial<EnhancedLinkedInData>,
-    openaiApiKey?: string
+    _deprecatedApiKey?: string  // kept for backward compat, no longer used
 ): Promise<PersonaProfile> {
-    const apiKey = openaiApiKey || process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-        console.log('[Persona] No OpenAI API key, using rule-based analysis')
+    if (!process.env.ANTHROPIC_API_KEY) {
+        console.log('[Persona] No ANTHROPIC_API_KEY, using rule-based analysis')
         return generateRuleBasedPersona(profileData)
     }
 
     try {
+        const { generateJSON } = await import('./claude')
         const prompt = buildPersonaPrompt(profileData)
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                messages: [
-                    {
-                        role: 'system',
-                        content: `You are an expert sales psychologist who analyzes LinkedIn profiles to create prospect personas for B2B sales calls. 
-            
+        const persona = await generateJSON<PersonaProfile>(prompt, {
+            model: 'haiku',
+            maxTokens: 1000,
+            temperature: 0.7,
+            system: `You are an expert sales psychologist who analyzes LinkedIn profiles to create prospect personas for B2B sales calls.
+
 You assess DISC personality types by analyzing communication style, content themes, and professional focus. Be concise and actionable.
 
-Return JSON only, no markdown.`
-                    },
-                    { role: 'user', content: prompt }
-                ],
-                temperature: 0.7,
-                max_tokens: 1000,
-            }),
+Return JSON only, no markdown.`,
         })
 
-        if (!response.ok) {
-            console.error('[Persona] OpenAI API error:', response.status)
-            return generateRuleBasedPersona(profileData)
-        }
-
-        const data = await response.json()
-        const content = data.choices?.[0]?.message?.content || ''
-
-        // Parse JSON response
-        try {
-            const jsonMatch = content.match(/\{[\s\S]*\}/)
-            if (jsonMatch) {
-                const persona = JSON.parse(jsonMatch[0]) as PersonaProfile
-                console.log('[Persona] AI analysis complete:', persona.discProfile)
-                return persona
-            }
-        } catch (parseError) {
-            console.error('[Persona] JSON parse error:', parseError)
-        }
-
-        return generateRuleBasedPersona(profileData)
+        console.log('[Persona] AI analysis complete:', persona.discProfile)
+        return persona
     } catch (error) {
         console.error('[Persona] AI generation error:', error)
         return generateRuleBasedPersona(profileData)

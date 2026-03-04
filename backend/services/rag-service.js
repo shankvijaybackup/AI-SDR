@@ -1,19 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import OpenAI from 'openai';
+import { embedQuery } from '../voyageClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Lazy OpenAI initialization to prevent startup failures
-let openai = null;
-function getOpenAI() {
-  if (!openai && process.env.OPENAI_API_KEY) {
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  }
-  return openai;
-}
+// NOTE: existing stored embeddings were OpenAI 1536-dim.
+// After deploying, run: npm run reindex-embeddings to regenerate with Voyage AI (1024-dim)
 
 // Load knowledge base
 let knowledgeBase = null;
@@ -211,24 +205,11 @@ export async function getRelevantContext(question, conversationPhase) {
  */
 export async function getRelevantContextWithEmbeddings(question) {
   try {
-    const client = getOpenAI();
-    if (!client) {
-      console.warn('[RAG] OpenAI not available, falling back to keyword search');
-      return await getRelevantContext(question, 'discovery');
-    }
+    // Voyage AI embedding
+    const _embedding = await embedQuery(question);
 
-    // Generate embedding for the question
-    const embedding = await client.embeddings.create({
-      model: "text-embedding-3-small",
-      input: question,
-    });
-
-    // In production, you'd:
-    // 1. Store KB chunks with embeddings in a vector DB (Pinecone, Weaviate, etc.)
-    // 2. Query vector DB with question embedding
-    // 3. Return top K most similar chunks
-
-    // For now, fall back to keyword search
+    // TODO: Store KB chunks with Voyage embeddings in a vector DB.
+    // For now, fall back to keyword search (re-indexing needed first).
     return await getRelevantContext(question, 'discovery');
   } catch (error) {
     console.error('[RAG] Embedding error:', error);

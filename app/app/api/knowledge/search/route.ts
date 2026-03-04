@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { VoyageAIClient } from 'voyageai'
 import { Prisma } from '@prisma/client'
 import { getCurrentUserFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -34,16 +34,14 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (magnitudeA * magnitudeB)
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+const voyageClient = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY || '' })
 
 export async function GET(req: NextRequest) {
   try {
     // Support both cookie auth (browser) and x-user-id header (backend service)
     const userIdHeader = req.headers.get('x-user-id')
     let userId: string
-    
+
     if (userIdHeader) {
       userId = userIdHeader
     } else {
@@ -62,12 +60,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing q parameter' }, { status: 400 })
     }
 
-    const embeddingResp = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: query,
+    // Generate embedding with Voyage AI (voyage-3: 1024-dim)
+    const embeddingResp = await voyageClient.embed({
+      input: [query],
+      model: 'voyage-3',
     })
 
-    const queryEmbedding = embeddingResp.data[0]?.embedding
+    const queryEmbedding = embeddingResp.data?.[0]?.embedding
     if (!queryEmbedding) {
       return NextResponse.json({ error: 'Failed to generate embedding' }, { status: 500 })
     }

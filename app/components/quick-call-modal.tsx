@@ -56,6 +56,27 @@ export function QuickCallModal({ open, onOpenChange, lead, onCallComplete }: Qui
 
     const fetchScripts = async () => {
         try {
+            // First, try to fetch the lead's personalized generated script
+            if (lead?.id) {
+                const leadScriptResponse = await fetch(`/api/leads/${lead.id}/script`)
+                if (leadScriptResponse.ok) {
+                    const leadScriptData = await leadScriptResponse.json()
+                    if (leadScriptData.script) {
+                        // Lead has a generated script - use it!
+                        const personalizedScript: Script = {
+                            id: `lead-${lead.id}`,
+                            name: `🎯 Personalized Script for ${lead.firstName} ${lead.lastName}`,
+                            content: JSON.stringify(leadScriptData.script),
+                            isDefault: true
+                        }
+                        setScripts([personalizedScript])
+                        setSelectedScript(personalizedScript)
+                        return // Use only the personalized script
+                    }
+                }
+            }
+
+            // Fallback: If no personalized script, fetch generic scripts
             const response = await fetch('/api/scripts')
             if (response.ok) {
                 const data = await response.json()

@@ -1,9 +1,9 @@
 // Document processing service for knowledge base uploads
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { VoyageAIClient } from 'voyageai'
 import * as XLSX from 'xlsx'
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '')
+// Initialize Voyage AI for embeddings
+const voyageClient = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY || '' })
 
 interface ProcessedDocument {
   content: string
@@ -24,36 +24,27 @@ interface ProcessedDocument {
 // ... (existing extraction functions: PDF, DOCX, Excel, PPT, etc.)
 
 /**
- * Generate embeddings for text chunks using Gemini
+ * Generate embeddings for text chunks using Voyage AI (voyage-3, 1024-dim)
  */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' })
-
-    // Gemini supports batch embedding, but let's do it carefully or per chunk if needed
-    // text-embedding-004 supports batching
     const embeddings: number[][] = []
 
-    // Gemini might have limits on batch size, let's process in small batches
-    const batchSize = 10
+    // Voyage AI supports up to 128 inputs per batch
+    const batchSize = 128
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize)
-      /**
-       * Note: Gemini API for embeddings might be slightly different depending on version.
-       * Using batchEmbedContents if available, or iterating.
-       * The standard JS SDK usually provides embedContent which takes one.
-       * For safety/compatibility with standard SDK, we'll map.
-       */
-      const batchPromises = batch.map(text => model.embedContent(text))
-      const batchResults = await Promise.all(batchPromises)
-      embeddings.push(...batchResults.map(r => r.embedding.values))
+      const result = await voyageClient.embed({
+        input: batch,
+        model: 'voyage-3',
+      })
+      const batchEmbeddings = result.data?.map((d: any) => d.embedding) || []
+      embeddings.push(...batchEmbeddings)
     }
 
     return embeddings
   } catch (error) {
     console.error('[Embeddings] Generation error:', error)
-    // Fallback or rethrow
-    // If Gemini fails (e.g. key missing), we can't proceed with RAG.
     throw new Error('Failed to generate embeddings: ' + (error instanceof Error ? error.message : String(error)))
   }
 }
@@ -66,12 +57,12 @@ export async function generateSummary(content: string, maxLength: number = 500):
     // Truncate content if too long (Gemini 1.5 Flash has huge window but let's be reasonable)
     const truncatedContent = content.slice(0, 30000)
 
-    const { generateContentSafe } = await import('./gemini')
+    const { generateContent } = await import('./claude')
     const prompt = `You are a helpful assistant that creates concise summaries of documents for a sales knowledge base. Focus on key points, features, benefits, and use cases.
-    
-    Summarize the following content in ${maxLength} characters or less:\n\n${truncatedContent}`
-    const result = await generateContentSafe(prompt)
-    return result.response.text() || 'Summary generation failed'
+
+Summarize the following content in ${maxLength} characters or less:\n\n${truncatedContent}`
+    const text = await generateContent(prompt, { model: 'haiku', maxTokens: 512 })
+    return text || 'Summary generation failed'
   } catch (error) {
     console.error('[Summary] Generation error:', error)
     return 'Summary not available'

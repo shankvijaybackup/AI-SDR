@@ -12,9 +12,9 @@
  * - Common objections to prepare for
  */
 
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Cache for role intelligence (avoid repeated API calls)
 const roleIntelligenceCache = new Map();
@@ -44,74 +44,30 @@ export async function researchRoleChallenges(role, industry = '', companySize = 
     try {
         const startTime = Date.now();
 
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are a sales intelligence expert. Research what challenges, priorities, and pain points a specific job role faces. 
-Provide practical, actionable intelligence that helps sales reps have better conversations.
-Be specific to 2024-2025 trends and challenges.`
-                },
-                {
-                    role: 'user',
-                    content: `Research the role: "${role}"${industry ? ` in the ${industry} industry` : ''}${companySize ? ` at a ${companySize} company` : ''}.
+        const response = await anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            system: `You are a sales intelligence expert. Provide practical, actionable role intelligence for sales reps. Reply ONLY with valid JSON.`,
+            messages: [{
+                role: 'user',
+                content: `Research the role: "${role}"${industry ? ` in ${industry}` : ''}${companySize ? ` at a ${companySize} company` : ''}.
 
-Provide intelligence in JSON format:
-
+Return JSON:
 {
-  "role": "Normalized role title",
-  "seniority": "C-level/VP/Director/Manager/Individual Contributor",
-  "department": "Sales/IT/HR/Operations/etc.",
-  
-  "challenges": [
-    "Top challenge 1 they face today",
-    "Top challenge 2",
-    "Top challenge 3 (up to 5)"
-  ],
-  
-  "kpis": [
-    "KPI 1 they are measured on",
-    "KPI 2 (up to 5)"
-  ],
-  
-  "priorities": [
-    "What they care most about right now",
-    "Priority 2 (up to 3)"
-  ],
-  
-  "trends": [
-    "Industry trend affecting this role in 2024-2025",
-    "Trend 2 (up to 3)"
-  ],
-  
-  "outreachAngles": [
-    "Best angle to approach this person",
-    "Alternative angle 2",
-    "What messaging resonates with them"
-  ],
-  
-  "commonObjections": [
-    "Objection 1 to prepare for",
-    "Objection 2",
-    "Objection 3"
-  ],
-  
-  "discoveryQuestions": [
-    "Good question to ask in discovery",
-    "Question 2",
-    "Question 3"
-  ],
-  
-  "decisionMakingPower": "Final decision maker / Influencer / End user",
-  "reportingTo": "Who they typically report to",
-  "teamSize": "Typical team size they manage"
-}
-
-Be specific and practical. Focus on what would help a sales rep have a better conversation.`
-                }
-            ],
-            response_format: { type: 'json_object' },
+  "role": "Normalized title",
+  "seniority": "C-level/VP/Director/Manager/IC",
+  "department": "IT/Sales/HR/etc",
+  "challenges": [],
+  "kpis": [],
+  "priorities": [],
+  "trends": [],
+  "outreachAngles": [],
+  "commonObjections": [],
+  "discoveryQuestions": [],
+  "decisionMakingPower": "Decision maker/Influencer/End user",
+  "reportingTo": "Typical manager",
+  "teamSize": "Team size"
+}`
+            }],
             temperature: 0.4,
             max_tokens: 1500
         });
@@ -119,7 +75,9 @@ Be specific and practical. Focus on what would help a sales rep have a better co
         const elapsed = Date.now() - startTime;
         console.log(`[Role Intelligence] Completed in ${elapsed}ms`);
 
-        const intelligence = JSON.parse(response.choices[0].message.content);
+        const rawText = response.content[0].text;
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        const intelligence = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
 
         // Cache the result
         roleIntelligenceCache.set(cacheKey, intelligence);

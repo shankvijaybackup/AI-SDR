@@ -446,8 +446,8 @@ function AskAITab() {
             // Filter out error messages and ensure valid content
             const history = messages
                 .filter(m => {
-                    // Skip error messages from Google AI
-                    if (m.content.includes('[GoogleGenerativeAI Error]')) return false
+                    // Skip error messages from AI provider
+                    if (m.content.includes('[GoogleGenerativeAI Error]') || m.content.includes('[AnthropicError]')) return false
                     // Skip empty messages
                     if (!m.content || m.content.trim().length === 0) return false
                     // Skip error connecting messages

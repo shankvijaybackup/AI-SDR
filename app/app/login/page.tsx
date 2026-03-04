@@ -41,7 +41,8 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/leads')
+      // Success! Hard redirect to ensure cookie is properly set
+      window.location.href = '/leads'
     } catch (err) {
       setError('An error occurred. Please try again.')
       setLoading(false)

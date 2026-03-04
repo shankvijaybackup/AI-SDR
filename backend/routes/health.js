@@ -16,7 +16,9 @@ export async function healthCheck(req, res) {
             redis: await isRedisAvailable(),
             database: false,
             twilio: !!process.env.TWILIO_ACCOUNT_SID && !!process.env.TWILIO_AUTH_TOKEN,
-            openai: !!process.env.OPENAI_API_KEY,
+            anthropic: !!process.env.ANTHROPIC_API_KEY,
+            groq: !!process.env.GROQ_API_KEY,
+            voyage: !!process.env.VOYAGE_API_KEY,
             timestamp: new Date().toISOString()
         };
 
@@ -29,7 +31,7 @@ export async function healthCheck(req, res) {
         }
 
         // Determine overall health
-        const healthy = checks.redis && checks.database && checks.twilio && checks.openai;
+        const healthy = checks.redis && checks.database && checks.twilio && checks.anthropic;
         const status = healthy ? 'healthy' : 'degraded';
         const httpStatus = healthy ? 200 : 503;
 

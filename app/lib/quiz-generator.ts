@@ -1,8 +1,6 @@
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateJSON } from '@/lib/claude'
 import { prisma } from "./prisma";
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '');
 
 interface GenerateQuizOptions {
     sourceIds: string[];
@@ -17,71 +15,57 @@ export async function generateQuizFromSources({ sourceIds, userId, count = 5, di
         const sources = await prisma.knowledgeSource.findMany({
             where: {
                 id: { in: sourceIds },
-                // Ensure user owns them or they are shared? For MVP, ownership check.
-                // userId: userId // Commented out to allow testing if userId mismatch in seed data
             },
-            select: { title: true, content: true, summary: true } // Fetch content and summary
+            select: { title: true, content: true, summary: true }
         });
 
         if (sources.length === 0) {
             throw new Error("No valid knowledge sources found.");
         }
 
-        // 2. Prepare Context (Concatenate content, truncating if necessary)
-        // Gemini 1.5 Flash has 1M context, so we can be generous, but let's still be safe.
-        // We'll prioritize Summary first, then Content.
-
+        // 2. Prepare Context
         let combinedContext = "";
         sources.forEach(source => {
             combinedContext += `--- DOCUMENT: ${source.title} ---\n`;
-            combinedContext += source.content || source.summary || ""; // Fallback
+            combinedContext += source.content || source.summary || "";
             combinedContext += `\n\n`;
         });
 
-        // Truncate hard limit (e.g. 100k chars for safety if using smaller model, but Flash handles more)
-        if (combinedContext.length > 500000) {
-            combinedContext = combinedContext.substring(0, 500000) + "...[TRUNCATED]";
+        if (combinedContext.length > 100000) {
+            combinedContext = combinedContext.substring(0, 100000) + "...[TRUNCATED]";
         }
 
-        // 3. Prompt Engineering
-        const systemPrompt = `
-      You are an expert Sales Enablement Tutor. 
-      Your goal is to create a quiz that tests a sales representative's understanding of the provided knowledge base materials.
-      
-      Instructions:
-      1. Generate ${count} multiple-choice questions based ONLY on the provided context.
-      2. Difficulty Level: ${difficulty.toUpperCase()}.
-      3. Focus on key sales concepts, product features, objection handling, and value propositions.
-      4. Output strictly in JSON format.
-      
-      JSON Schema:
-      {
-        "questions": [
-          {
-            "question": "string",
-            "options": ["string", "string", "string", "string"],
-            "correctAnswer": "string (must be one of the options)",
-            "explanation": "string (why this is correct)"
-          }
-        ]
-      }
-    `;
+        // 3. Generate quiz with Claude
+        const prompt = `You are an expert Sales Enablement Tutor.
+Your goal is to create a quiz that tests a sales representative's understanding of the provided knowledge base materials.
 
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp",
-            generationConfig: { responseMimeType: "application/json" }
+Instructions:
+1. Generate ${count} multiple-choice questions based ONLY on the provided context.
+2. Difficulty Level: ${difficulty.toUpperCase()}.
+3. Focus on key sales concepts, product features, objection handling, and value propositions.
+4. Output strictly in JSON format.
+
+JSON Schema:
+{
+  "questions": [
+    {
+      "question": "string",
+      "options": ["string", "string", "string", "string"],
+      "correctAnswer": "string (must be one of the options)",
+      "explanation": "string (why this is correct)"
+    }
+  ]
+}
+
+CONTEXT:
+${combinedContext}`;
+
+        const data = await generateJSON<{ questions: any[] }>(prompt, {
+            model: 'haiku',
+            maxTokens: 2048,
+            temperature: 0.4,
         });
 
-        const result = await model.generateContent([
-            systemPrompt,
-            `CONTEXT:\n${combinedContext}`
-        ]);
-
-        const response = result.response;
-        const text = response.text();
-
-        // Parse JSON
-        const data = JSON.parse(text);
         const questions = data.questions;
 
         if (!questions || !Array.isArray(questions)) {
@@ -89,7 +73,6 @@ export async function generateQuizFromSources({ sourceIds, userId, count = 5, di
         }
 
         // 4. Save to DB
-        // Create Quiz
         const quizTitle = sources.length === 1
             ? `Quiz: ${sources[0].title}`
             : `Combined Quiz (${sources.length} sources)`;
@@ -102,7 +85,6 @@ export async function generateQuizFromSources({ sourceIds, userId, count = 5, di
                 title: quizTitle,
                 description: quizDescription,
                 difficulty,
-                // Connect multiple sources
                 sources: {
                     connect: sourceIds.map(id => ({ id }))
                 },

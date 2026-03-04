@@ -1,67 +1,69 @@
 
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
     const checks = {
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'Set' : 'Missing',
-        GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY ? 'Set' : 'Missing',
-        GEMINI_API_KEY: process.env.GEMINI_API_KEY ? 'Set' : 'Missing',
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? 'Set' : 'Missing',
+        GROQ_API_KEY: process.env.GROQ_API_KEY ? 'Set' : 'Missing',
+        VOYAGE_API_KEY: process.env.VOYAGE_API_KEY ? 'Set' : 'Missing',
         DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Missing',
     }
 
-    // 1. Check OpenAI
-    let openaiStatus = 'Skipped'
-    if (process.env.OPENAI_API_KEY) {
+    // 1. Check Anthropic
+    let anthropicStatus = 'Skipped'
+    if (process.env.ANTHROPIC_API_KEY) {
         try {
-            const { OpenAI } = await import('openai')
-            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-            await openai.chat.completions.create({
-                model: 'gpt-3.5-turbo',
+            const Anthropic = (await import('@anthropic-ai/sdk')).default
+            const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+            await client.messages.create({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 1,
                 messages: [{ role: 'user', content: 'ping' }],
-                max_tokens: 1
             })
-            openaiStatus = 'Active/Valid'
+            anthropicStatus = 'Active/Valid'
         } catch (error: any) {
-            openaiStatus = `Error: ${error.status || error.code || error.message}`
+            anthropicStatus = `Error: ${error.status || error.code || error.message}`
         }
     }
 
-    // 2. Check Gemini
-    let geminiStatus = 'Skipped'
-    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
-    if (geminiKey) {
+    // 2. Check Groq
+    let groqStatus = 'Skipped'
+    if (process.env.GROQ_API_KEY) {
         try {
-            const { GoogleGenerativeAI } = await import('@google/generative-ai')
-            const genAI = new GoogleGenerativeAI(geminiKey)
-            const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-001', 'gemini-1.5-pro', 'gemini-pro']
-            let worked = false
-            let errorMsg = ''
-
-            for (const modelName of modelsToTry) {
-                try {
-                    const model = genAI.getGenerativeModel({ model: modelName })
-                    await model.generateContent('ping')
-                    geminiStatus = `Active (Authorized for ${modelName})`
-                    worked = true
-                    break
-                } catch (e: any) {
-                    errorMsg = e.message
-                }
-            }
-
-            if (!worked) {
-                geminiStatus = `Error: All models failed. Last error: ${errorMsg}`
-            }
+            const Groq = (await import('groq-sdk')).default
+            const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+            await groq.chat.completions.create({
+                model: 'llama-3.1-8b-instant',
+                messages: [{ role: 'user', content: 'ping' }],
+                max_tokens: 1,
+            })
+            groqStatus = 'Active/Valid'
         } catch (error: any) {
-            geminiStatus = `Error: ${error.message}`
+            groqStatus = `Error: ${error.status || error.code || error.message}`
+        }
+    }
+
+    // 3. Check Voyage AI
+    let voyageStatus = 'Skipped'
+    if (process.env.VOYAGE_API_KEY) {
+        try {
+            const { VoyageAIClient } = await import('voyageai')
+            const client = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY })
+            await client.embed({ input: ['ping'], model: 'voyage-3' })
+            voyageStatus = 'Active/Valid'
+        } catch (error: any) {
+            voyageStatus = `Error: ${error.status || error.code || error.message}`
         }
     }
 
     return NextResponse.json({
         env: checks,
         connectivity: {
-            openai: openaiStatus,
-            gemini: geminiStatus
+            anthropic: anthropicStatus,
+            groq: groqStatus,
+            voyage: voyageStatus,
         }
     })
 }

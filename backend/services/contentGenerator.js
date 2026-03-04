@@ -1,7 +1,20 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import prisma from '../lib/prisma.js';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+async function claudeJSON(system, prompt, model = 'claude-haiku-4-5-20251001', maxTokens = 800) {
+    const response = await anthropic.messages.create({
+        model,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+        system: system + ' Reply ONLY with valid JSON.',
+        messages: [{ role: 'user', content: prompt }],
+    });
+    const text = response.content[0].text;
+    const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    return JSON.parse(match ? match[0] : text);
+}
 
 export const ContentGeneratorService = {
 
@@ -34,90 +47,44 @@ export const ContentGeneratorService = {
       - 10: Perfect
     `;
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        return JSON.parse(completion.choices[0].message.content);
+        return claudeJSON(
+            'You are an expert Sales Copywriter who scores and improves cold outreach messages.',
+            prompt,
+            'claude-sonnet-4-6'
+        );
     },
 
     /**
      * Generate LinkedIn Headline
      */
     async generateHeadline(role, industry, tone = "Professional") {
-        const prompt = `
-      Generate 5 LinkedIn headlines for a ${role} in ${industry}.
-      Tone: ${tone}
-      
-      Rules:
-      - Under 220 characters
-      - Focus on value/results/impact
-      - No buzzwords like "Passionate" or "Guru"
-      
-      Return JSON: { "headlines": ["headline 1", "headline 2"...] }
-    `;
-
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        return JSON.parse(completion.choices[0].message.content);
+        return claudeJSON(
+            'You are a LinkedIn profile expert.',
+            `Generate 5 LinkedIn headlines for a ${role} in ${industry}. Tone: ${tone}. Under 220 chars each. No buzzwords.
+Return JSON: { "headlines": ["headline 1", "headline 2", "headline 3", "headline 4", "headline 5"] }`
+        );
     },
 
     /**
      * Generate Sales Navigator Filters from natural language
      */
     async generateSalesNavFilters(query) {
-        const prompt = `
-      Convert this natural language search request into LinkedIn Sales Navigator filters.
-      Request: "${query}"
-      
-      Return JSON:
-      {
-        "jobTitles": [],
-        "industries": [],
-        "companySize": [],
-        "keywords": [],
-        "geography": []
-      }
-    `;
-
-        const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [{ role: "user", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        return JSON.parse(completion.choices[0].message.content);
+        return claudeJSON(
+            'You are a LinkedIn Sales Navigator expert.',
+            `Convert this to Sales Navigator filters: "${query}"
+Return JSON: { "jobTitles": [], "industries": [], "companySize": [], "keywords": [], "geography": [] }`
+        );
     },
 
     /**
      * Generate Icebreaker for a profile
      */
     async generateIcebreaker(profileUrl, quickContext = "") {
-        // Ideally we'd scrape the profile here. For now, we generate based on the URL or simulated context.
-        const prompt = `
-      Write 3 icebreakers for a LinkedIn message to someone with this profile: ${profileUrl}.
-      Context/Recent Activity Snippet: "${quickContext}"
-      
-      Rules:
-      - Casual but professional
-      - Under 30 words
-      - Reference the context if provided
-      
-      Return JSON: { "icebreakers": ["option 1", "option 2", "option 3"] }
-    `;
-
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
-            response_format: { type: "json_object" }
-        });
-
-        return JSON.parse(completion.choices[0].message.content);
+        return claudeJSON(
+            'You are a sales outreach expert specialising in personalised icebreakers.',
+            `Write 3 icebreakers for a LinkedIn message to this profile: ${profileUrl}.
+Context: "${quickContext}". Rules: casual but professional, under 30 words, reference context if provided.
+Return JSON: { "icebreakers": ["option 1", "option 2", "option 3"] }`
+        );
     }
 };

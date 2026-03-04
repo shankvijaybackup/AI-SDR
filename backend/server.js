@@ -619,6 +619,12 @@ app.post("/api/twilio/voice", async (req, res) => {
 
   console.log(`[Script] Using opening: ${openingScript.substring(0, 80)}...`);
 
+  // CRITICAL FIX: Add greeting to transcript BEFORE playing
+  // This ensures the agent's first message is captured
+  console.log(`[Greeting] Adding to transcript for ${callSid}`);
+  addTranscript(callSid, { speaker: "agent", text: openingScript });
+  console.log(`[Greeting] ✅ Added to transcript`);
+
   // Play greeting with TTS (ElevenLabs with Polly fallback)
   // Pass region and voice ID for proper regional voice
   const leadRegion = activeCall ? activeCall.region : null;

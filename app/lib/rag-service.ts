@@ -1,10 +1,8 @@
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "./prisma";
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export interface ChatMessage {
     role: "user" | "model";
@@ -22,13 +20,9 @@ export async function chatWithKnowledge(
         console.log(`[DeepTutor] Starting chat for User ${userId} with ${sourceIds.length} sources.`);
 
         // 1. Fetch Context (Document Content)
-        // For MVP, we fetch the full text of selected documents. 
-        // In production, we would use embeddings/RAG to fetch only relevant chunks.
         const sources = await prisma.knowledgeSource.findMany({
             where: {
                 id: { in: sourceIds },
-                // Ensure user has access (basic check, can be refined for company sharing)
-                // OR: userId: userId (but we also want shared docs)
             },
             select: {
                 title: true,
@@ -42,7 +36,6 @@ export async function chatWithKnowledge(
         }
 
         // 2. Prepare Context String
-        // Truncate if too long (Gemini 1.5 Pro/Flash has huge context, but good update practice)
         let contextText = "";
         sources.forEach(source => {
             contextText += `\n--- SOURCE: ${source.title} (${source.type}) ---\n${source.content}\n`;
@@ -53,8 +46,7 @@ export async function chatWithKnowledge(
         const sourceRefText = sourceMap.map(s => `[${s.num}] "${s.title}"`).join(', ');
 
         // 4. Construct System Prompt
-        const systemPrompt = `
-You are the "Deep Tutor", an intelligent AI sales enablement coach.
+        const systemPrompt = `You are the "Deep Tutor", an intelligent AI sales enablement coach.
 Your goal is to answer the user's questions based ONLY on the provided context.
 If the answer is not in the context, say "I don't have enough information in the provided documents to answer that."
 
@@ -75,71 +67,49 @@ EXAMPLE FORMAT:
 Your answer here with citations [1]. More info [2].
 
 ---
-📚 **Sources**: [1] Document Title, [2] Another Document
-`;
+📚 **Sources**: [1] Document Title, [2] Another Document`;
 
-        // 5. Start Chat (Stateless for this service wrapper, but using history from frontend)
-        // We construct the full prompt history for the generative model
-        // Note: Google's SDK 'startChat' is stateful, but for a REST API we often rebuild state or use 'generateContent' with history string.
-        // Let's use 'startChat' by mapping history.
-
-        // Handle both 'parts' and 'content' fields from frontend, filter out empty/invalid messages
+        // 5. Build Claude messages array from history
         console.log('[DeepTutor] Raw history received:', JSON.stringify(history));
 
-        const geminiHistory = history
+        const messages: Anthropic.MessageParam[] = history
             .filter(h => {
                 const text = h.parts || h.content;
-                return text && typeof text === 'string' && text.trim().length > 0;
+                return text && typeof text === 'string' && (text as string).trim().length > 0;
             })
             .map(h => {
                 const textContent = String(h.parts || h.content || '').trim();
                 console.log(`[DeepTutor] Mapping message - role: ${h.role}, text: ${textContent.substring(0, 50)}...`);
                 return {
-                    role: h.role as 'user' | 'model',
-                    parts: [{ text: textContent }]
+                    role: (h.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+                    content: textContent,
                 };
             });
 
-        console.log('[DeepTutor] Processed history count:', geminiHistory.length);
+        // Add current user message
+        messages.push({ role: 'user', content: message });
 
-        // Inject system prompt into the first message or use systemInstruction if supported (Gemini 1.5)
-        // For broad compatibility, we'll prepend context to the latest message or system instruction.
-        // Let's use systemInstruction if strictly using 1.5, but 'gemini-pro' might vary.
-        // Safest approach for "Chat": Prepend context to the first prompt or a distinct system message.
+        console.log('[DeepTutor] Processed history count:', messages.length - 1);
 
-        const chat = model.startChat({
-            history: [
-                {
-                    role: "user",
-                    parts: [{ text: `SYSTEM INSTRUCTION: ${systemPrompt}` }]
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "Understood. I am ready to act as the Deep Tutor based on the provided context." }]
-                },
-                ...geminiHistory
-            ],
-            generationConfig: {
-                maxOutputTokens: 1000,
-            }
+        const result = await anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages,
         });
 
-        const result = await chat.sendMessage(message);
-        const response = result.response.text();
-
+        const response = result.content[0]?.text || '';
         return response;
 
     } catch (error: unknown) {
         const err = error as { message?: string; status?: number };
         console.error("[DeepTutor] Error:", err);
 
-        // Handle Quota Exceeded (429)
-        if (err.message?.includes('429') || err.status === 429) {
-            return "⚠️ **AI Service Busy (Quota Exceeded)**\n\nThe AI service is currently experiencing high demand or has hit a free tier limit. Please wait a minute and try again.\n\n*(Admin: Check Gemini API Quotas)*";
+        if (err.status === 429) {
+            return "⚠️ **AI Service Busy (Rate Limited)**\n\nThe AI service is currently experiencing high demand. Please wait a minute and try again.";
         }
 
-        // Handle Overloaded (503)
-        if (err.message?.includes('503') || err.status === 503) {
+        if (err.status === 503) {
             return "⚠️ **AI Service Overloaded**\n\nThe AI is temporarily unavailable. Please try again in 30 seconds.";
         }
 

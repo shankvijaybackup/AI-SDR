@@ -3,9 +3,8 @@ import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
-import { createRealtimeSession, sendAudioFromTwilioPayload } from "./realtimeClient.js";
 import { createDeepgramConnection, extractTranscript, MIN_CONFIDENCE_THRESHOLD } from "./deepgramClient.js";
-import { getAiSdrReply } from "./openaiClient.js";
+import { getAiSdrReply } from "./claudeClient.js";
 import { synthesizeTTS } from "./server.js";
 import { getActiveCall, updateCallTranscript } from "./routes/initiate-call.js";
 import { convertMp3ToMulaw, sendAudioToTwilio } from "./audioConverter.js";
@@ -29,20 +28,12 @@ try {
 const sessions = new Map();
 const SPEECH_PAUSE_MS = 800; // Reduced from 1200ms for faster response
 
-function scheduleOpenAiResponse(streamSid) {
+function scheduleClaudeResponse(streamSid) {
   const sessionInfo = sessions.get(streamSid);
-  if (!sessionInfo || !sessionInfo.openaiSession) {
-    return;
-  }
-  if (sessionInfo.commitTimer) {
-    clearTimeout(sessionInfo.commitTimer);
-  }
+  if (!sessionInfo) return;
+  if (sessionInfo.commitTimer) clearTimeout(sessionInfo.commitTimer);
   sessionInfo.commitTimer = setTimeout(() => {
-    try {
-      sessionInfo.openaiSession.commitAndRequestResponse();
-    } catch (err) {
-      console.error("[MediaStream] Failed to commit audio buffer:", err);
-    }
+    sessionInfo.pendingResponse = true;
     sessionInfo.commitTimer = null;
   }, SPEECH_PAUSE_MS);
 }

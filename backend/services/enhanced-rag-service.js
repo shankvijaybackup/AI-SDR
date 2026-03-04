@@ -1,9 +1,5 @@
-import OpenAI from 'openai';
+import { embedQuery } from '../voyageClient.js';
 import { findObjectionResponse, getCompanyInfo, getCustomerStory } from './rag-service.js';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 /**
  * Detect pain points from prospect's response
@@ -254,14 +250,9 @@ async function searchUploadedKnowledge(question, userId) {
  */
 async function generateQuestionEmbedding(question) {
   try {
-    const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: question,
-    });
-    
-    return response.data[0].embedding;
+    return await embedQuery(question);
   } catch (error) {
-    console.error('[Embeddings] Error:', error);
+    console.error('[Embeddings] Voyage error:', error);
     throw error;
   }
 }

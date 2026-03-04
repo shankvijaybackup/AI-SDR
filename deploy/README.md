@@ -1,266 +1,213 @@
-# AWS EC2 Deployment Guide
+# AI-SDR Deployment Scripts
 
-Quick guide for deploying AI-SDR backend to AWS EC2.
-
-## Prerequisites
-
-1. AWS account with free tier eligibility
-2. Upstash account (free Redis)
-3. SSH client
-4. Your Render frontend still running
+Production-ready deployment scripts and configurations for AWS EC2.
 
 ## Quick Start
 
-### 1. Set Up Upstash Redis (5 min)
-1. Go to https://upstash.com and sign up
-2. Create new Redis database
-3. Choose region: `us-west-2` (closest to AWS Oregon)
-4. Copy the connection URL (format: `rediss://default:password@host:port`)
-5. Save for later
+### First Time Setup (Fresh EC2 Instance)
 
-### 2. Launch EC2 Instance (10 min)
-1. AWS Console → EC2 → Launch Instance
-2. **Settings**:
-   - Name: `ai-sdr-backend`
-   - AMI: Ubuntu Server 24.04 LTS
-   - Instance type: `t2.micro` (Free tier)
-   - Create new key pair → Download `.pem` file
-3. **Security Group** - Inbound rules:
-   - SSH (22): Your IP only
-   - HTTP (80): 0.0.0.0/0
-   - HTTPS (443): 0.0.0.0/0
-   - Custom TCP (4000): 0.0.0.0/0
-4. Launch and note the public IP
-
-### 3. Connect to EC2
 ```bash
-# Make key file secure
-chmod 400 your-key.pem
-
-# Connect
-ssh -i your-key.pem ubuntu@<EC2_PUBLIC_IP>
+# On your EC2 instance
+sudo ./setup-server.sh
 ```
 
-### 4. Run Setup Script
+### Regular Deployment (Local Machine)
+
 ```bash
-# Download and run setup
-wget https://raw.githubusercontent.com/shankvijaybackup/AI-SDR/main/deploy/ec2-setup.sh
-chmod +x ec2-setup.sh
-./ec2-setup.sh
+# From project root
+./deploy_full.sh
 ```
 
-**Or clone and run locally**:
+## Files Overview
+
+### Scripts
+
+| Script | Purpose | Run From |
+|--------|---------|----------|
+| `setup-server.sh` | Initial server setup (Node.js, PM2, Nginx) | EC2 (once) |
+| `setup-ssl.sh` | SSL certificate setup with Let's Encrypt | EC2 (once) |
+| `setup-monitoring.sh` | CloudWatch monitoring setup | EC2 (optional) |
+| `../deploy_full.sh` | Full stack deployment | Local |
+| `rollback.sh` | Rollback to previous version | Local or EC2 |
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `nginx_full.conf` | Production Nginx configuration with SSL |
+| `config/pm2/production.json` | PM2 process manager configuration |
+
+### Documentation
+
+| File | Purpose |
+|------|---------|
+| `../DEPLOYMENT.md` | Complete deployment guide |
+| `PRE_DEPLOYMENT_CHECKLIST.md` | Pre-deployment checklist |
+| `QUICK_REFERENCE.md` | Quick command reference |
+
+## Deployment Workflow
+
+### Initial Setup (One Time)
+
+1. **Setup Server**
+   ```bash
+   sudo ./setup-server.sh
+   ```
+   Installs: Node.js, PM2, Nginx, Git, system packages
+
+2. **Configure Environment**
+   ```bash
+   cp ../backend/.env.production.template ../backend/.env
+   cp ../app/.env.production.template ../app/.env.production
+   nano ../backend/.env  # Fill in values
+   nano ../app/.env.production  # Fill in values
+   ```
+
+3. **Deploy Application**
+   ```bash
+   cd .. && ./deploy_full.sh
+   ```
+
+4. **Setup SSL**
+   ```bash
+   sudo ./setup-ssl.sh
+   ```
+
+5. **Setup Monitoring** (Optional)
+   ```bash
+   sudo ./setup-monitoring.sh
+   ```
+
+### Regular Updates
+
 ```bash
-git clone https://github.com/shankvijaybackup/AI-SDR.git
-cd AI-SDR/deploy
-bash ec2-setup.sh
+# From local machine
+./deploy_full.sh
 ```
 
-### 5. Configure Environment
-```bash
-# Copy template
-cp ~/AI-SDR/deploy/env.template ~/AI-SDR/backend/.env
+This will:
+- Package and upload code
+- Install dependencies
+- Run database migrations
+- Build frontend
+- Restart services
+- Run health checks
+- Create backup
 
-# Edit with your values
-nano ~/AI-SDR/backend/.env
+### Rollback
+
+If deployment fails:
+```bash
+./deploy/rollback.sh
 ```
 
-**Required values**:
-- `PUBLIC_BASE_URL`: Your EC2 IP (http://YOUR_EC2_IP)
-- `DATABASE_URL`: From Neon dashboard
-- `REDIS_URL`: From Upstash (step 1)
-- `TWILIO_*`: From Twilio console
-- `OPENAI_API_KEY`: From OpenAI
-- `ELEVEN_*`: From ElevenLabs
-- `ENCRYPTION_KEY`: Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+## Environment Variables
 
-### 6. Set Up Nginx
+### Required Backend Variables
+
 ```bash
-# Edit nginx config with your EC2 IP
-nano ~/AI-SDR/deploy/nginx-config.conf
-# Replace YOUR_EC2_PUBLIC_IP with actual IP
+# Server
+PUBLIC_BASE_URL=https://yourdomain.com
+FRONTEND_ORIGIN=https://yourdomain.com
+NODE_ENV=production
 
-# Run setup script
-bash ~/AI-SDR/deploy/setup-nginx.sh
+# Database
+DATABASE_URL=postgresql://...
+
+# Redis
+REDIS_URL=rediss://...
+
+# Twilio
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=...
+
+# OpenAI
+OPENAI_API_KEY=...
+
+# ElevenLabs
+ELEVEN_API_KEY=...
+
+# Security
+ENCRYPTION_KEY=...  # Generate new 64-char hex
+SENTRY_DSN=...
 ```
 
-### 7. Start Backend
+### Required Frontend Variables
+
 ```bash
-bash ~/AI-SDR/deploy/start-backend.sh
+# API
+NEXT_PUBLIC_API_URL=https://yourdomain.com
+BACKEND_API_URL=http://localhost:4000
+
+# Database
+DATABASE_URL=postgresql://...
+
+# Auth
+JWT_SECRET=...  # Generate new 64-char hex
+NEXTAUTH_SECRET=...
+NEXTAUTH_URL=https://yourdomain.com
 ```
 
-### 8. Verify Deployment
+## Health Checks
+
 ```bash
-# Check logs
-pm2 logs
+# Backend
+curl http://localhost:4000/health
+curl https://yourdomain.com/health
 
-# Test health endpoint
-curl http://<EC2_PUBLIC_IP>/health
+# Frontend
+curl http://localhost:3000
 
-# Should see JSON response with status: ok
+# PM2 Status
+pm2 list
+
+# Nginx Status
+sudo systemctl status nginx
 ```
 
-### 9. Update Twilio Webhooks
-1. Twilio Console → Phone Numbers → Your number
-2. Update webhooks:
-   - Voice: `http://<EC2_PUBLIC_IP>/twiml/voice`
-   - Status: `http://<EC2_PUBLIC_IP>/twiml/status`
-3. Save
+## Common Issues
 
-### 10. Update Frontend
-1. Render Dashboard → ai-sdr-app → Environment
-2. Edit `NEXT_PUBLIC_BACKEND_URL`
-3. Set to: `http://<EC2_PUBLIC_IP>`
-4. Redeploy
-
-## Useful Commands
-
-### PM2 (Process Manager)
+### Deployment Fails
 ```bash
-pm2 status              # Check app status
-pm2 logs                # View logs
-pm2 restart all         # Restart app
-pm2 stop all           # Stop app
-pm2 monit              # Monitor resources
+pm2 logs --lines 100
+./deploy/rollback.sh
 ```
 
-### Nginx
+### SSL Issues
 ```bash
-sudo systemctl status nginx     # Check status
-sudo systemctl restart nginx    # Restart
-sudo nginx -t                   # Test config
-sudo nano /etc/nginx/sites-available/ai-sdr-backend  # Edit config
+sudo certbot certificates
+sudo certbot renew --force-renewal
+sudo systemctl reload nginx
 ```
 
-### Deployments (Future Updates)
+### Service Won't Start
 ```bash
-# SSH into EC2
-ssh -i your-key.pem ubuntu@<EC2_PUBLIC_IP>
-
-# Pull latest code
-cd ~/AI-SDR/backend
-git pull origin main
-npm install
-
-# Restart
-pm2 restart ai-sdr-backend
-pm2 logs
-```
-
-### Monitoring
-```bash
-# System resources
-htop
-
-# Disk space
-df -h
-
-# Memory
-free -h
-
-# Application logs
-pm2 logs ai-sdr-backend --lines 100
-```
-
-## Troubleshooting
-
-### Backend won't start
-```bash
-# Check logs
+pm2 list
 pm2 logs ai-sdr-backend --lines 50
-
-# Try manual start to see errors
-cd ~/AI-SDR/backend
-node server.js
+pm2 restart all
 ```
-
-### Can't connect from browser
-- Check security group allows port 80 from 0.0.0.0/0
-- Check Nginx is running: `sudo systemctl status nginx`
-- Check backend is running: `pm2 status`
-- Test locally: `curl http://localhost:4000/health`
-
-### Redis connection failed
-- Check REDIS_URL in .env is correct
-- Test Redis: `redis-cli -u $REDIS_URL ping`
-- Check Upstash dashboard for connection string
-
-### Out of memory
-```bash
-# Add swap space
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-```
-
-## Security (Recommended)
-
-### Set up firewall
-```bash
-sudo ufw allow 22
-sudo ufw allow 80
-sudo ufw allow 443
-sudo ufw enable
-```
-
-### Install fail2ban
-```bash
-sudo apt install fail2ban
-```
-
-### Enable auto-updates
-```bash
-sudo apt install unattended-upgrades
-sudo dpkg-reconfigure -plow unattended-upgrades
-```
-
-## SSL Certificate (Optional - Requires Domain)
-
-If you have a domain pointed to your EC2 IP:
-
-```bash
-# Install Certbot
-sudo apt install -y certbot python3-certbot-nginx
-
-# Get certificate
-sudo certbot --nginx -d yourdomain.com
-
-# Auto-renewal is configured automatically
-```
-
-Then update:
-- `PUBLIC_BASE_URL` in .env to `https://yourdomain.com`
-- Twilio webhooks to use `https://`
-- Frontend `NEXT_PUBLIC_BACKEND_URL` to `https://yourdomain.com`
 
 ## Cost Estimate
 
-**Free Tier (12 months)**:
-- EC2 t2.micro: 750 hours/month = Free
-- Data transfer: 15GB/month = Free
-- Upstash Redis: 10K commands/day = Free
-- **Total: $0/month**
+**AWS Costs** (~$40/month):
+- EC2 t3.medium: $30/month
+- Data transfer: ~$5/month
+- CloudWatch: ~$5/month
 
-**After 12 Months**:
-- EC2 t2.micro: ~$8.50/month
-- Data transfer: ~$1-5/month
-- **Total: ~$10-15/month**
+**External Services** ($50-200/month):
+- Neon PostgreSQL: $0-20/month
+- Upstash Redis: $0/month (free tier)
+- Twilio, OpenAI, ElevenLabs: Pay per use
+
+**Total**: ~$100-150/month
 
 ## Support
 
-If you run into issues:
-1. Check logs: `pm2 logs`
-2. Check system resources: `htop`
-3. Check backend manually: `cd ~/AI-SDR/backend && node server.js`
-4. Review full deployment plan: `~/AI-SDR/deploy/../.claude/plans/buzzing-juggling-rainbow.md`
+- **Full Documentation**: See [../DEPLOYMENT.md](../DEPLOYMENT.md)
+- **Quick Reference**: See [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- **Checklist**: See [PRE_DEPLOYMENT_CHECKLIST.md](PRE_DEPLOYMENT_CHECKLIST.md)
 
-## Next Steps
+---
 
-After successful deployment:
-1. Test voice calls thoroughly
-2. Monitor for 24 hours
-3. Set up CloudWatch alarms (optional)
-4. Stop Render backend service
-5. Set up automated backups
+Ready to deploy? Start with [DEPLOYMENT.md](../DEPLOYMENT.md)
