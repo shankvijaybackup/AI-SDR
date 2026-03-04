@@ -30,8 +30,8 @@ export async function healthCheck(req, res) {
             console.error('[Health] Database check failed:', err.message);
         }
 
-        // Determine overall health
-        const healthy = checks.redis && checks.database && checks.twilio && checks.anthropic;
+        // Determine overall health — Redis is optional (used for caching, not required)
+        const healthy = checks.database && checks.twilio && checks.anthropic;
         const status = healthy ? 'healthy' : 'degraded';
         const httpStatus = healthy ? 200 : 503;
 
@@ -55,18 +55,23 @@ export async function healthCheck(req, res) {
  */
 export async function readinessCheck(req, res) {
     try {
-        // Check if Redis is available (required for distributed state)
-        const redisReady = await isRedisAvailable();
+        // Redis is optional (caching only) — only require database to be ready
+        let dbReady = false;
+        try {
+            await prisma.$queryRaw`SELECT 1`;
+            dbReady = true;
+        } catch {}
 
-        if (!redisReady) {
+        if (!dbReady) {
             return res.status(503).json({
                 ready: false,
-                reason: 'Redis not available'
+                reason: 'Database not available'
             });
         }
 
         res.json({
             ready: true,
+            redis: await isRedisAvailable(),
             timestamp: new Date().toISOString()
         });
     } catch (err) {
