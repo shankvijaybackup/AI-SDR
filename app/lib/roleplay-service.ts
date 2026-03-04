@@ -70,7 +70,8 @@ INSTRUCTIONS:
             messages,
         });
 
-        const responseText = result.content[0]?.text || '';
+        const textBlock = result.content.find((b) => b.type === 'text')
+        const responseText = (textBlock as { type: 'text'; text: string } | undefined)?.text || '';
 
         // 5. Update DB
         const updatedTranscript = [
@@ -127,7 +128,8 @@ ${transcriptText}`;
         messages: [{ role: 'user', content: scorePrompt }],
     });
 
-    const responseText = result.content[0]?.text || '';
+    const textBlock2 = result.content.find((b) => b.type === 'text')
+    const responseText = (textBlock2 as { type: 'text'; text: string } | undefined)?.text || '';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { score: 50, feedback: "Could not parse feedback." };
 

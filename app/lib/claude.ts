@@ -43,7 +43,8 @@ export async function generateContent(
     messages: [{ role: 'user', content: prompt }],
   })
 
-  return response.content[0]?.text || ''
+  const block = response.content.find((b) => b.type === 'text')
+  return (block as { type: 'text'; text: string } | undefined)?.text || ''
 }
 
 /**

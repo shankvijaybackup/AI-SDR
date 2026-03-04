@@ -56,7 +56,7 @@ ${source.content.substring(0, 15000)}`
         const mindMap = await prisma.mindMap.create({
             data: {
                 sourceId,
-                data: data
+                data: data as any
             }
         })
 
@@ -213,7 +213,7 @@ ${combinedContent}`
             data: {
                 userId,
                 sourceId: null,
-                data: data
+                data: data as any
             }
         })
 

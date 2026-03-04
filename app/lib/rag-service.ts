@@ -98,7 +98,8 @@ Your answer here with citations [1]. More info [2].
             messages,
         });
 
-        const response = result.content[0]?.text || '';
+        const textBlock = result.content.find((b) => b.type === 'text')
+        const response = (textBlock as { type: 'text'; text: string } | undefined)?.text || '';
         return response;
 
     } catch (error: unknown) {
