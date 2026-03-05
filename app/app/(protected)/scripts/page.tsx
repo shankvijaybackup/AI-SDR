@@ -100,10 +100,8 @@ export default function ScriptsPage() {
   }
 
   const handleGenerateScript = async () => {
-    if (selectedSources.length === 0) {
-      alert('Please select at least one knowledge source')
-      return
-    }
+    // Knowledge sources are now optional — brand context is always injected
+    // (proceed even with empty selection)
 
     setGenerating(true)
     try {
@@ -291,9 +289,14 @@ export default function ScriptsPage() {
                     Select Knowledge Sources ({selectedSources.length} selected)
                   </Label>
                   {knowledgeSources.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center border rounded-lg">
-                      No knowledge sources found. Add content to your Knowledge Base first.
-                    </p>
+                    <div className="py-4 px-4 text-center border rounded-lg bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                      <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">✓ Standard Atomicwork brand context will be used</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Upload product docs, case studies, or battle cards to the{' '}
+                        <a href="/knowledge" className="underline text-blue-600 dark:text-blue-400" target="_blank">Knowledge Base</a>{' '}
+                        to enrich scripts further.
+                      </p>
+                    </div>
                   ) : (
                     <div className="max-h-60 overflow-y-auto border rounded-lg divide-y dark:border-slate-700 dark:divide-slate-700">
                       {knowledgeSources.map(source => (
@@ -329,7 +332,7 @@ export default function ScriptsPage() {
                   <Button variant="ghost" onClick={() => setShowAIGenerate(false)}>Cancel</Button>
                   <Button
                     onClick={handleGenerateScript}
-                    disabled={generating || selectedSources.length === 0}
+                    disabled={generating}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
                     {generating ? (

@@ -71,49 +71,47 @@ export async function POST(request: NextRequest) {
 
         const { knowledgeSourceIds, scriptType, targetPersona } = await request.json()
 
-        if (!knowledgeSourceIds || knowledgeSourceIds.length === 0) {
-            return NextResponse.json({ error: 'Please select at least one knowledge source' }, { status: 400 })
+        // Knowledge sources are OPTIONAL — brand context is always injected.
+        // If sources are provided, fetch them for additional product-specific detail.
+        let knowledgeSources: any[] = []
+        if (knowledgeSourceIds && knowledgeSourceIds.length > 0) {
+            knowledgeSources = await prisma.knowledgeSource.findMany({
+                where: {
+                    id: { in: knowledgeSourceIds },
+                    OR: [
+                        { userId: currentUser.userId },
+                        { createdBy: currentUser.userId },
+                        { isShared: true },
+                    ],
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    summary: true,
+                    content: true,
+                    chunks: true,
+                },
+            })
         }
 
-        // Fetch the selected knowledge sources
-        const knowledgeSources = await prisma.knowledgeSource.findMany({
-            where: {
-                id: { in: knowledgeSourceIds },
-                OR: [
-                    { userId: currentUser.userId },
-                    { createdBy: currentUser.userId },
-                    { isShared: true },
-                ],
-            },
-            select: {
-                id: true,
-                title: true,
-                description: true,
-                summary: true,
-                content: true,
-                chunks: true,
-            },
-        })
+        // Compile knowledge content (empty string if no sources — brand context covers baseline)
+        const knowledgeContent = knowledgeSources.length > 0
+            ? knowledgeSources.map((source) => {
+                let content = `## ${source.title}\n`
+                if (source.description) content += `${source.description}\n`
+                if (source.summary) content += `Summary: ${source.summary}\n`
 
-        if (knowledgeSources.length === 0) {
-            return NextResponse.json({ error: 'No knowledge sources found' }, { status: 404 })
-        }
+                if (source.content) {
+                    content += `\nContent:\n${source.content.slice(0, 8000)}`
+                } else if (source.chunks && Array.isArray(source.chunks)) {
+                    const chunkTexts = (source.chunks as any[]).slice(0, 20).map((c: any) => c.text || c.content || '').join('\n')
+                    content += `\nContent:\n${chunkTexts}`
+                }
 
-        // Compile knowledge content
-        const knowledgeContent = knowledgeSources.map((source) => {
-            let content = `## ${source.title}\n`
-            if (source.description) content += `${source.description}\n`
-            if (source.summary) content += `Summary: ${source.summary}\n`
-
-            if (source.content) {
-                content += `\nContent:\n${source.content.slice(0, 8000)}`
-            } else if (source.chunks && Array.isArray(source.chunks)) {
-                const chunkTexts = (source.chunks as any[]).slice(0, 20).map((c: any) => c.text || c.content || '').join('\n')
-                content += `\nContent:\n${chunkTexts}`
-            }
-
-            return content
-        }).join('\n\n---\n\n')
+                return content
+            }).join('\n\n---\n\n')
+            : '(No additional knowledge sources selected — using standard brand context below)'
 
         // Type-specific structure instructions
         const structureMap: Record<string, string> = {
