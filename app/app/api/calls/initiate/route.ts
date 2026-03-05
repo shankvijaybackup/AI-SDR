@@ -224,7 +224,13 @@ Remember to:
       })
 
       if (!twilioResponse.ok) {
-        throw new Error('Failed to initiate Twilio call')
+        // Pass through the actual backend error so the user can see what went wrong
+        let backendError = 'Failed to initiate Twilio call'
+        try {
+          const errBody = await twilioResponse.json()
+          backendError = errBody.error || errBody.message || backendError
+        } catch {}
+        throw new Error(backendError)
       }
 
       const twilioData = await twilioResponse.json()
@@ -251,8 +257,9 @@ Remember to:
       })
 
       console.error('Twilio call initiation error:', twilioError)
+      const twilioErrorMsg = twilioError instanceof Error ? twilioError.message : 'Failed to initiate call with Twilio'
       return NextResponse.json(
-        { error: 'Failed to initiate call with Twilio' },
+        { error: twilioErrorMsg },
         { status: 500 }
       )
     }
