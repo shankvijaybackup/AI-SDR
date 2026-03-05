@@ -130,7 +130,9 @@ app.use(cors({
 app.use(cookieParser());
 
 // Parse JSON bodies (must come before routes)
-app.use(bodyParser.json());
+// Limit raised to 5mb to handle call payloads that include full linkedinData/persona
+app.use(bodyParser.json({ limit: '5mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '5mb' }));
 
 app.use('/api/integrations', integrationsRouter);
 app.use('/api/accounts', accountsRouter);
