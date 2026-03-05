@@ -64,42 +64,74 @@ export async function POST(request: NextRequest) {
             return content
         }).join('\n\n---\n\n')
 
-        // Determine script type prompt
-        const scriptTypePrompts: Record<string, string> = {
-            'cold_call': 'cold call opening script for prospects who have never heard of the company',
-            'follow_up': 'follow-up call script for prospects who have shown initial interest',
-            'demo': 'demo call script to showcase product features and benefits',
-            'objection': 'objection handling script with responses to common concerns',
-            'closing': 'closing script to convert interested prospects into customers',
+        // Type-specific structure instructions
+        const structureMap: Record<string, string> = {
+            cold_call: `Use the proven 4-part cold call structure:
+1. OPENER — Pattern interrupt + ask permission ("Hi {{firstName}}, I know I'm an interruption. Do you have 27 seconds to tell me if I should hang up?")
+2. HOOK — Problem-first statement specific to their role/industry. Make them nod. Never lead with the product name.
+3. VALUE DRIVERS — Three tight proof points: Speed (resolution time), Cost (TCO/savings), Experience (employee satisfaction). Add one customer reference.
+4. THE ASK — Soft close: "Would you be opposed to a 15-minute call to see how [similar company] solved this?"`,
+            follow_up: `Structure as a warm follow-up:
+1. OPENER — Reference the previous touchpoint specifically
+2. BRIDGE — "Since we last spoke..." tie to a relevant industry event or pain trigger
+3. NEW VALUE — One new proof point or customer story not mentioned before
+4. NEXT STEP — Concrete, time-boxed ask for a meeting or demo`,
+            demo: `Structure as a demo prep script:
+1. AGENDA SET — Confirm goals and success criteria at the start
+2. DISCOVERY RECAP — Reference their stated pain points from the discovery call
+3. TAILORED DEMO FLOW — Map each feature directly to their stated pain
+4. PROOF MOMENT — Drop a comparable customer result at the key demo moment
+5. NEXT STEP — "Based on what you've seen, what would it take to move forward?"`,
+            objection: `Create an objection handling guide with 5 common objections:
+For each: State the objection → Acknowledge it → Reframe → Provide proof → Re-ask
+Cover: (1) We already have an ITSM tool, (2) No budget right now, (3) Send me info, (4) Not the right time, (5) Need to involve [other person]`,
+            closing: `Structure as a closing call script:
+1. OPEN WITH MOMENTUM — Reference all prior positive signals
+2. HANDLE FINAL OBJECTIONS — Pre-empt blockers before they arise
+3. BUILD URGENCY — Tie to a real business event or timeline
+4. PROPOSE NEXT STEP — Specific, low-friction commitment ask`,
         }
 
-        const scriptTypeDesc = scriptTypePrompts[scriptType] || 'general sales call script'
+        const structure = structureMap[scriptType] || 'Use a clear opening, value proposition, and call-to-action.'
 
-        const prompt = `Based on this knowledge about a product/company, create a professional ${scriptTypeDesc}.
+        const prompt = `You are writing a reusable call script TEMPLATE for a B2B sales team. This template will be used across many leads, so include variable placeholders for personalization.
 
-TARGET PERSONA: ${targetPersona || 'B2B decision makers'}
-
-KNOWLEDGE BASE CONTENT:
+PRODUCT/COMPANY KNOWLEDGE:
 ${knowledgeContent.slice(0, 50000)}
 
-REQUIREMENTS:
-- Natural, conversational tone (not robotic)
-- Include placeholders: {{firstName}}, {{lastName}}, {{company}}, {{jobTitle}}, {{repName}}
-- Strong opening hook
-- Key value propositions from the knowledge base
-- Clear call-to-action
-- 200-400 words
-${scriptType === 'objection' ? '- Include 3-5 common objections with responses' : ''}
+TARGET PERSONA: ${targetPersona || 'B2B IT/Operations decision makers'}
 
-Generate ONLY the script content, no commentary.`
+SCRIPT STRUCTURE TO FOLLOW:
+${structure}
 
-        console.log('[Script Gen] Generating with Claude Sonnet...')
+VARIABLE PLACEHOLDERS TO USE (required):
+- {{firstName}} — prospect's first name
+- {{company}} — prospect's company name
+- {{jobTitle}} — prospect's job title
+- {{repName}} — the sales rep's name
+- {{lastName}} — prospect's last name (use sparingly)
+
+TONE & STYLE RULES:
+- Conversational, NOT corporate-speak or robotic
+- Never say "I'm calling to tell you about our solution" or "I wanted to reach out"
+- Pain-first: always lead with the problem they experience, not the product features
+- Specific numbers/outcomes from the knowledge base (e.g. "80% ticket deflection", "10x faster resolution")
+- Include a [Wait for response] or [Listen here] stage direction at key moments
+- Objection handling: use "Feel-Felt-Found" or "Reframe-and-Proof" patterns
+${scriptType === 'objection' ? '- Cover at least 5 distinct objections with full handling script' : '- Keep to 250–400 words'}
+
+Output ONLY the script text. No titles, no commentary, no markdown headers.`
+
+        console.log('[Script Gen] Generating with Claude Sonnet (structured prompt)...')
 
         const generatedScript = await generateContent(prompt, {
             model: 'sonnet',
-            system: 'You are an expert sales script writer. Output only the script content, no explanations or commentary.',
-            maxTokens: 1500,
-            temperature: 0.7,
+            system: `You are a world-class B2B sales script writer specialising in ITSM and enterprise software.
+You write scripts that sound completely human and natural — not like traditional sales pitches.
+Your scripts lead with pain, use social proof from real customers, and end with a low-pressure soft close.
+Output ONLY the script content. No preamble, no explanation, no markdown headers.`,
+            maxTokens: 1800,
+            temperature: 0.65,
         })
 
         if (!generatedScript) {
