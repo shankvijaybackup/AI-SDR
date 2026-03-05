@@ -8,11 +8,13 @@ services:
     region: oregon
     plan: free
     rootDir: app
-    buildCommand: npm install --include=dev && npx prisma generate && npm run build
+    buildCommand: NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max-old-space-size=400' npm install --include=dev && npx prisma generate && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
       # Internal networking: Frontend talks to Backend via private Render URL
       - key: BACKEND_API_URL
         fromService:
