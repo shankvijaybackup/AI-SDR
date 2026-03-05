@@ -1,15 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Standalone output is required for Render container deployments
-  output: 'standalone',
-
-  // Disable production source maps — biggest single build memory saving (~40%)
+  // Disable production source maps — faster builds, smaller bundles
   productionBrowserSourceMaps: false,
 
-  // Webpack memory optimizations for low-RAM build hosts (Render free: 512MB)
+  // Webpack memory optimizations (still useful even on Standard plan)
   webpack: (config, { isServer }) => {
-    // Disable parallel minification workers — prevents peak OOM during terser step
+    // Disable parallel minification workers — reduces peak RAM during terser step
     if (config.optimization?.minimizer) {
       config.optimization.minimizer.forEach((plugin: any) => {
         if (plugin?.options && 'parallel' in plugin.options) {
