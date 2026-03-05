@@ -8,7 +8,7 @@ services:
     region: oregon
     plan: free
     rootDir: app
-    buildCommand: NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max-old-space-size=400' npm install --include=dev && npx prisma generate && npm run build
+    buildCommand: NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max-old-space-size=460' npm install --include=dev && npx prisma generate && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV

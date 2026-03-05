@@ -7,16 +7,16 @@ const nextConfig: NextConfig = {
   // Disable production source maps — biggest single build memory saving (~40%)
   productionBrowserSourceMaps: false,
 
-  // Reduce webpack parallelism to stay inside Render free-tier RAM (512MB)
+  // Webpack memory optimizations for low-RAM build hosts (Render free: 512MB)
   webpack: (config, { isServer }) => {
-    // Cap concurrent workers to prevent OOM on low-RAM build hosts
-    config.parallelism = 1;
-
-    if (!isServer) {
-      // Don't generate source maps in client chunks
-      config.devtool = false;
+    // Disable parallel minification workers — prevents peak OOM during terser step
+    if (config.optimization?.minimizer) {
+      config.optimization.minimizer.forEach((plugin: any) => {
+        if (plugin?.options && 'parallel' in plugin.options) {
+          plugin.options.parallel = false;
+        }
+      });
     }
-
     return config;
   },
 };
