@@ -3,6 +3,57 @@ import { getCurrentUserFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateContent } from '@/lib/claude'
 
+// ─── Standard Atomicwork Brand Context ────────────────────────────────────────
+// These credibility points should be woven SUBTLY into every generated script.
+// Don't recite them as a list — use 1-2 naturally in the opener or value section.
+const ATOMICWORK_BRAND_CONTEXT = `
+ATOMICWORK — STANDARD CREDIBILITY TALKING POINTS
+(Weave these in naturally — never recite as a list. Use 1-2 max per script section.)
+
+WHAT WE DO:
+Atomicwork is an AI-native ITSM and ESM platform — built for the way employees actually work.
+Unlike legacy tools with bolt-on AI, we are AI-native from the ground up.
+We bring IT, HR, and Finance service teams into one unified platform.
+Employees get help where they already are: Microsoft Teams, Slack, Voice, and Vision AI.
+
+KEY DIFFERENTIATOR (use this framing):
+"We're not adding AI to an old system — we built the whole thing around AI.
+That's why companies see 80%+ ticket deflection and 10x faster resolution."
+
+MULTI-MODAL AI:
+We support Voice AI and Vision AI — employees can literally talk to or show their issue to get help.
+Not just chat. Full multi-modal support.
+
+FOUNDING TEAM CREDIBILITY (use briefly — one line, builds trust fast):
+- Vijay Rayapati (CEO): Ex-Nutanix GM
+- Kiran Darisi (CTO) & Parsuram Vijayasankar (Chief Designer): Co-founders of Freshworks ($13B IPO)
+One-liner: "We're built by the team that built Freshworks and scaled Nutanix."
+
+FUNDING & VALIDATION (use to establish credibility, not to brag):
+- $40M raised — $25M Series A led by Khosla Ventures (Jan 2025)
+- $3M from 40+ global CIOs and CTOs — the buyers themselves bet on us
+One-liner: "We're backed by Khosla Ventures and over 40 global CIOs who use and invest in us."
+
+CUSTOMER PROOF (use the most relevant one for the prospect's industry):
+- Financial Services: Pepper Money (ANZ, 2,038 users), Zuora (USA, 1,842 users)
+- Government / Public Sector: icare NSW (ANZ, 5,000 users), SIA
+- Life Sciences / Pharma: Structure Therapeutics (USA), Abzena (UK)
+- Technology / SaaS: Skydio, Blackline Group, HighRadius (4,090 users), High Level (3,202 users)
+- Healthcare: AVMC (USA, 7,487 users)
+- Media / Ad Tech: oOh!media (ANZ, 800 users)
+One-liner: "Companies like Pepper Money, Zuora, Skydio, and Blackline are already running on Atomicwork."
+
+CALL BEHAVIOR RULES (critical — always enforce these in scripts):
+1. LISTEN FIRST — Ask one good question, then STOP and listen. Don't steamroll.
+   Include [Wait — let them respond] or [Listen fully before continuing] at key moments.
+2. BE POLITE AND CONSULTATIVE — This is a conversation, not a pitch. Match their energy.
+3. IF THEY SAY NO — Do NOT push. Gracefully exit with:
+   "Completely understand. Can I send you a quick email with a one-pager so you have it
+   when the timing's right? No pressure at all." Then end the call warmly.
+4. NEVER oversell or overpitch — If they're not interested, respect that immediately.
+5. ONE ASK PER CALL — Only ask for ONE thing (meeting OR email). Not both.
+`
+
 export async function POST(request: NextRequest) {
     try {
         const currentUser = getCurrentUserFromRequest(request)
@@ -96,8 +147,11 @@ Cover: (1) We already have an ITSM tool, (2) No budget right now, (3) Send me in
 
         const prompt = `You are writing a reusable call script TEMPLATE for a B2B sales team. This template will be used across many leads, so include variable placeholders for personalization.
 
-PRODUCT/COMPANY KNOWLEDGE:
-${knowledgeContent.slice(0, 50000)}
+PRODUCT/COMPANY KNOWLEDGE (from knowledge base):
+${knowledgeContent.slice(0, 40000)}
+
+STANDARD COMPANY CREDIBILITY & CALL BEHAVIOR:
+${ATOMICWORK_BRAND_CONTEXT}
 
 TARGET PERSONA: ${targetPersona || 'B2B IT/Operations decision makers'}
 
@@ -115,10 +169,12 @@ TONE & STYLE RULES:
 - Conversational, NOT corporate-speak or robotic
 - Never say "I'm calling to tell you about our solution" or "I wanted to reach out"
 - Pain-first: always lead with the problem they experience, not the product features
-- Specific numbers/outcomes from the knowledge base (e.g. "80% ticket deflection", "10x faster resolution")
-- Include a [Wait for response] or [Listen here] stage direction at key moments
+- Use specific outcomes: "80% ticket deflection", "10x faster resolution", "50%+ ticket deflection"
+- Include [Wait — let them respond] or [Listen before continuing] stage directions at key moments
 - Objection handling: use "Feel-Felt-Found" or "Reframe-and-Proof" patterns
-${scriptType === 'objection' ? '- Cover at least 5 distinct objections with full handling script' : '- Keep to 250–400 words'}
+- If prospect declines: script must have a graceful exit — offer to send an email, thank them, close warmly
+- Do NOT oversell. ONE ask per call maximum.
+${scriptType === 'objection' ? '- Cover at least 5 distinct objections with full handling script' : '- Keep to 300–450 words'}
 
 Output ONLY the script text. No titles, no commentary, no markdown headers.`
 

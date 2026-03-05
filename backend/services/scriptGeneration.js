@@ -82,30 +82,33 @@ async function buildScriptContext(lead, persona, companyContext) {
             roleAndFocus: getValue(persona.executiveSnapshot?.roleAndFocus)
         },
 
-        // Atomicwork product context
+        // Atomicwork product context — keep updated with latest positioning
         product: {
             name: 'Atomicwork',
-            category: 'AI-Powered Employee Service Management',
+            category: 'AI-Native ITSM & ESM Platform',
+            positioning: 'Built from the ground up with AI — not bolt-on. We bring IT, HR, and Finance service teams onto one unified platform.',
             valueProps: [
-                'Reduce support tickets by 60% with AI automation',
-                'Deploy in 2 weeks vs 6 months for traditional ITSM',
-                'Modern Slack/Teams interface instead of clunky portals',
-                'AI that learns from your company\'s knowledge base',
-                'No-code workflow automation for HR, IT, and Facilities'
+                'Automate up to 80% of routine employee support requests with AI',
+                '10x faster ticket resolution vs legacy ITSM tools',
+                '50%+ ticket deflection rate — employees self-serve in Teams/Slack',
+                'Multi-modal support: Voice AI, Vision AI, Chat — employees get help how they want',
+                'Deploy in weeks, not months — no rip-and-replace required'
             ],
             differentiators: [
-                'Only ITSM with true conversational AI (not chatbots)',
-                'Built for distributed/remote teams from day one',
-                'Integrates with Slack, Teams, Google Chat natively',
-                'ROI in 90 days - measurable ticket reduction',
-                'Loved by employees - 9.2/10 satisfaction score'
+                'AI-native from day one — not a chatbot bolted onto a legacy system',
+                'Universal Agent: IT, HR, Finance all unified — one platform, one experience',
+                'Employees get help in Microsoft Teams, Slack, Voice, and Vision AI — where they already work',
+                'Works alongside existing tools (ServiceNow, Jira) — not a replacement',
+                'Backed by Khosla Ventures and 40+ global CIOs who use and invest in us'
             ],
+            foundingTeam: 'Built by the team that built Freshworks ($13B IPO) — Kiran Darisi (CTO) and Parsuram Vijayasankar (Chief Designer) are Freshworks co-founders. CEO Vijay Rayapati ran the GM division at Nutanix.',
+            funding: '$40M raised — $25M Series A led by Khosla Ventures (Jan 2025). $3M from 40+ global CIOs.',
+            customers: 'Pepper Money, Zuora, Structure Therapeutics, Skydio, Blackline Group, HighRadius, oOh!media, icare NSW, AVMC.',
             idealFor: [
-                'Companies with 200-10,000 employees',
-                'Distributed/remote teams',
-                'High support ticket volumes (HR, IT, Facilities)',
-                'Teams tired of ServiceNow/Jira complexity',
-                'Organizations prioritizing employee experience'
+                'Enterprises with distributed / remote service teams',
+                'Companies running legacy ITSM (ServiceNow, Jira, Freshservice) with low adoption',
+                'IT, HR, or Finance leaders tired of portal-first, ticket-heavy processes',
+                'Organisations prioritising employee experience and AI-first operations'
             ]
         },
 
@@ -122,31 +125,48 @@ async function buildScriptContext(lead, persona, companyContext) {
 async function generateScriptWithClaude(context) {
     const systemPrompt = `You are an expert ITSM cold call script writer following the proven "ITSM Playbook" structure.
 
-Your scripts MUST follow this exact 4-part structure:
+ATOMICWORK BRAND CREDIBILITY (weave 1-2 of these in naturally — never recite as a list):
+- AI-native ITSM & ESM — built from the ground up with AI, not bolted on
+- Universal Agent: IT, HR, Finance all unified in one platform
+- Multi-modal: Teams, Slack, Voice AI, Vision AI — employees get help where they are
+- Built by the team that built Freshworks (Kiran Darisi + Parsuram Vijayasankar, co-founders)
+- CEO Vijay Rayapati: Ex-Nutanix GM
+- $40M raised — Series A led by Khosla Ventures, backed by 40+ global CIOs
+- Customers: Pepper Money, Zuora, Structure Therapeutics, Skydio, Blackline Group, HighRadius
+
+SCRIPT STRUCTURE — 4-PART ITSM PLAYBOOK:
 
 1. THE OPENER (Pattern Interrupt + Permission)
    - Start with: "Hi [Name], I know I'm an interruption"
    - Get permission: "Do you have 27 seconds to tell me if I should hang up?"
-   - NEVER start with company name or product
+   - NEVER start with company name or product pitch
 
 2. THE HOOK (Problem-First, NOT Product-First)
    - Format: "I'm talking to [ROLE] who are [SPECIFIC PAIN POINT]"
-   - Make them NOD because pain is so specific
+   - Make them NOD because the pain is so specific to their role
    - End with: "Does that sound familiar?"
-   - NEVER mention "ITSM" or "ticketing" - talk about the PAIN
+   - NEVER mention "ITSM" or "ticketing" — talk about the human PAIN
 
 3. THE VALUE DRIVERS (Top 3 in this order)
-   - Speed: "We resolve 40% of tickets in under 10 seconds"
-   - Cost: "Cut costs from $50/ticket down to $5"
-   - Experience: "Give employees help in Slack, not portals"
-   - Add social proof: "One [industry] company like yours [result]"
+   - Speed: outcomes with real numbers ("80% ticket deflection", "10x faster resolution")
+   - Cost: TCO reduction, time saved, agent efficiency
+   - Experience: "employees get help in Slack/Teams, not portals"
+   - Add social proof with a customer name relevant to their industry
 
-4. THE ASK (Soft Close)
-   - Use: "Would you be opposed to seeing how [companies like yours achieved outcome]?"
+4. THE ASK (Soft Close — never hard close)
+   - Use: "Would you be opposed to seeing how [company like theirs] did this?"
    - Offer choice: "2-minute video OR 15-minute call this week?"
-   - NEVER hard close or ask for 30+ minutes
+   - NEVER ask for 30+ minutes on a cold call
 
-Scripts must be conversational, persona-aware, and natural - not robotic reading.`;
+CALL BEHAVIOUR RULES — ENFORCE IN EVERY SCRIPT:
+- LISTEN FIRST: After asking a question, the script must pause with [Wait — listen fully]
+- ONE ask only: meeting OR email, never both
+- If prospect says NO or not interested: "Completely understood. Can I drop you a quick one-pager by email — no pressure at all?" Then close warmly.
+- NEVER oversell or overpitch
+- Be polite and consultative throughout — match the prospect's energy
+- Respectful exit: "Thank you for your time, [Name]. I'll send a brief email with one customer story. Take care."
+
+Scripts must be conversational, persona-aware, and completely natural — not robotic reading.`;
 
     const userPrompt = `Generate a personalized call script for this lead:
 
@@ -177,8 +197,11 @@ Expected Objections:
 ${context.persona.expectedObjections.map((o, i) => `${i + 1}. ${o}`).join('\n')}
 
 PRODUCT CONTEXT:
-Product: ${context.product.name}
-Category: ${context.product.category}
+Product: ${context.product.name} — ${context.product.positioning}
+
+Founding Team: ${context.product.foundingTeam}
+Funding: ${context.product.funding}
+Reference Customers: ${context.product.customers}
 
 Key Value Props:
 ${context.product.valueProps.map((v, i) => `${i + 1}. ${v}`).join('\n')}
@@ -187,7 +210,7 @@ Differentiators:
 ${context.product.differentiators.map((d, i) => `${i + 1}. ${d}`).join('\n')}
 
 Ideal For:
-${context.product.idealFor.map((i, idx) => `${idx + 1}. ${i}`).join('\n')}
+${context.product.idealFor.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}
 
 ${context.companyContext ? `COMPANY RESEARCH:\n${JSON.stringify(context.companyContext, null, 2)}` : ''}
 
@@ -259,33 +282,50 @@ Generate a call script in this EXACT JSON structure (ITSM Playbook Format):
     "noBudget": {
       "objection": "We don't have budget",
       "response": "I hear you. Most teams don't have ITSM budget sitting around. But if you're spending $200K/year on Tier 1 support, and we can cut that by half, the ROI case becomes pretty clear. Want to see the numbers?"
+    },
+    "notInterested": {
+      "objection": "Not interested / We're good",
+      "response": "Completely understood. Thank you for being upfront. Can I drop you a quick one-pager by email — one page, no pressure, just so you have it if anything changes? Then I'll stay out of your inbox."
     }
+  },
+  "gracefulExit": {
+    "ifTheyDecline": "Completely understood, [Name]. Thank you for your time. I'll send a brief email — one customer story relevant to ${context.lead.company || 'your industry'} and the core idea. Nothing spammy. Take care.",
+    "emailOffer": "Can I drop you a quick one-pager? No pressure at all — just so you have it when the timing's right.",
+    "warmClose": "Really appreciate you taking the call. Have a great rest of your day."
   },
   "agentToneInstructions": {
     "discProfile": "${context.persona.discProfile}",
-    "toneGuidance": "Adapt tone to DISC profile - see persona insights",
+    "toneGuidance": "Adapt tone to DISC profile — see persona insights. Be polite and consultative throughout.",
     "communicationStyle": "${context.persona.communicationStyle}",
     "keyPrinciples": [
-      "Sound human and conversational, NOT robotic",
-      "Use natural pauses and acknowledge their responses",
-      "Match their energy level",
-      "Don't sound like you're reading a script"
+      "Sound human and conversational — NOT robotic or scripted",
+      "Listen fully after every question — include [Wait — let them respond] pauses",
+      "Match their energy and pace",
+      "ONE ask per call — meeting OR email, never both",
+      "If they say NO: acknowledge gracefully, offer email one-pager, close warmly",
+      "Never oversell or overpitch — respect a no immediately"
     ]
   },
   "agentInstructions": {
-    "tone": "Adapt tone based on DISC profile",
-    "pacing": "Fast/moderate/slow based on communication style",
+    "tone": "Adapt tone based on DISC profile — see agentToneInstructions",
+    "pacing": "Match prospect's pace — fast for D/I profiles, slower and more deliberate for S/C profiles",
     "keyReminders": [
-      "Important things for AI agent to remember during call"
+      "Always pause and listen after asking a question",
+      "Weave in 1-2 credibility points naturally (founding team, Khosla funding, customers) — never recite as a list",
+      "Use specific customer names relevant to their industry",
+      "Lead with pain — never lead with product features"
     ],
     "exitCriteria": [
-      "When to end call (positive or negative)"
+      "POSITIVE: They agree to a call or video — confirm details warmly",
+      "NEGATIVE: They decline — offer email one-pager, thank them, close warmly",
+      "HARD NO: Acknowledge immediately, no pushback, graceful exit"
     ]
   }
 }
 
-Make it highly specific to ${context.lead.fullName}'s persona, role, and likely challenges.
-Be conversational and natural - this is for an AI voice agent, not a human reading a script.`;
+Make it highly specific to ${context.lead.fullName}'s persona, role, and industry.
+Use the founding team, funding, and customer references naturally — not as a list.
+Be conversational and natural — this is for an AI voice agent, not a human reading a script.`;
 
     const message = await anthropic.messages.create({
         model: "claude-sonnet-4-6",

@@ -90,6 +90,12 @@ function renderPersonalizedScript(raw: string): Array<{ emoji: string; label: st
             sections.push({ emoji: '🛡️', label: 'Objections', text: lines.join('\n\n') })
         }
 
+        if (s.gracefulExit) {
+            const ge = s.gracefulExit
+            const exitLines = [ge.ifTheyDecline, ge.emailOffer, ge.warmClose].filter(Boolean)
+            sections.push({ emoji: '👋', label: 'If They Say No', text: exitLines.join('\n') })
+        }
+
         if (s.agentToneInstructions) {
             const t = s.agentToneInstructions
             sections.push({

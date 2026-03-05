@@ -4,7 +4,7 @@ import prisma from '../lib/prisma.js';
 
 const router = express.Router();
 
-// Example customer references for script generation
+// Customer references — pick the most industry-relevant one per lead
 const CUSTOMER_REFERENCES = {
   financial_services: [
     { name: 'Pepper Money', region: 'ANZ', industry: 'Financial Services', users: 2038 },
@@ -15,35 +15,57 @@ const CUSTOMER_REFERENCES = {
     { name: 'icare NSW', region: 'ANZ', industry: 'Government', users: 5000 },
   ],
   pharma: [
+    { name: 'Structure Therapeutics', region: 'USA', industry: 'Biotechnology', users: 610 },
     { name: 'Abzena', region: 'UK', industry: 'Life Sciences', users: 564 },
-    { name: 'StructureTx', region: 'USA', industry: 'Biotechnology', users: 610 },
   ],
   healthcare: [
     { name: 'AVMC', region: 'USA', industry: 'Healthcare', users: 7487 },
   ],
   media: [
-    { name: 'Mari', region: 'USA', industry: 'Media & Entertainment', users: 488 },
     { name: 'oOh!media', region: 'ANZ', industry: 'Media & Advertising', users: 800 },
+    { name: 'Mari', region: 'USA', industry: 'Media & Entertainment', users: 488 },
   ],
   technology: [
-    { name: 'High Level', region: 'USA', industry: 'Marketing', users: 3202 },
+    { name: 'Skydio', region: 'USA', industry: 'Technology / Autonomous Drones', users: null },
+    { name: 'Blackline Group', region: 'USA', industry: 'Technology / Accounting', users: null },
     { name: 'HighRadius', region: 'USA', industry: 'Technology', users: 4090 },
+    { name: 'High Level', region: 'USA', industry: 'Marketing SaaS', users: 3202 },
+  ],
+  general: [
+    { name: 'Pepper Money', region: 'ANZ', industry: 'Financial Services', users: 2038 },
+    { name: 'Zuora', region: 'USA', industry: 'SaaS', users: 1842 },
+    { name: 'Skydio', region: 'USA', industry: 'Technology', users: null },
+    { name: 'Blackline Group', region: 'USA', industry: 'Technology', users: null },
   ],
 };
 
-// Atomicwork credibility points
+// Atomicwork standard credibility — use 1-2 points subtly per script, never recite as a list
 const ATOMICWORK_CREDIBILITY = `
-Founded by proven leaders:
-- Vijay Rayapati (CEO): Ex-Nutanix GM, led successful exit (Minjar acquired by Nutanix)
-- Kiran Darisi (CTO): Co-founder of Freshworks (IPO: $10B+ valuation)
+WHAT WE ARE:
+Atomicwork is an AI-native ITSM and ESM platform — built from the ground up with AI, not bolted on.
+We bring IT, HR, and Finance service teams onto one unified platform.
+Employees get help where they already are: Microsoft Teams, Slack, Voice, and Vision AI (fully multi-modal).
+
+FOUNDING TEAM (one-liner: "Built by the team behind Freshworks and Nutanix"):
+- Vijay Rayapati (CEO): Ex-Nutanix GM (Minjar acquired by Nutanix)
+- Kiran Darisi (CTO): Co-founder of Freshworks ($13B IPO)
 - Parsuram Vijayasankar (Chief Designer): Co-founder of Freshworks
 
-Funding: $40M total
-- $11M Seed (Sep 2023): Blume Ventures, Z47 (Matrix Partners)
-- $3M Strategic (Sep 2024): 40+ global CIOs/CTOs
+FUNDING & VALIDATION:
+- $40M raised total
 - $25M Series A (Jan 2025): Khosla Ventures (lead), Battery Ventures, Peak XV Partners
+- $3M from 40+ global CIOs/CTOs — the buyers themselves invest in us
+One-liner: "Backed by Khosla Ventures and 40+ global CIOs."
 
-AI-native employee service management platform helping companies transform IT support.
+CUSTOMERS (AI-first organisations):
+Pepper Money, Zuora, Structure Therapeutics, Skydio, Blackline Group, HighRadius, oOh!media, icare NSW.
+
+CALL BEHAVIOUR RULES — ENFORCE IN EVERY SCRIPT:
+1. LISTEN FIRST. Ask a question, then include [Wait — listen fully] before responding.
+2. BE POLITE AND CONSULTATIVE. Match their tone. Never steamroll.
+3. IF THEY SAY NO: "Completely understand. Can I send you a quick one-pager so you have it when the timing's right? No pressure." Then end warmly.
+4. NEVER oversell or overpitch. ONE ask per call.
+5. Respect their time — if they're busy, offer to call back rather than push through.
 `;
 
 /**
@@ -150,8 +172,10 @@ router.post('/:id/script/generate', authenticateToken, async (req, res) => {
       customerRefs = CUSTOMER_REFERENCES.healthcare;
     } else if (industry.includes('media') || industry.includes('advertising') || industry.includes('marketing')) {
       customerRefs = CUSTOMER_REFERENCES.media;
-    } else {
+    } else if (industry.includes('tech') || industry.includes('software') || industry.includes('saas') || industry.includes('drone') || industry.includes('sky')) {
       customerRefs = CUSTOMER_REFERENCES.technology;
+    } else {
+      customerRefs = CUSTOMER_REFERENCES.general;
     }
 
     // Build hyper-personalized script
@@ -169,10 +193,13 @@ router.post('/:id/script/generate', authenticateToken, async (req, res) => {
       },
 
       credibilityBuilding: {
-        introduction: `Quick context on Atomicwork - we're an AI-native employee service management platform.`,
-        founders: `Founded by ex-Nutanix and ex-Freshworks leaders - Vijay Rayapati (CEO), Kiran Darisi and Parsuram Vijayasankar (both Freshworks co-founders).`,
-        funding: `We recently raised $40M including Series A led by Khosla Ventures.`,
-        customerExample: customerRefs.length > 0 ? `Working with companies like ${customerRefs[0].name} in ${customerRefs[0].region}${customerRefs[0].industry ? ` (${customerRefs[0].industry})` : ''} with ${customerRefs[0].users.toLocaleString()}+ users.` : '',
+        introduction: `Quick context on Atomicwork — we're an AI-native ITSM and ESM platform, built from the ground up with AI. Not bolt-on. We bring IT, HR, and Finance service teams onto one platform and meet employees where they already are — Teams, Slack, and now Voice and Vision AI.`,
+        founders: `We're built by the team that built Freshworks — Kiran Darisi and Parsuram Vijayasankar are co-founders here — plus Vijay Rayapati who ran the Nutanix GM division.`,
+        funding: `We raised $40M including a Series A led by Khosla Ventures, and the $3M strategic round came from 40+ global CIOs — the buyers themselves invest in us.`,
+        customerExample: customerRefs.length > 0
+          ? `We're working with AI-first companies like ${customerRefs[0].name}${customerRefs[0].region ? ` (${customerRefs[0].region})` : ''}${customerRefs[0].users ? ` with ${customerRefs[0].users.toLocaleString()}+ users` : ''}.`
+          : `We work with companies like Pepper Money, Zuora, Skydio, and Blackline Group.`,
+        allCustomers: `Pepper Money, Zuora, Structure Therapeutics, Skydio, Blackline Group, HighRadius, oOh!media, and more.`,
       },
 
       discovery: {
@@ -226,33 +253,53 @@ router.post('/:id/script/generate', authenticateToken, async (req, res) => {
         },
         timing: {
           objection: 'Not the right time',
-          response: `Fair enough. When would be a better time to revisit this? I'm happy to set up a brief 15-minute demo when it makes sense for you. In the meantime, can I send you a quick case study from ${customerRefs[0]?.name || 'a similar company'}?`,
+          response: `Completely understand — timing matters. Can I just drop you a quick email with a one-pager so you have it when the moment's right? No pressure at all.`,
+        },
+        notInterested: {
+          objection: 'Not interested / We\'re good',
+          response: `No problem at all, ${lead.firstName}. I appreciate you taking the time. Can I send you a short email — one page, no fluff — just so you have it if anything changes? Happy to stay out of your inbox after that.`,
+        },
+        sendInfo: {
+          objection: 'Just send me some info',
+          response: `Of course. I'll keep it tight — one page with the core idea and a customer story relevant to ${lead.company || 'your industry'}. Is ${lead.email || 'your email'} the best place to send it?`,
         },
       },
 
       closing: {
         directAsk: persona.discProfile === 'D' || persona.discProfile === 'C'
-          ? `${lead.firstName}, based on what we've discussed, I think there's clear value here. Can we schedule a 30-minute demo for next week so you can see this in action?`
-          : `${lead.firstName}, I'd love to show you how this works. Would you be open to a quick demo call next week?`,
+          ? `${lead.firstName}, based on what we've discussed, does a 15-minute demo next week make sense? I'll show you exactly how this works in your context.`
+          : `${lead.firstName}, would you be open to a quick 15-minute call next week? I can walk you through how companies like ${customerRefs[0]?.name || 'similar organisations'} made this work.`,
 
-        alternativeClose: `If a demo isn't the right next step, could I send you a detailed case study and ROI calculator? Then we can reconnect in a few weeks?`,
+        gracefulExit: `No pressure at all. Can I drop you a quick one-pager by email so you have it when the timing works? I'll keep it to a single page — promise.`,
 
-        urgency: `We're currently running a Q1 promotion for new customers, so there's potential cost savings if we can get you started soon.`,
+        ifTheyDecline: `Completely understood. Thank you for your time, ${lead.firstName}. I'll send a brief email — nothing spammy, just the core idea and one customer example. Take care.`,
       },
 
       agentToneInstructions: {
         communicationStyle: persona.communicationStyle || 'Professional, clear, and respectful',
         discProfile: persona.discProfile || 'Not specified',
         toneGuidance: persona.discProfile === 'D'
-          ? 'Be direct, confident, and results-focused. No fluff. Show ROI clearly.'
+          ? 'Be direct, confident, results-focused. No fluff. Lead with outcomes and ROI. Get to the point fast.'
           : persona.discProfile === 'I'
-          ? 'Be enthusiastic, friendly, and relationship-focused. Share stories and build rapport.'
+          ? 'Be warm, enthusiastic, and story-driven. Build rapport first. Share a relatable customer story before the ask.'
           : persona.discProfile === 'S'
-          ? 'Be patient, supportive, and empathetic. Build trust slowly. Emphasize team benefits.'
-          : 'Be precise, data-driven, and logical. Provide details, answer questions thoroughly.',
+          ? 'Be patient, calm, and empathetic. Never rush. Build trust before the ask. Emphasise team stability and low disruption.'
+          : 'Be precise, data-driven, and thorough. Provide specifics. Answer every question fully before moving on.',
+
+        callBehaviourRules: [
+          'LISTEN FIRST — Ask one question, then stop and listen fully. Do not interrupt.',
+          'ONE ask per call — meeting OR email, never both.',
+          'If they say NO or show disinterest — acknowledge gracefully, offer to send a one-pager, thank them, and close warmly.',
+          'Never oversell or overpitch. If they are not interested, respect it immediately.',
+          'Match their energy and pace — if they are brief, be brief. If they want to talk, let them.',
+          'Be polite throughout — even on objections. Never push back aggressively.',
+        ],
 
         motivators: Array.isArray(persona.motivators) ? persona.motivators : [],
         avoidTopics: (persona.internalCoaching && Array.isArray(persona.internalCoaching.pitfallsAvoid)) ? persona.internalCoaching.pitfallsAvoid : [],
+        pitfallsToAvoid: (persona.internalCoaching && Array.isArray(persona.internalCoaching.pitfallsAvoid))
+          ? persona.internalCoaching.pitfallsAvoid
+          : ['Avoid aggressive ROI claims', 'Avoid pressuring for quick decisions', 'Never dismiss existing processes'],
       },
 
       additionalNotes: {
