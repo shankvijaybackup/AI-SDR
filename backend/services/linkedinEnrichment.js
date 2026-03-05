@@ -456,333 +456,205 @@ async function generateStrategicPersona(profileData, lead) {
  * Generate persona using Claude Opus 4.5
  */
 async function generatePersonaWithClaude(profileData, lead) {
-    const systemPrompt = `You are an expert sales psychologist and communication strategist.
-Analyze LinkedIn profiles to create actionable strategic intelligence for sales conversations.
+    const systemPrompt = `You are an expert sales strategist and communication specialist.
+Your role is to analyze professional background data and generate actionable intelligence for sales conversations.
 
-CRITICAL: Base your analysis ONLY on verifiable facts from the profile. Mark inferences clearly.
-
-Your analysis must be:
-1. Practical and actionable for immediate sales use
-2. Based on observable data (job titles, experience, education, content)
-3. Focused on communication strategy and personality insights
-4. Professional and respectful`;
+Write professional, confident, natural language throughout.
+NO labels, tags, or prefixes of any kind (no "[INFERENCE]", no "[FACT]", no asterisks).
+When data is limited, reason intelligently from job title, company context, and industry norms — this is expected and valuable.
+Produce clean JSON with plain string values. Be specific, concrete, and immediately useful to a sales rep.`;
 
     const userPrompt = buildEnrichmentPrompt(profileData, lead);
 
     const message = await anthropic.messages.create({
         model: "claude-opus-4-5-20251101",
         max_tokens: 4000,
-        temperature: 0.7,
-        messages: [{ role: "user", content: systemPrompt + "\n\n" + userPrompt }]
+        temperature: 0.6,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }]
     });
 
     const content = message.content[0].text;
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     const result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
 
+    // Attach generation metadata
+    result.metadata = {
+        approach: "claude-only",
+        models: ["claude-opus-4-5"],
+        timestamp: new Date().toISOString()
+    };
+
     return result;
 }
 
 /**
- * Build enrichment prompt for both models
+ * Build enrichment prompt for Claude persona generation
  */
 function buildEnrichmentPrompt(profileData, lead) {
-    return `Analyze this LinkedIn profile and generate strategic sales intelligence:
+    const name = profileData.name || `${lead.firstName} ${lead.lastName}`;
+    const role = lead.jobTitle || profileData.headline || 'Executive';
+    const company = lead.company || 'their company';
+    const location = profileData.location || '';
+    const about = profileData.about || '';
 
-NAME: ${profileData.name}
-HEADLINE: ${profileData.headline}
-CURRENT ROLE: ${lead.jobTitle || profileData.headline}
-COMPANY: ${lead.company}
-LOCATION: ${profileData.location}
+    const experienceBlock = profileData.experience && profileData.experience.length > 0
+        ? profileData.experience.map(exp => `- ${exp.title} at ${exp.company}${exp.duration ? ` (${exp.duration})` : ''}`).join('\n')
+        : `- Current: ${role} at ${company}`;
 
-EXPERIENCE:
-${profileData.experience.map(exp => `- ${exp.title} at ${exp.company} (${exp.duration})`).join('\n')}
+    const educationBlock = profileData.education && profileData.education.length > 0
+        ? profileData.education.map(edu => `- ${edu.degree} from ${edu.school}`).join('\n')
+        : 'Not available';
+
+    const skillsBlock = profileData.skills && profileData.skills.length > 0
+        ? profileData.skills.join(', ')
+        : 'Not listed';
+
+    return `Generate strategic sales intelligence for this professional:
+
+NAME: ${name}
+CURRENT ROLE: ${role}
+COMPANY: ${company}
+${location ? `LOCATION: ${location}` : ''}
+
+CAREER HISTORY:
+${experienceBlock}
 
 EDUCATION:
-${profileData.education.map(edu => `- ${edu.degree} from ${edu.school}`).join('\n')}
+${educationBlock}
 
-SKILLS: ${profileData.skills.join(', ')}
+SKILLS: ${skillsBlock}
 
-ABOUT:
-${profileData.about || 'Not provided'}
+${about ? `ABOUT / BIO:\n${about}` : ''}
 
-Generate a comprehensive strategic brief in this EXACT JSON structure:
+Produce a strategic brief in this EXACT JSON structure (all values must be plain strings or string arrays — no labels, no prefixes):
 
 {
-  "discProfile": "D/I/S/C (choose primary)",
-  "discDescription": "1 sentence description of personality type",
-  "communicationStyle": "1 sentence: how they prefer to communicate",
+  "discProfile": "D, I, S, or C",
+  "discDescription": "One sentence describing their personality style and how they operate",
+  "communicationStyle": "One sentence describing how they prefer to communicate and be approached",
   "executiveSnapshot": {
-    "roleAndFocus": "What their role focuses on day-to-day",
-    "coreStrengths": ["Strength 1", "Strength 2", "Strength 3"],
-    "personaRead": "1 sentence personality assessment"
+    "roleAndFocus": "What this person focuses on day-to-day based on their role and background",
+    "coreStrengths": ["Specific strength 1", "Specific strength 2", "Specific strength 3"],
+    "personaRead": "One sentence personality assessment — what makes them tick as a buyer"
   },
   "strategicPrep": {
-    "connectionAngle": "Best way to open the conversation",
-    "commonGround": "Potential connection points or shared interests",
+    "connectionAngle": "Specific, natural way to open the first conversation with this person",
+    "commonGround": "Genuine connection points based on their background",
     "smartQuestions": [
-      "Question 1 about their role/company",
-      "Question 2 about their goals",
-      "Question 3 about their challenges"
+      "Specific question tailored to their role at ${company}",
+      "Question about their strategic priorities",
+      "Question to uncover pain or opportunity"
     ]
   },
   "internalCoaching": {
     "howToWin": [
-      "Do this",
-      "Say this",
-      "Focus on this"
+      "Concrete action to take",
+      "What to say or emphasize",
+      "How to frame the value prop for them"
     ],
     "pitfallsAvoid": [
-      "Don't do this",
-      "Avoid this",
-      "Never say this"
+      "Specific thing to avoid with this person",
+      "Tone or approach that won't land",
+      "Topic or assumption to steer clear of"
     ]
   },
   "likelyPainPoints": [
-    "Pain point 1 based on their role",
-    "Pain point 2 based on their industry",
-    "Pain point 3 based on their experience"
+    "Specific pain relevant to their role",
+    "Challenge common to their industry or company stage",
+    "Operational friction they likely face"
   ],
-  "motivators": ["What drives them professionally"],
+  "motivators": [
+    "What drives them professionally",
+    "What success looks like in their role",
+    "What they care about beyond their title"
+  ],
   "talkingPoints": [
-    "Point 1 relevant to their background",
-    "Point 2 relevant to their company",
-    "Point 3 relevant to their role"
+    "Opening hook tied to their background",
+    "Value angle relevant to their company",
+    "Proof point or analogy that resonates with their world"
   ]
 }
 
-Base your analysis ONLY on the provided data. Be specific and actionable.
-
-Include a "factualClaims" array listing only verifiable facts from the profile.`;
+Be specific, confident, and immediately useful to a sales rep preparing for a cold call.`;
 }
 
-/**
- * Synthesize (now single-model, kept for backward compat)
- * @deprecated — use generatePersonaWithClaude directly
- */
-function synthesizePersonas(claudePersona, _unused, profileData) {
-    console.log('[LinkedIn] Finalising persona...');
-
-    const validation = { factualAccuracy: 'high', confidence: 'high', flaggedClaims: [] };
-
-    const synthesized = {
-        metadata: {
-            approach: "claude-only",
-            models: ["claude-opus-4-6"],
-            timestamp: new Date().toISOString(),
-            validationScore: {
-                claudeVerified: validation.claudeValid,
-                openaiVerified: validation.openaiValid,
-                consensusRate: validation.consensusRate
-            }
-        },
-        discProfile: selectBest('discProfile', claudePersona, openaiPersona),
-        discDescription: selectBest('discDescription', claudePersona, openaiPersona),
-        communicationStyle: selectBest('communicationStyle', claudePersona, openaiPersona),
-        executiveSnapshot: {
-            roleAndFocus: selectBest('executiveSnapshot.roleAndFocus', claudePersona, openaiPersona),
-            coreStrengths: mergeArrays(claudePersona.executiveSnapshot?.coreStrengths, openaiPersona.executiveSnapshot?.coreStrengths, 3),
-            personaRead: selectBest('executiveSnapshot.personaRead', claudePersona, openaiPersona)
-        },
-        strategicPrep: {
-            connectionAngle: selectBest('strategicPrep.connectionAngle', claudePersona, openaiPersona),
-            commonGround: selectBest('strategicPrep.commonGround', claudePersona, openaiPersona),
-            smartQuestions: mergeArrays(claudePersona.strategicPrep?.smartQuestions, openaiPersona.strategicPrep?.smartQuestions, 7)
-        },
-        internalCoaching: {
-            howToWin: mergeArrays(claudePersona.internalCoaching?.howToWin, openaiPersona.internalCoaching?.howToWin, 7),
-            pitfallsAvoid: mergeArrays(claudePersona.internalCoaching?.pitfallsAvoid, openaiPersona.internalCoaching?.pitfallsAvoid, 7)
-        },
-        likelyPainPoints: mergeArrays(claudePersona.likelyPainPoints, openaiPersona.likelyPainPoints, 7),
-        motivators: mergeArrays(claudePersona.motivators, openaiPersona.motivators, 5),
-        talkingPoints: mergeArrays(claudePersona.talkingPoints, openaiPersona.talkingPoints, 7),
-        decisionMakingStyle: selectBest('decisionMakingStyle', claudePersona, openaiPersona),
-        expectedObjections: mergeArrays(claudePersona.expectedObjections, openaiPersona.expectedObjections, 5)
-    };
-
-    return synthesized;
-}
 
 /**
- * Cross-validate factual claims between models
- */
-function crossValidateClaims(claudePersona, openaiPersona, profileData) {
-    const claudeFacts = claudePersona.factualClaims || [];
-    const openaiFacts = openaiPersona.factualClaims || [];
-
-    // Simple validation - count verified claims
-    const validation = {
-        claudeValid: claudeFacts.length,
-        openaiValid: openaiFacts.length,
-        consensusRate: claudeFacts.length > 0 && openaiFacts.length > 0
-            ? Math.min(claudeFacts.length, openaiFacts.length) / Math.max(claudeFacts.length, openaiFacts.length) * 100
-            : 0
-    };
-
-    return validation;
-}
-
-/**
- * Select best value (longest/most detailed)
- */
-function selectBest(path, claudeData, openaiData) {
-    const getNestedValue = (obj, path) => {
-        return path.split('.').reduce((curr, prop) => curr?.[prop], obj);
-    };
-
-    const claudeValue = getNestedValue(claudeData, path) || '';
-    const openaiValue = getNestedValue(openaiData, path) || '';
-
-    // Prefer Claude if significantly longer (more detailed)
-    if (claudeValue.length > openaiValue.length * 1.3) {
-        return { value: claudeValue, source: 'claude', confidence: 'high' };
-    } else if (openaiValue.length > claudeValue.length * 1.3) {
-        return { value: openaiValue, source: 'openai', confidence: 'high' };
-    } else {
-        // Similar length, prefer Claude
-        return { value: claudeValue || openaiValue, source: 'claude', confidence: 'medium' };
-    }
-}
-
-/**
- * Merge and rank arrays from both models
- */
-function mergeArrays(claudeArray = [], openaiArray = [], topN = 7) {
-    const merged = [];
-
-    // Add Claude items with metadata
-    claudeArray.forEach(item => {
-        if (typeof item === 'string') {
-            merged.push({ text: item, source: 'claude', length: item.length });
-        } else if (item && typeof item === 'object') {
-            merged.push({ ...item, source: 'claude' });
-        }
-    });
-
-    // Add OpenAI items that are sufficiently different
-    openaiArray.forEach(item => {
-        const itemText = typeof item === 'string' ? item : JSON.stringify(item);
-        const isDuplicate = merged.some(m => {
-            const mergedText = typeof m.text === 'string' ? m.text : JSON.stringify(m);
-            return similarity(mergedText, itemText) > 0.7;
-        });
-
-        if (!isDuplicate) {
-            if (typeof item === 'string') {
-                merged.push({ text: item, source: 'openai', length: item.length });
-            } else if (item && typeof item === 'object') {
-                merged.push({ ...item, source: 'openai' });
-            }
-        }
-    });
-
-    // Sort by length (detail level)
-    merged.sort((a, b) => {
-        const aLength = a.length || (a.text ? a.text.length : 0);
-        const bLength = b.length || (b.text ? b.text.length : 0);
-        return bLength - aLength;
-    });
-
-    // Return top N items with source attribution
-    return merged.slice(0, topN).map(item => ({
-        text: item.text || item,
-        source: item.source,
-        confidence: item.source === 'claude' ? 'high' : 'medium'
-    }));
-}
-
-/**
- * Calculate string similarity
- */
-function similarity(str1, str2) {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-    if (longer.length === 0) return 1.0;
-
-    const editDistance = levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
-}
-
-/**
- * Calculate Levenshtein distance
- */
-function levenshteinDistance(str1, str2) {
-    const matrix = [];
-    for (let i = 0; i <= str2.length; i++) {
-        matrix[i] = [i];
-    }
-    for (let j = 0; j <= str1.length; j++) {
-        matrix[0][j] = j;
-    }
-    for (let i = 1; i <= str2.length; i++) {
-        for (let j = 1; j <= str1.length; j++) {
-            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
-                );
-            }
-        }
-    }
-    return matrix[str2.length][str1.length];
-}
-
-/**
- * Get basic fallback persona
+ * Get basic fallback persona when all enrichment methods fail.
+ * Uses available lead data to generate a minimal but clean persona.
  */
 function getBasicFallbackPersona(lead) {
+    const role = lead.jobTitle || 'Executive';
+    const company = lead.company || 'their company';
+    const name = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'this person';
+
+    // Detect seniority from title
+    const titleLower = role.toLowerCase();
+    const isCxO = /\b(ceo|cto|cfo|coo|cpo|ciso|vp|svp|evp|president|founder|co-founder)\b/.test(titleLower);
+    const isManager = /\b(director|head|manager|lead)\b/.test(titleLower);
+    const discType = isCxO ? 'D' : isManager ? 'C' : 'S';
+    const discDesc = isCxO
+        ? 'Results-oriented and decisive — wants the punchline fast, not the full story'
+        : isManager
+        ? 'Analytical and methodical — values process, proof, and clear ROI'
+        : 'Collaborative and relationship-driven — listens well and values trust';
+
     return {
         metadata: {
             approach: "fallback",
             models: [],
             timestamp: new Date().toISOString()
         },
-        discProfile: { value: "Unknown", source: "fallback", confidence: "low" },
-        discDescription: { value: "Profile analysis not available", source: "fallback", confidence: "low" },
-        communicationStyle: { value: "Professional and direct", source: "fallback", confidence: "low" },
+        discProfile: discType,
+        discDescription: discDesc,
+        communicationStyle: isCxO
+            ? 'Lead with business outcomes and bottom-line impact. Be brief and crisp.'
+            : 'Be professional and structured. Support claims with data and evidence.',
         executiveSnapshot: {
-            roleAndFocus: { value: lead.jobTitle || "Role information not available", source: "fallback", confidence: "low" },
-            coreStrengths: [{ text: "Industry experience", source: "fallback", confidence: "low" }],
-            personaRead: { value: "Strategic professional", source: "fallback", confidence: "low" }
+            roleAndFocus: `${name} is ${role} at ${company}, focused on ${isCxO ? 'strategic direction, growth, and operational outcomes' : 'team execution and delivering measurable results'}.`,
+            coreStrengths: [
+                `Experienced ${role}`,
+                isCxO ? 'Strategic decision-maker' : 'Operational discipline',
+                'Accountable for team outcomes'
+            ],
+            personaRead: `A ${isCxO ? 'senior executive who moves fast and expects brevity' : 'professional who values substance over hype'} — earn their attention quickly.`
         },
         strategicPrep: {
-            connectionAngle: { value: `Ask about ${lead.company}'s current priorities`, source: "fallback", confidence: "low" },
-            commonGround: { value: "Industry challenges", source: "fallback", confidence: "low" },
+            connectionAngle: `Open with a quick observation about challenges facing ${role}s at ${isCxO ? 'scaling companies' : 'their team level'} right now, then ask a pointed question.`,
+            commonGround: `Other ${role}s at companies similar to ${company} have faced the same IT and employee experience challenges you solve.`,
             smartQuestions: [
-                { text: `How is ${lead.company} handling current market changes?`, source: "fallback", confidence: "low" },
-                { text: "What are your top priorities this quarter?", source: "fallback", confidence: "low" },
-                { text: "What challenges are you facing in your role?", source: "fallback", confidence: "low" }
+                `What does your current IT service desk look like — are employees getting fast resolution or are tickets piling up?`,
+                `How much time do your IT staff spend on repetitive L1 requests versus strategic work?`,
+                `If you could change one thing about how your team handles service requests today, what would it be?`
             ]
         },
         internalCoaching: {
             howToWin: [
-                { text: "Be respectful of their time", source: "fallback", confidence: "low" },
-                { text: "Focus on business value", source: "fallback", confidence: "low" },
-                { text: "Ask insightful questions", source: "fallback", confidence: "low" }
+                `Open with a specific insight about ${company}'s size or industry, not a generic intro`,
+                `Ask one sharp question and listen — let them do 60% of the talking`,
+                `Tie Atomicwork to a business outcome they care about (speed, cost, employee experience)`
             ],
             pitfallsAvoid: [
-                { text: "Don't be too salesy", source: "fallback", confidence: "low" },
-                { text: "Avoid making assumptions", source: "fallback", confidence: "low" },
-                { text: "Don't rush to pitch", source: "fallback", confidence: "low" }
+                `Don't start with "We're an AI-powered ITSM..." — lead with their pain, not the product`,
+                `Don't oversell. ${isCxO ? 'A C-suite exec will tune out at the first whiff of hype' : 'A manager will want evidence, not enthusiasm'}`,
+                `Avoid asking for a full demo commitment on the first call — aim for curiosity and a next step`
             ]
         },
         likelyPainPoints: [
-            { text: "Time management", source: "fallback", confidence: "low" },
-            { text: "Process efficiency", source: "fallback", confidence: "low" },
-            { text: "Team alignment", source: "fallback", confidence: "low" }
+            `IT tickets taking too long to resolve, frustrating employees and slowing productivity`,
+            `IT staff buried in repetitive L1 requests with no time for strategic initiatives`,
+            `No visibility into employee service experience or resolution metrics`
         ],
         motivators: [
-            { text: "Results", source: "fallback", confidence: "low" },
-            { text: "Efficiency", source: "fallback", confidence: "low" },
-            { text: "Growth", source: "fallback", confidence: "low" }
+            `Making their team look good and removing blockers`,
+            `Reducing overhead while maintaining or improving service quality`,
+            `Being seen as forward-thinking — adopting AI in a way that actually works`
         ],
         talkingPoints: [
-            { text: `Experience in ${lead.company}`, source: "fallback", confidence: "low" },
-            { text: "Industry expertise", source: "fallback", confidence: "low" },
-            { text: "Professional development", source: "fallback", confidence: "low" }
+            `Atomicwork is an AI-native ITSM that lives inside Teams and Slack — no new tool for employees to learn`,
+            `Customers like Pepper Money and Zuora saw 80%+ ticket deflection within 90 days`,
+            `Founded by ex-Freshworks, Zoho, and Nutanix leaders — backed by Khosla Ventures ($40M raised)`
         ]
     };
 }
