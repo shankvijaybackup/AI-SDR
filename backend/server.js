@@ -709,7 +709,13 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
     // If Twilio posts back with no speech (silence/timeout), reprompt + listen again.
     if (!String(speechResult || "").trim()) {
-      twiml.say({ voice: "Polly.Joanna" }, "Are you still there?");
+      // Use ElevenLabs with the call's voice — not Polly.Joanna — for a consistent experience
+      try {
+        const stillThereUrl1 = await synthesizeTTS("Are you still there?", callSid, call.voicePersona, call.leadRegion, call.voiceId);
+        twiml.play(stillThereUrl1);
+      } catch (err) {
+        twiml.say({ voice: "Polly.Joanna" }, "Are you still there?");
+      }
 
       twiml.gather({
         input: "speech",
@@ -725,7 +731,7 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
 
       // Second reprompt + listen, then loop back here.
       try {
-        const stillThereUrl2 = await synthesizeTTS("Are you still there?", callSid);
+        const stillThereUrl2 = await synthesizeTTS("Are you still there?", callSid, call.voicePersona, call.leadRegion, call.voiceId);
         twiml.play(stillThereUrl2);
       } catch (err) {
         twiml.pause({ length: 0.2 });
@@ -931,6 +937,11 @@ app.post("/api/twilio/handle-speech", async (req, res) => {
         industry: call.industry || null,
         role: call.role || null
       });
+      // Guard: getAiSdrReply must return a non-empty string — never allow null through
+      if (!reply || typeof reply !== "string" || !reply.trim()) {
+        console.error("[AI] ❌ getAiSdrReply returned null/empty — using fallback");
+        reply = "Sorry, I missed that — could you say that again?";
+      }
       console.log("[AI] ✅ Reply received:", reply.substring(0, 100));
     } catch (aiError) {
       console.error("[AI] ❌ Error getting reply:", aiError.message);

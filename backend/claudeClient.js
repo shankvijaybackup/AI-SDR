@@ -137,15 +137,23 @@ Reply ONLY with what you'd say aloud. No labels, no quotes.`;
 // ─── Voice Reply: Groq primary → Claude fallback ─────────────────────────────
 
 export async function getAiSdrReply({ transcript = [], latestUserText = "", callSid, leadName = "there", voicePersona = "Arabella", script, leadContext = {} }) {
-  // Cache check
-  if (needsAI && getCachedResponse) {
-    if (!needsAI(latestUserText)) return null;
-    const cached = await getCachedResponse(latestUserText);
-    if (cached) return cached;
-  }
-
+  // Infer phase first — needed for cache lookup and prompt building
   const phase = inferPhase({ transcript, latestUserText });
   console.log(`[AI] Phase: ${phase} | "${latestUserText.substring(0, 50)}"`);
+
+  // Cache check — fast in-memory responses for common patterns (no AI needed)
+  // IMPORTANT: never return null on a cache miss — always fall through to AI.
+  // Returning null caused null.substring() to throw in server.js → Polly.Joanna fallback.
+  if (getCachedResponse) {
+    const cached = getCachedResponse(latestUserText, phase, {
+      voicePersona,
+      leadEmail: leadContext?.email,
+    });
+    if (cached) {
+      console.log(`[Cache] Hit: "${cached.substring(0, 60)}"`);
+      return cached;
+    }
+  }
 
   // RAG context
   let ragContext = null;
